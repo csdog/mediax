@@ -1,0 +1,8 @@
+appId: local.media-post.desktop
+productName: media-post
+files:
+  - out/**/*
+  - package.json
+mac:
+  target: dir
+  identity: null

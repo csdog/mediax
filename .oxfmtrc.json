@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": [
+    "src/renderer/components/ui/**",
+    "out/**",
+    "dist/**",
+    "node_modules/**",
+    ".scratch/**",
+    ".idea/**",
+    "pnpm-lock.yaml"
+  ]
+}
