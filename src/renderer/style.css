@@ -117,7 +117,7 @@
   }
 }
 
-/* Keep native macOS window controls; the application header provides dragging. */
+/* The toolbar belongs to the client area, with space for native macOS controls. */
 .window-drag {
   -webkit-app-region: drag;
   user-select: none;
@@ -130,41 +130,167 @@ a,
 [role="button"] {
   -webkit-app-region: no-drag;
 }
+.workspace {
+  padding-top: 44px;
+  min-height: 100svh;
+  background: #fff;
+}
+.app-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  background: #ebebea;
+  border-bottom: 1px solid #e4e4e3;
+  padding-left: 88px;
+  gap: 12px;
+}
+.toolbar-navigation {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 168px;
+}
+.toolbar-tab {
+  height: 32px;
+  min-width: 230px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  font-size: 12px;
+  border-left: 1px solid #dcdcdc;
+}
+.activity-rail {
+  position: sticky;
+  top: 44px;
+  width: 44px;
+  min-width: 44px;
+  height: calc(100svh - 44px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  background: #ececeb;
+  color: #777;
+}
+.activity-rail button[data-active="true"] {
+  color: #282828;
+  background: #dedfdf;
+}
+.workspace [data-slot="sidebar-container"] {
+  top: 44px;
+  height: calc(100svh - 44px);
+  left: 44px;
+}
+.workspace [data-slot="sidebar"][data-state="collapsed"] [data-slot="sidebar-container"] {
+  left: calc(44px - var(--sidebar-width));
+}
 .workspace [data-slot="sidebar-inner"] {
-  border-right: 1px solid var(--border);
+  background: #f8f8f8;
+  border-right: 1px solid #e7e7e7;
+}
+.workspace [data-slot="sidebar-menu-button"] {
+  font-size: 13px;
+  height: 30px;
+}
+.workspace [data-slot="sidebar-menu-button"][data-active="true"] {
+  background: #eaeaea;
+  font-weight: 400;
+}
+.workspace [data-slot="sidebar-menu-button"] svg {
+  display: none;
+}
+.document-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  border-bottom: 1px solid #efefef;
+  padding: 0 22px;
+}
+.document-content {
+  width: 100%;
+  padding: 24px;
+  flex: 1;
+}
+.document-content > [role="status"] {
+  margin-bottom: 20px;
+}
+.compose-content {
+  padding: 0;
+}
+.compose-content > [role="status"] {
+  margin: 16px 24px;
 }
 .workspace [data-slot="card"] {
+  border: 0;
+  border-radius: 0;
   box-shadow: none;
-  gap: 1.25rem;
+  background: transparent;
+  gap: 18px;
+  padding-top: 20px;
+  padding-bottom: 20px;
 }
 .workspace [data-slot="card-title"] {
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 500;
 }
 .workspace [data-slot="card-description"] {
-  font-size: 0.8125rem;
+  font-size: 12px;
+  line-height: 1.6;
 }
-.workspace [data-slot="sidebar-menu-button"][data-active="true"] {
+.account-summary {
+  border-bottom: 1px solid #eee;
+  margin-bottom: 8px;
+}
+.account-summary [data-slot="card"] {
+  padding: 0 0 16px;
+}
+.account-summary [data-slot="card-header"] {
+  padding: 0;
+  gap: 6px;
+}
+.document-content:not(.compose-content) > [data-slot="card"] {
+  border-bottom: 1px solid #eee;
+}
+.editor-workspace {
+  min-height: calc(100svh - 88px);
+}
+.editor-workspace > [data-slot="card"] {
+  min-width: 0;
+}
+.editor-workspace > div {
+  min-height: calc(100svh - 88px);
+  border-left: 1px solid #e8e8e8;
+}
+.editor-workspace > div > [data-slot="card"] {
+  border-bottom: 1px solid #eee;
+}
+.workspace [data-slot="textarea"] {
+  min-height: 310px;
+  border-radius: 14px;
+  box-shadow: 0 1px 5px #00000005;
+  font-size: 13px;
+}
+.workspace [data-slot="empty-title"] {
   font-weight: 500;
+  font-size: 13px;
 }
-.workspace [data-slot="empty"] {
-  border-radius: var(--radius);
+.workspace [data-slot="empty-description"] {
+  font-size: 12px;
 }
-
-.workspace .header-sidebar-trigger {
-  display: none;
+.workspace [data-slot="button"] {
+  font-size: 12px;
 }
-.workspace:has([data-slot="sidebar"][data-state="collapsed"]) header.window-drag {
-  padding-left: 6rem;
-}
-.workspace:has([data-slot="sidebar"][data-state="collapsed"]) .header-sidebar-trigger {
-  display: inline-flex;
-}
-@media (max-width: 767px) {
-  .workspace header.window-drag {
-    padding-left: 6rem;
-  }
-  .workspace .header-sidebar-trigger {
-    display: inline-flex;
+@media (max-width: 1023px) {
+  .editor-workspace > div {
+    min-height: auto;
+    border-left: 0;
+    border-top: 1px solid #eee;
   }
 }

@@ -14,6 +14,10 @@ import {
   CheckCircle2,
   X,
   CircleHelp,
+  ChevronDown,
+  FolderOpen,
+  ArrowLeft,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -116,20 +120,67 @@ export function App() {
     <TooltipProvider>
       <SidebarProvider
         className="workspace"
-        style={{ "--sidebar-width": "15rem" } as React.CSSProperties}
+        style={{ "--sidebar-width": "14rem" } as React.CSSProperties}
       >
+        <div className="app-toolbar window-drag">
+          <div className="toolbar-navigation window-no-drag">
+            <Button variant="ghost" size="icon-xs" aria-label="后退" disabled>
+              <ArrowLeft />
+            </Button>
+            <Button variant="ghost" size="icon-xs" aria-label="前进" disabled>
+              <ArrowRight />
+            </Button>
+            <SidebarTrigger aria-label="切换侧栏" />
+          </div>
+          <div className="toolbar-tab">
+            <FolderOpen className="size-3.5" />
+            <span>{pageTitle}</span>
+          </div>
+          <div className="ml-auto px-4 text-xs text-muted-foreground">media-post</div>
+        </div>
+        <aside className="activity-rail" aria-label="快捷导航">
+          <div className="flex flex-col gap-2">
+            {nav.map((n) => (
+              <Tooltip key={n.id}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`打开${n.title}`}
+                    data-active={page === n.id}
+                    onClick={() => {
+                      setPage(n.id);
+                      void run(reload);
+                    }}
+                  >
+                    <n.icon className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">{n.title}</TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+          <Avatar className="mt-auto size-6">
+            <AvatarFallback className="text-[9px]">MP</AvatarFallback>
+          </Avatar>
+        </aside>
         <Sidebar className="border-0" variant="sidebar">
-          <SidebarHeader className="p-0">
-            <div className="window-drag flex h-12 items-center justify-end px-3">
-              <SidebarTrigger
-                aria-label="切换侧栏"
-                className="window-no-drag text-muted-foreground"
-              />
+          <SidebarHeader className="px-3 py-3">
+            <div className="flex h-8 items-center gap-1.5 px-2">
+              <span className="text-sm font-semibold">media-post</span>
+              <ChevronDown className="size-3 text-muted-foreground" />
             </div>
-            <div className="flex items-center gap-2.5 px-5 pb-6 pt-4">
-              <Send className="size-4 text-foreground" />
-              <p className="text-sm font-medium tracking-tight">media-post</p>
-            </div>
+            <Button
+              variant="ghost"
+              className="justify-start px-2 text-[13px] font-normal"
+              onClick={() => {
+                setPage("compose");
+                void run(reload);
+              }}
+            >
+              <Plus className="size-3.5" />
+              新建内容
+            </Button>
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup className="px-3">
@@ -167,28 +218,16 @@ export function App() {
           </SidebarFooter>
         </Sidebar>
         <SidebarInset className="min-w-0 bg-background">
-          <header className="window-drag flex h-12 shrink-0 items-center gap-3 px-6">
-            <SidebarTrigger
-              aria-label="展开侧栏"
-              className="header-sidebar-trigger window-no-drag"
-            />
-            <span className="text-sm font-medium">{pageTitle}</span>
-            <span className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-emerald-600" />
-              本地
-            </span>
+          <header className="document-toolbar">
+            <span className="text-xs text-muted-foreground">工作空间</span>
+            <span className="text-xs text-muted-foreground">/</span>
+            <span className="text-xs">{pageTitle}</span>
+            <Badge variant="outline" className="ml-auto font-normal text-[10px]">
+              Facebook · 本地
+            </Badge>
           </header>
-          <main className="mx-auto w-full max-w-6xl space-y-5 px-8 pb-10 pt-10 lg:px-12">
-            <div>
-              <h1 className="text-[22px] font-medium tracking-tight">{pageTitle}</h1>
-              <p className="mt-2 text-[13px] text-muted-foreground">
-                {page === "accounts"
-                  ? "连接 Facebook 账号，独立管理每个账号的登录状态。"
-                  : page === "compose"
-                    ? "准备正文与图片，预览内容并选择发布目标。"
-                    : "查看每个目标的发布结果与执行记录。"}
-              </p>
-            </div>
+          <main className={`document-content ${page === "compose" ? "compose-content" : ""}`}>
+            <h1 className="sr-only">{pageTitle}</h1>
             {notice && (
               <Alert role="status">
                 <CircleHelp />
@@ -197,7 +236,7 @@ export function App() {
             )}
             {page === "accounts" && (
               <>
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="account-summary flex flex-wrap gap-6">
                   {[
                     ["已添加账号", accounts.length],
                     ["已检测登录", accounts.filter((a) => a.login === "logged_in").length],
@@ -206,7 +245,7 @@ export function App() {
                     <Card key={label}>
                       <CardHeader>
                         <CardDescription>{label}</CardDescription>
-                        <CardTitle className="text-3xl tabular-nums">{value}</CardTitle>
+                        <CardTitle className="text-base tabular-nums">{value}</CardTitle>
                       </CardHeader>
                     </Card>
                   ))}
@@ -308,7 +347,7 @@ export function App() {
               </>
             )}
             {page === "compose" && (
-              <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="editor-workspace grid items-start lg:grid-cols-[minmax(0,1fr)_320px]">
                 <Card>
                   <CardHeader>
                     <CardTitle>编辑内容</CardTitle>

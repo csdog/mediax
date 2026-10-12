@@ -5,3 +5,5 @@ allowBuilds:
   better-sqlite3: true
   esbuild: true
   electron-winstaller: false
+minimumReleaseAgeExclude:
+  - "@radix-ui/react-slot@1.5.0"

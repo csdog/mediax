@@ -64,6 +64,8 @@ test(
           } else
             assert.equal(await page.getByLabel("发布正文").inputValue(), "A durable local draft");
           assert(await page.getByRole("button", { name: "发布", exact: true }).isDisabled());
+          await page.mouse.move(800, 90);
+          await page.getByRole("tooltip").waitFor({ state: "hidden" });
           await page.screenshot({
             path: join(tmpdir(), "media-post-compose.png"),
           });

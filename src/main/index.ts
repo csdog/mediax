@@ -8,6 +8,8 @@ import { AccountService } from "./accounts/AccountService";
 import { registerIpc } from "./ipc";
 import { CdpBridge } from "./browser/CdpBridge";
 
+app.setName("media-post");
+
 // Configure before ready; port is dynamically reserved, never a public bind.
 async function unusedPort(): Promise<number> {
   const server = createServer();
