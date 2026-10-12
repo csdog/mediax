@@ -23,7 +23,7 @@ test(
         const child = spawn(
           binary,
           process.env.MEDIA_POST_PACKAGED ? [] : [resolve("out/main/index.js")],
-          { env, stdio: ["ignore", "pipe", "pipe"] },
+          { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] },
         );
         let output = "",
           browser;

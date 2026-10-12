@@ -1,6 +1,6 @@
 # media-post
 
-macOS 本地 Facebook 内容工具。Electron + TypeScript + React + Tailwind CSS + shadcn/ui 官方组件；SQLite（better-sqlite3）保存业务数据。
+macOS 本地 Facebook 内容工具。Electron + TypeScript + React + TanStack Router / Query + Tailwind CSS + shadcn/ui 官方组件；Drizzle ORM + better-sqlite3 保存 SQLite 业务数据，Drizzle Kit 生成迁移。
 
 ## 当前状态
 
@@ -91,3 +91,45 @@ Git 与工具配置均位于 `media-post-desktop/`；外层 `media-post/` 仅作
 ## UI 组件基础
 
 shadcn 使用官方 `base-nova`（Base UI）组件，配置位于 `components.json`；应用继续使用已有中性灰白语义 Token 与 Lucide 图标。组件组合采用 Base UI 的 `render` API。弹窗、Popover、Tooltip、HoverCard、Select、Checkbox、Drawer 等交互组件均使用 Base UI；表单组合使用 `useRender`，Toast 使用 Base UI toast manager。已移除直接 Radix 与 Vaul 依赖。
+
+## 渲染进程结构与依赖原则
+
+`src/renderer/src.tsx` 只负责挂载应用与加载样式；页面通过 TanStack Router 的代码路由注册，使用内存 history，兼容开发服务器和打包后的 `file://`。账号浏览器标签页继续由 Electron 管理，会话与标签恢复仍使用 SQLite。
+
+```text
+src/renderer/
+  src.tsx                     # 应用入口
+  app/                        # Router、QueryClient、查询定义、工作区 Context
+  pages/                      # 账号、内容发布、发布记录、设置、新标签页、账号浏览器
+  components/workspace/       # 工具栏、导航、外壳与页面公共容器
+  components/dialogs/         # 工作区公共弹窗
+  components/ui/              # 官方 shadcn / Base UI 组件
+  hooks/                      # 桌面协调、原生视图布局、预览和快捷键设置
+```
+
+TanStack Query 管理账号、发布记录、快捷键设置与标签预览；发布记录每 1.5 秒刷新，由 Query 管理请求生命周期，替代手写定时器。写操作使用 Mutation；发布等副作用关闭自动重试。预览截图仅保存在内存，关闭预览后立即清理对应查询缓存。草稿编辑状态由工作区持有，页面切换和打开设置不会清空正文、图片或目标选择。
+
+通用能力优先使用已有依赖和成熟、维护活跃的 npm 包：路由与数据状态用 TanStack，界面优先组合 shadcn / Base UI，表单与校验可复用已安装的 React Hook Form / Zod，日期处理可复用 date-fns。新增依赖前检查现有依赖是否已满足需要；业务规则、Electron 原生视图协调与 Facebook 平台适配保留在项目代码中。避免为简单局部逻辑引入不必要依赖，也避免重复实现成熟库已有的能力。
+
+## SQLite 与数据库迁移
+
+表定义集中在 `src/main/storage/schema.ts`；`Database.ts` 使用 Drizzle 的类型安全查询、JSON 字段映射与事务，底层继续使用 better-sqlite3，并保留外键约束和 WAL。草稿仅保存图片路径及名称，预览仍在加载时生成。
+
+```sh
+# 修改 schema.ts 后生成 SQL 迁移及快照
+mise exec -- pnpm run db:generate --name=describe_change
+# 检查迁移历史是否存在冲突
+mise exec -- pnpm run db:check
+```
+
+`drizzle.config.ts` 配置 SQLite、schema 路径与 `drizzle/` 输出目录，不绑定用户数据库。提交时同时包含生成的 SQL、`meta/_journal.json` 和 schema 快照。`db:check` 只检查迁移历史一致性，实际执行由自动化测试验证。
+
+应用在打开数据库时调用官方 better-sqlite3 migrator，按 `__drizzle_migrations` 执行尚未应用的迁移；迁移失败会回滚并停止打开数据库。迁移文件随桌面包进入 `app.asar/drizzle`，主进程通过自身模块位置定位，不依赖启动时的工作目录。Drizzle Kit 只作为开发依赖，应用运行时不调用 CLI。
+
+初始迁移 `0000_legacy_baseline.sql` 由 Kit 生成，针对已有 v1/v2 数据库将建表语句调整为 `IF NOT EXISTS`，保留原表和记录，并补齐 v1 缺少的 settings 表。此基线只完成既有数据库接管，不重建表；旧库主键原有的可空属性保持不变，新库按 Drizzle 定义建立非空主键。`user_version=3` 标记接管完成，阻止旧应用误读；后续结构版本以 Drizzle 迁移历史为准。启动时拒绝高于本应用的旧版本号或 Drizzle 迁移记录。已有迁移发布后不可修改；后续改表应生成新的迁移。不要对真实用户数据库运行 `drizzle-kit push`。
+
+迁移测试使用独立的原版 v1 SQL fixture，覆盖 v1/v2 账号、图片草稿、任务、目标、尝试记录与设置保留，重复启动不重复迁移、失败回滚、防降级以及中断任务恢复。
+
+## 窗口外框与原生材质
+
+已依据本机 Codex 安装包静态样式与窗口代码修正分层：macOS 使用 menu 材质，失焦切换实色；外框、圆角页面底板、侧栏与白色内容区分别绘制。当前原生材质与界面统一为浅色。其他平台使用中性实色回退，尚未实机验收。详见 [窗口实现与静态依据](docs/window-chrome.md)。

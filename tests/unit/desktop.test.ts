@@ -1,8 +1,4 @@
 import { it, expect } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import Sqlite from "better-sqlite3";
 import { Database } from "../../src/main/storage/Database";
 import { TaskNotifications, type TaskNotice } from "../../src/main/desktop/TaskNotifications";
 import { restoreWindowState } from "../../src/main/desktop/windowState";
@@ -15,37 +11,6 @@ it("restores a window on visible displays and handles removed monitors and corru
   const removed = restoreWindowState({ x: -3000, y: 100, width: 3000, height: 2000 }, areas);
   expect(removed).toEqual({ x: 0, y: 25, width: 1440, height: 875, maximized: false });
   expect(restoreWindowState({ x: NaN }, areas).width).toBe(1280);
-});
-
-it("migrates a v1 database without losing drafts or accounts and persists window settings", () => {
-  const dir = mkdtempSync(join(tmpdir(), "media-post-settings-"));
-  const file = join(dir, "app.sqlite");
-  try {
-    const original = new Database(file);
-    original.addAccount("Existing account");
-    original.saveDraft("Existing draft", []);
-    original.close();
-    const old = new Sqlite(file);
-    old.exec("DROP TABLE settings; PRAGMA user_version=1");
-    old.close();
-    const migrated = new Database(file);
-    expect(migrated.schemaVersion()).toBe(2);
-    expect(migrated.accounts()[0].name).toBe("Existing account");
-    expect(migrated.draft().body).toBe("Existing draft");
-    migrated.setSetting("mainWindow", {
-      x: 100,
-      y: 100,
-      width: 1100,
-      height: 740,
-      maximized: false,
-    });
-    migrated.close();
-    const restarted = new Database(file);
-    expect(restarted.setting("mainWindow")).toMatchObject({ width: 1100, height: 740 });
-    restarted.close();
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
 });
 
 function setup() {

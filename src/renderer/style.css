@@ -12,7 +12,10 @@
   --line-height-caption: 18px;
   --line-height-body: 22px;
   --line-height-heading: 26px;
-  --chrome: rgb(236 236 236 / 90%);
+  --surface-under: #f9f9f9;
+  --chrome: rgb(237 237 237 / 28%);
+  --page-surface: rgb(249 249 249 / 85%);
+  --surface-stroke: rgb(0 0 0 / 5%);
   --hover: #f2f2f2;
   --selected: #eeeeee;
   --hint: #8f8f8f;
@@ -26,9 +29,10 @@
   --radius-composer: 22px;
   --toolbar-height: 44px;
   --rail-width: 44px;
+  --frame-inset: 8px;
   --motion-duration: 150ms;
   --radius: 0.625rem;
-  --background: #fcfcfc;
+  --background: #ffffff;
   --foreground: #0d0d0d;
   --card: #ffffff;
   --card-foreground: var(--foreground);
@@ -51,7 +55,7 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: #fcfcfc;
+  --sidebar: rgb(255 255 255 / 65%);
   --sidebar-foreground: #0d0d0d;
   --sidebar-primary: #0d0d0d;
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -143,6 +147,7 @@
 
 /* Shared desktop chrome and controls. */
 .window-drag {
+  app-region: drag;
   -webkit-app-region: drag;
   user-select: none;
 }
@@ -152,9 +157,17 @@ input,
 textarea,
 a,
 [role="button"] {
+  app-region: no-drag;
   -webkit-app-region: no-drag;
 }
-html,
+html {
+  color-scheme: light;
+  background: var(--surface-under);
+}
+/* Only the macOS host supplies a native material; other hosts retain a neutral solid base. */
+html[data-desktop-platform="darwin"] {
+  background: transparent;
+}
 body,
 #root {
   background: transparent;
@@ -164,11 +177,27 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 .workspace {
+  position: relative;
+  isolation: isolate;
   height: 100svh;
   min-height: 0;
   overflow: hidden;
   padding-top: 44px;
   background: var(--chrome);
+}
+/* One rounded surface joins the sidebar and the content, inset from the window shell. */
+.workspace::before {
+  content: "";
+  position: absolute;
+  inset: var(--toolbar-height) var(--frame-inset) var(--frame-inset) var(--rail-width);
+  z-index: 0;
+  pointer-events: none;
+  border-radius: var(--radius-pane);
+  background: var(--page-surface);
+  box-shadow: 0 0 0 1px var(--surface-stroke);
+}
+.workspace.settings-active::before {
+  display: none;
 }
 .workspace svg {
   stroke-width: 1.65;
@@ -208,6 +237,7 @@ body {
 }
 .activity-rail {
   position: relative;
+  z-index: 1;
   width: 44px;
   min-width: 44px;
   height: 100%;
@@ -231,7 +261,7 @@ body {
 }
 .workspace [data-slot="sidebar-container"] {
   top: 44px;
-  height: calc(100svh - 44px);
+  height: calc(100svh - 44px - var(--frame-inset));
   left: 44px;
 }
 .workspace [data-slot="sidebar"][data-state="collapsed"] [data-slot="sidebar-container"] {
@@ -244,10 +274,15 @@ body {
   overflow: hidden;
 }
 .workspace [data-slot="sidebar-inset"] {
-  height: 100%;
+  z-index: 1;
+  height: calc(100% - var(--frame-inset));
+  margin-right: var(--frame-inset);
   overflow: hidden;
-  border-left: 1px solid var(--border);
-  border-radius: var(--radius-pane) 0 0 var(--radius-pane);
+  border-left: 1px solid var(--surface-stroke);
+  border-radius: 0 var(--radius-pane) var(--radius-pane) 0;
+}
+.workspace:has([data-slot="sidebar"][data-state="collapsed"]) [data-slot="sidebar-inset"] {
+  border-radius: var(--radius-pane);
 }
 .workspace [data-slot="sidebar-header"] {
   gap: 3px;
@@ -878,7 +913,8 @@ body {
   gap: 4px;
   flex: 1;
   min-width: 0;
-  padding-right: 8px;
+  /* Keep a draggable blank area even when the tab list overflows. */
+  padding-right: 64px;
 }
 .tab-strip .browser-tabs {
   flex: 0 1 auto;
@@ -1238,7 +1274,7 @@ body {
 
 .settings-full-page {
   position: fixed;
-  inset: 44px 8px 8px;
+  inset: var(--toolbar-height) var(--frame-inset) var(--frame-inset);
   z-index: 20;
   min-height: 0;
   overflow: hidden;
@@ -1278,7 +1314,7 @@ body {
 .settings-navigation {
   padding: 20px 12px;
   border-right: 1px solid var(--border);
-  background: var(--sidebar);
+  background: var(--surface-under);
   overflow-y: auto;
 }
 .settings-navigation .settings-title {

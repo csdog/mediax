@@ -2,6 +2,8 @@ appId: local.media-post.desktop
 productName: media-post
 files:
   - out/**/*
+  - drizzle/**/*.sql
+  - drizzle/meta/_journal.json
   - package.json
 mac:
   icon: build/icon.icns

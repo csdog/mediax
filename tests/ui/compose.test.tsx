@@ -49,6 +49,7 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       disconnect() {}
     },
   );
+  vi.stubGlobal("scrollTo", vi.fn());
   render(<App />);
   await waitFor(() => expect(window.desktop.loadDraft).toHaveBeenCalled());
   await waitFor(() =>
@@ -210,6 +211,19 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     ),
   );
   fireEvent.click(screen.getByRole("button", { name: "内容发布", exact: true }));
+  expect(((await screen.findByLabelText("发布正文")) as HTMLTextAreaElement).value).toBe(
+    "Latest draft from menu",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "打开头像菜单" }));
+  fireEvent.click(screen.getByRole("button", { name: "设置", exact: true }));
+  await screen.findByRole("main", { name: "设置页面" });
+  await waitFor(() =>
+    expect((screen.getByLabelText("全局呼出快捷键") as HTMLInputElement).disabled).toBe(false),
+  );
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(((await screen.findByLabelText("发布正文")) as HTMLTextAreaElement).value).toBe(
+    "Latest draft from menu",
+  );
   fireEvent.change(screen.getByLabelText("发布正文"), { target: { value: "" } });
   await waitFor(() =>
     expect(

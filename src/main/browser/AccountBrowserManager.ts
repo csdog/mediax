@@ -106,6 +106,8 @@ export class AccountBrowserManager {
         sandbox: true,
       },
     });
+    // Native views draw above the renderer, so CSS overflow cannot clip their corners.
+    if (this.host) view.setBorderRadius(12);
     view.setBounds({ x: 0, y: 44, width: 1000, height: 700 });
     view.setVisible(!this.host);
     win.contentView.addChildView(view);

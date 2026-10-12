@@ -35,3 +35,6 @@ const api: DesktopApi = {
   resume: (id) => call("resume", id),
 };
 contextBridge.exposeInMainWorld("desktop", api);
+
+// Read-only platform metadata lets CSS provide an opaque fallback outside macOS.
+contextBridge.exposeInMainWorld("desktopPlatform", process.platform);

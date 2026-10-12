@@ -10,6 +10,7 @@ import { CdpBridge } from "./browser/CdpBridge";
 
 import { DesktopShell } from "./desktop/DesktopShell";
 import { restoreWindowState } from "./desktop/windowState";
+import { installWindowBackdrop } from "./desktop/windowBackdrop";
 
 app.setName("media-post");
 
@@ -50,7 +51,10 @@ async function start(): Promise<void> {
   }
   if (!ready) throw new Error("CDP endpoint unavailable");
   if (process.env.MEDIA_POST_FIXTURE) {
-    const fixtureDb = new Database(join(app.getPath("userData"), "fixture.sqlite"));
+    const fixtureDb = new Database(
+      join(app.getPath("userData"), "fixture.sqlite"),
+      join(__dirname, "../../drizzle"),
+    );
     if (process.env.MEDIA_POST_PHASE === "restart" && fixtureDb.accounts().length !== 1)
       throw new Error("SQLite persistence failed");
     if (!fixtureDb.accounts().length) fixtureDb.addAccount("Persistent fixture account");
@@ -117,7 +121,10 @@ async function start(): Promise<void> {
     app.quit();
     return;
   }
-  const db = new Database(join(app.getPath("userData"), "media-post.sqlite"));
+  const db = new Database(
+    join(app.getPath("userData"), "media-post.sqlite"),
+    join(__dirname, "../../drizzle"),
+  );
   db.recover();
   const { maximized, ...bounds } = restoreWindowState(
     db.setting("mainWindow"),
@@ -133,10 +140,11 @@ async function start(): Promise<void> {
     title: "",
     titleBarStyle: "hidden",
     trafficLightPosition: { x: 16, y: 17 },
-    backgroundColor: process.platform === "darwin" ? "#00000000" : "#f2f2f2",
+    backgroundColor: "#f9f9f9",
     ...(process.platform === "darwin"
       ? {
-          vibrancy: "under-window" as const,
+          vibrancy: "menu" as const,
+          // Focus/blur switches between a native material and an opaque backdrop.
           visualEffectState: "followWindow" as const,
         }
       : {}),
@@ -147,6 +155,7 @@ async function start(): Promise<void> {
       preload: join(__dirname, "../preload/index.js"),
     },
   });
+  installWindowBackdrop(win);
   const shell = new DesktopShell(win, db);
   registerIpc(
     db,

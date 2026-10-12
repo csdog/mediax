@@ -29,6 +29,71 @@ test(
         (await page.evaluate(() => window.desktop.shortcutSettings())).accelerator,
         "Command+M",
       );
+      // Native focus belongs to BrowserWindow, not the DOM (account WebContentsViews can own focus).
+      const focusedBackdrop = await application.evaluate(async ({ BrowserWindow, nativeTheme }) => {
+        const window = BrowserWindow.getAllWindows()[0];
+        window.show();
+        window.focus();
+        for (let attempt = 0; attempt < 100 && !window.isFocused(); attempt++)
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        return {
+          focused: window.isFocused(),
+          color: window.getBackgroundColor().toLowerCase(),
+          reduced: nativeTheme.prefersReducedTransparency,
+          theme: nativeTheme.themeSource,
+        };
+      });
+      assert.equal(focusedBackdrop.theme, "light");
+      if (process.platform === "darwin") {
+        assert.equal(focusedBackdrop.focused, true);
+        // Electron getBackgroundColor reports RGB and omits the alpha channel.
+        assert.equal(focusedBackdrop.color, focusedBackdrop.reduced ? "#f9f9f9" : "#000000");
+        const inactiveBackdrop = await application.evaluate(async ({ BrowserWindow }) => {
+          const window = BrowserWindow.getAllWindows()[0];
+          window.blur();
+          for (
+            let attempt = 0;
+            attempt < 100 &&
+            (window.isFocused() || window.getBackgroundColor().toLowerCase() !== "#f9f9f9");
+            attempt++
+          )
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          return { focused: window.isFocused(), color: window.getBackgroundColor().toLowerCase() };
+        });
+        assert.deepEqual(inactiveBackdrop, { focused: false, color: "#f9f9f9" });
+        await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].focus());
+      }
+      const frame = await page.evaluate(() => {
+        const root = document.documentElement;
+        const main = document.querySelector('[data-slot="sidebar-inset"]');
+        const bounds = main.getBoundingClientRect();
+        const before = getComputedStyle(document.querySelector(".workspace"), "::before");
+        const mainStyle = getComputedStyle(main);
+        const actualPlatform = root.dataset.desktopPlatform;
+        root.dataset.desktopPlatform = "win32";
+        const fallback = getComputedStyle(root).backgroundColor;
+        root.dataset.desktopPlatform = actualPlatform;
+        return {
+          platform: actualPlatform,
+          fallback,
+          right: innerWidth - bounds.right,
+          bottom: innerHeight - bounds.bottom,
+          paneBackground: mainStyle.backgroundColor,
+          radius: mainStyle.borderTopRightRadius,
+          surface: before.backgroundColor,
+          toolbarDrag: getComputedStyle(document.querySelector(".app-toolbar")).webkitAppRegion,
+          tabStripDrag: getComputedStyle(document.querySelector(".tab-strip")).webkitAppRegion,
+        };
+      });
+      assert.equal(frame.platform, process.platform);
+      assert.equal(frame.fallback, "rgb(249, 249, 249)");
+      assert.equal(frame.right, 8);
+      assert.equal(frame.bottom, 8);
+      assert.equal(frame.paneBackground, "rgb(255, 255, 255)");
+      assert.equal(frame.radius, "12px");
+      assert.equal(frame.surface, "rgba(249, 249, 249, 0.85)");
+      assert.equal(frame.toolbarDrag, "drag");
+      assert.notEqual(frame.tabStripDrag, "no-drag");
       const account = await page.evaluate(() => window.desktop.addAccount("Browser tab fixture"));
       await application.evaluate(async ({ session }, id) => {
         const s = session.fromPartition(`persist:facebook-${id}`);

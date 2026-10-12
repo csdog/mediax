@@ -1,0 +1,280 @@
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import type {
+  AccountInfo,
+  ImageAsset,
+  Task,
+  TaskTarget,
+  DesktopPage,
+  Target,
+  TabAction,
+} from "../../shared/models";
+import { useTabPreview } from "./useTabPreview";
+import { useAccountBrowserLayout } from "./useAccountBrowserLayout";
+import { navigation } from "@/app/navigation";
+import { accountsOptions, historyOptions } from "@/app/queries";
+const emptyAccounts: AccountInfo[] = [];
+const emptyRecords: { tasks: Task[]; targets: TaskTarget[] } = { tasks: [], targets: [] };
+export function useWorkspaceController() {
+  const queryClient = useQueryClient();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const navigate = useNavigate();
+  const [lastPage, setLastPage] = useState<DesktopPage>("accounts");
+  const settingsOpen = pathname === "/settings";
+  const routePage = navigation.find((item) => pathname === `/${item.id}`)?.id;
+  const page = routePage ?? lastPage;
+  const setPage = (next: DesktopPage) => {
+    setLastPage(next);
+    void navigate({ to: `/${next}` });
+  };
+  const setSettingsOpen = (open: boolean) => {
+    if (open) {
+      setLastPage(page);
+      void navigate({ to: "/settings" });
+    } else void navigate({ to: `/${page}` });
+  };
+  const [initialized, setInitialized] = useState(false);
+  const accountsQuery = useQuery(accountsOptions);
+  const historyQuery = useQuery({
+    ...historyOptions,
+    enabled: initialized,
+    refetchInterval: 1500,
+    refetchIntervalInBackground: true,
+  });
+  const accounts = accountsQuery.data ?? emptyAccounts;
+  const records = historyQuery.data ?? emptyRecords;
+  const setAccounts = (next: React.SetStateAction<AccountInfo[]>) =>
+    queryClient.setQueryData(accountsOptions.queryKey, (old: AccountInfo[] | undefined) =>
+      typeof next === "function" ? next(old ?? []) : next,
+    );
+  const [name, setName] = useState("");
+  const [body, setBody] = useState("");
+  const [images, setImages] = useState<ImageAsset[]>([]);
+  const [notice, setNotice] = useState("");
+  const operation = useMutation({ mutationFn: (fn: () => Promise<unknown>) => fn(), retry: false });
+  const busy = operation.isPending;
+  useEffect(() => {
+    const error = accountsQuery.error ?? historyQuery.error;
+    if (error) setNotice(error.message);
+  }, [accountsQuery.error, historyQuery.error]);
+  const [verifyDialogTarget, setVerifyDialogTarget] = useState<TaskTarget | null>(null);
+  const [verifyUrl, setVerifyUrl] = useState("");
+  const [selectedTargets, setSelectedTargets] = useState<Target[]>([]);
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [platform, setPlatform] = useState<"facebook" | null>(null);
+  const [browserTabs, setBrowserTabs] = useState<{ id: string; name: string; kind?: "new" }[]>([]);
+  const closedTabs = useRef<{ id: string; name: string; kind?: "new" }[]>([]);
+  const [activeBrowser, setActiveBrowser] = useState<string | null>(null);
+  const isNewTab = browserTabs.some((tab) => tab.id === activeBrowser && tab.kind === "new");
+  const activeAccountId = isNewTab ? null : activeBrowser;
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const tabPreview = useTabPreview({ hoveredTab, activeAccountId, browserTabs });
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const openSettings = () => setSettingsOpen(true);
+  const [focusedTask, setFocusedTask] = useState<string | undefined>();
+  const openBrowser = async (account: { id: string; name: string }) => {
+    setHoveredTab(null);
+    setBrowserTabs((tabs) => {
+      const remaining = isNewTab ? tabs.filter((tab) => tab.id !== activeBrowser) : tabs;
+      return remaining.some((tab) => tab.id === account.id) ? remaining : [...remaining, account];
+    });
+    setActiveBrowser(account.id);
+    await window.desktop.openAccount(account.id);
+    await queryClient.fetchQuery({ ...accountsOptions, staleTime: 0 });
+  };
+  const { browserPane, overlayCover } = useAccountBrowserLayout({
+    activeBrowser,
+    settingsOpen,
+    accountDialogOpen,
+    avatarMenuOpen,
+    hoveredTab,
+    tabPreview,
+    setNotice,
+  });
+  const reload = async () => {
+    await Promise.all([
+      queryClient.fetchQuery({ ...accountsOptions, staleTime: 0 }),
+      queryClient.fetchQuery(historyOptions),
+    ]);
+  };
+  const run = async (fn: () => Promise<unknown>) => {
+    setNotice("");
+    try {
+      await operation.mutateAsync(fn);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    }
+  };
+  useEffect(() => {
+    void run(async () => {
+      const loadedAccounts = await queryClient.fetchQuery(accountsOptions);
+      setAccounts(loadedAccounts);
+      await queryClient.fetchQuery(historyOptions);
+      const saved = await window.desktop.workspaceSession?.();
+      if (saved && Array.isArray(saved.tabs)) {
+        const restored = saved.tabs.flatMap((tab) => {
+          if (tab.kind === "new") return [{ ...tab, name: "新标签页" }];
+          const account = loadedAccounts.find((a) => a.id === tab.id);
+          return account ? [{ id: account.id, name: account.name }] : [];
+        });
+        setBrowserTabs(restored);
+        setPage(saved.page);
+        for (const tab of restored) {
+          if (tab.kind === "new") continue;
+          try {
+            await window.desktop.openAccount(tab.id);
+          } catch (error) {
+            setNotice(`恢复 ${tab.name} 失败：${String(error)}`);
+          }
+        }
+        setActiveBrowser(restored.some((tab) => tab.id === saved.activeId) ? saved.activeId : null);
+      }
+      const d = await window.desktop.loadDraft();
+      setBody(d.body);
+      setImages(d.images);
+      setInitialized(true);
+    });
+  }, []);
+  useEffect(() => {
+    if (!initialized) return;
+    void window.desktop
+      .saveWorkspaceSession?.({
+        tabs: browserTabs.map(({ id, kind }) => (kind === "new" ? { id, kind } : { id })),
+        activeId: activeBrowser,
+        page,
+      })
+      ?.catch((error) => setNotice(`保存标签页失败：${String(error)}`));
+  }, [initialized, browserTabs, activeBrowser, page]);
+  useEffect(() => {
+    if (!initialized) return;
+    return window.desktop.onCommand?.((command) => {
+      if (busy && command.action !== "navigate") return;
+      if (command.action === "tab") {
+        if (!settingsOpen && !accountDialogOpen && !publishDialogOpen && !verifyDialogTarget)
+          handleTabCommand(command.operation);
+      } else if (command.action === "settings") {
+        void openSettings();
+      } else if (command.action === "navigate") {
+        setActiveBrowser(null);
+        setPage(command.page);
+        setFocusedTask(command.taskId);
+        void run(reload);
+        if (command.page === "compose")
+          requestAnimationFrame(() => document.getElementById("post-body")?.focus());
+      } else if (command.action === "save-draft") {
+        void run(async () => {
+          await window.desktop.saveDraft(body, images);
+          setNotice("草稿已保存到本机");
+        });
+      } else if (command.action === "import-markdown") {
+        setActiveBrowser(null);
+        setPage("compose");
+        void run(async () => {
+          const text = await window.desktop.importMarkdown();
+          if (text !== null) setBody(text);
+        });
+      }
+    });
+  }, [
+    body,
+    images,
+    initialized,
+    busy,
+    browserTabs,
+    activeBrowser,
+    settingsOpen,
+    accountDialogOpen,
+    publishDialogOpen,
+    verifyDialogTarget,
+  ]);
+  const closeBrowserTab = async (id: string) => {
+    setHoveredTab(null);
+    if (browserTabs.find((tab) => tab.id === id)?.kind !== "new")
+      await window.desktop.closeAccountBrowser(id);
+    const index = browserTabs.findIndex((tab) => tab.id === id);
+    const closed = browserTabs[index];
+    if (closed) closedTabs.current = [...closedTabs.current.slice(-19), closed];
+    setBrowserTabs((tabs) => tabs.filter((tab) => tab.id !== id));
+    if (activeBrowser === id)
+      setActiveBrowser(browserTabs[index + 1]?.id ?? browserTabs[index - 1]?.id ?? null);
+  };
+  const newBrowserTab = () => {
+    const tab = { id: `new-${crypto.randomUUID()}`, name: "新标签页", kind: "new" as const };
+    setHoveredTab(null);
+    setBrowserTabs((tabs) => [...tabs, tab]);
+    setActiveBrowser(tab.id);
+  };
+  const handleTabCommand = (operation: TabAction) => {
+    setHoveredTab(null);
+    if (operation === "new") newBrowserTab();
+    else if (operation === "close" && activeBrowser) void run(() => closeBrowserTab(activeBrowser));
+    else if (operation === "next" || operation === "previous") {
+      const ids = [null, ...browserTabs.map((tab) => tab.id)];
+      const index = ids.indexOf(activeBrowser);
+      setActiveBrowser(ids[(index + (operation === "next" ? 1 : ids.length - 1)) % ids.length]);
+    } else if (operation === "reopen") {
+      const tab = closedTabs.current.pop();
+      if (!tab) return;
+      if (tab.kind === "new") {
+        setBrowserTabs((tabs) => [...tabs, tab]);
+        setActiveBrowser(tab.id);
+      } else if (accounts.some((a) => a.id === tab.id)) void run(() => openBrowser(tab));
+    }
+  };
+  const pageTitle = navigation.find((item) => item.id === page)!.title;
+  return {
+    page,
+    setPage,
+    accounts,
+    setAccounts,
+    name,
+    setName,
+    body,
+    setBody,
+    images,
+    setImages,
+    notice,
+    setNotice,
+    busy,
+    records,
+    verifyDialogTarget,
+    setVerifyDialogTarget,
+    verifyUrl,
+    setVerifyUrl,
+    selectedTargets,
+    setSelectedTargets,
+    publishDialogOpen,
+    setPublishDialogOpen,
+    accountDialogOpen,
+    setAccountDialogOpen,
+    platform,
+    setPlatform,
+    browserTabs,
+    activeBrowser,
+    setActiveBrowser,
+    isNewTab,
+    hoveredTab,
+    setHoveredTab,
+    tabPreview,
+    browserPane,
+    overlayCover,
+    avatarMenuOpen,
+    setAvatarMenuOpen,
+    sidebarOpen,
+    setSidebarOpen,
+    settingsOpen,
+    setSettingsOpen,
+    openSettings,
+    focusedTask,
+    setFocusedTask,
+    openBrowser,
+    reload,
+    run,
+    closeBrowserTab,
+    newBrowserTab,
+    pageTitle,
+  };
+}
