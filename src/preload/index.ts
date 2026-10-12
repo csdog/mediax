@@ -1,8 +1,24 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { DesktopApi } from "../shared/models";
+import type { DesktopApi, DesktopCommand } from "../shared/models";
 const call = (method: string, ...args: unknown[]) =>
   ipcRenderer.invoke(`media-post:${method}`, ...args);
 const api: DesktopApi = {
+  workspaceSession: () => call("workspaceSession"),
+  saveWorkspaceSession: (session) => call("saveWorkspaceSession", session),
+  previewAccountBrowser: (id) => call("previewAccountBrowser", id),
+  layoutAccountBrowser: (id, bounds) => call("layoutAccountBrowser", id, bounds),
+  closeAccountBrowser: (id) => call("closeAccountBrowser", id),
+  shortcutSettings: () => call("shortcutSettings"),
+  setGlobalShortcut: (accelerator) => call("setGlobalShortcut", accelerator),
+  onCommand: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, command: DesktopCommand) =>
+      listener(command);
+    ipcRenderer.on("media-post:command", receive);
+    void call("rendererReady");
+    return () => {
+      ipcRenderer.removeListener("media-post:command", receive);
+    };
+  },
   accounts: () => call("accounts"),
   addAccount: (n) => call("addAccount", n),
   openAccount: (id) => call("openAccount", id),
@@ -13,6 +29,8 @@ const api: DesktopApi = {
   loadDraft: () => call("loadDraft"),
   publish: (b, i, t) => call("publish", b, i, t),
   history: () => call("history"),
+  openPost: (url) => call("openPost", url),
+  verifyTarget: (id, url) => call("verifyTarget", id, url),
   retry: (id) => call("retry", id),
   resume: (id) => call("resume", id),
 };

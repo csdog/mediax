@@ -17,6 +17,19 @@ export class CdpBridge {
     }
     throw new Error("Electron account target not exposed through CDP");
   }
+  async findTarget(targetId: string): Promise<Page> {
+    if (!this.browser?.isConnected()) throw new Error("浏览器连接已断开，请重新打开账号标签页");
+    for (const page of this.browser.contexts().flatMap((context) => context.pages())) {
+      const session = await page.context().newCDPSession(page);
+      try {
+        const { targetInfo } = await session.send("Target.getTargetInfo");
+        if (targetInfo.targetId === targetId) return page;
+      } finally {
+        await session.detach();
+      }
+    }
+    throw new Error("未找到账号对应的浏览器 target");
+  }
   async disconnect(): Promise<void> {
     await this.browser?.close();
     this.browser = undefined;

@@ -3,12 +3,13 @@ import { randomUUID } from "node:crypto";
 import type { Account, Task, Target, TaskTarget, Status } from "../../shared/models";
 export class Database {
   private db: Sqlite.Database;
+  private targetListeners = new Set<(target: TaskTarget) => void>();
   constructor(path: string) {
     this.db = new Sqlite(path);
     this.db.pragma("foreign_keys = ON");
     this.db.pragma("journal_mode = WAL");
     const version = this.schemaVersion();
-    if (version > 1) throw new Error("数据库版本高于当前应用，不能降级读取");
+    if (version > 2) throw new Error("数据库版本高于当前应用，不能降级读取");
     if (version === 0)
       this.db.transaction(() => {
         this.db.exec(`
@@ -20,6 +21,36 @@ export class Database {
    PRAGMA user_version=1;
   `);
       })();
+    if (version < 2)
+      this.db.transaction(() => {
+        this.db.exec(
+          "CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL); PRAGMA user_version=2;",
+        );
+      })();
+  }
+  setting(key: string): unknown {
+    const row = this.db.prepare("SELECT value FROM settings WHERE key=?").get(key) as
+      | { value: string }
+      | undefined;
+    if (!row) return null;
+    try {
+      return JSON.parse(row.value);
+    } catch {
+      return null;
+    }
+  }
+  setSetting(key: string, value: unknown) {
+    this.db
+      .prepare(
+        "INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      )
+      .run(key, JSON.stringify(value));
+  }
+  onTargetChange(listener: (target: TaskTarget) => void) {
+    this.targetListeners.add(listener);
+    return () => {
+      this.targetListeners.delete(listener);
+    };
   }
   schemaVersion() {
     return this.db.pragma("user_version", { simple: true }) as number;
@@ -89,9 +120,21 @@ export class Database {
     ) as TaskTarget[];
   }
   transition(id: string, status: Status, error: string | null = null, url: string | null = null) {
+    const previous = this.db.prepare("SELECT status FROM targets WHERE id=?").get(id) as
+      | { status: Status }
+      | undefined;
     this.db
       .prepare("UPDATE targets SET status=?,error=?,url=? WHERE id=?")
       .run(status, error, url, id);
+    if (!previous || previous.status === status) return;
+    const target = this.db.prepare("SELECT * FROM targets WHERE id=?").get(id) as TaskTarget;
+    for (const listener of this.targetListeners) {
+      try {
+        listener(target);
+      } catch (error) {
+        console.warn("任务状态监听失败:", error);
+      }
+    }
   }
   startAttempt(id: string) {
     const attempt = randomUUID();
@@ -129,6 +172,7 @@ export class Database {
     this.transition(id, "pending");
   }
   close() {
+    this.targetListeners.clear();
     this.db.close();
   }
 }

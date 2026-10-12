@@ -92,3 +92,13 @@ it("allows a clear preparation failure to retry without rerunning success", asyn
   expect(submits).toEqual(["2", "1"]);
   db.close();
 });
+
+it("records adapter initialization failures without leaving a running target", async () => {
+  const db = setup();
+  const queue = new PublishQueue(db, () => {
+    throw new Error("closed account tab");
+  });
+  await queue.run();
+  expect(db.targets().map((t) => t.status)).toEqual(["failed", "failed"]);
+  db.close();
+});

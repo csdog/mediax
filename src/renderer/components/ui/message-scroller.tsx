@@ -1,3 +1,5 @@
+"use client"
+
 import * as React from "react"
 import {
   MessageScroller as MessageScrollerPrimitive,
@@ -6,9 +8,9 @@ import {
   useMessageScrollerVisibility,
 } from "@shadcn/react/message-scroller"
 import { cn } from "cn"
-import { ArrowDownIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { ArrowDownIcon } from "lucide-react"
 
 function MessageScrollerProvider(
   props: React.ComponentProps<typeof MessageScrollerPrimitive.Provider>
@@ -40,7 +42,7 @@ function MessageScrollerViewport({
     <MessageScrollerPrimitive.Viewport
       data-slot="message-scroller-viewport"
       className={cn(
-        "size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain contain-content data-autoscrolling:scrollbar-none data-pending-scroll:invisible",
+        "size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain contain-content data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent data-pending-scroll:invisible",
         className
       )}
       {...props}
@@ -55,7 +57,7 @@ function MessageScrollerContent({
   return (
     <MessageScrollerPrimitive.Content
       data-slot="message-scroller-content"
-      className={cn("flex h-max min-h-full flex-col gap-8", className)}
+      className={cn("flex h-max min-h-full flex-col gap-6", className)}
       {...props}
     />
   )
@@ -105,7 +107,8 @@ function MessageScrollerButton({
     >
       {children ?? (
         <>
-          <ArrowDownIcon />
+          <ArrowDownIcon
+          />
           <span className="sr-only">
             {direction === "end" ? "Scroll to end" : "Scroll to start"}
           </span>

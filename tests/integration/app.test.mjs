@@ -49,12 +49,31 @@ test(
             await new Promise((r) => setTimeout(r, 50));
           }
           assert(page, "Missing app renderer");
+          if (phase === "restart") {
+            await page.getByRole("tab", { name: "新标签页", exact: true }).waitFor();
+            assert.equal(
+              await page
+                .getByRole("tab", { name: "新标签页", exact: true })
+                .getAttribute("aria-selected"),
+              "true",
+            );
+            assert.equal(
+              (await page.evaluate(() => window.desktop.workspaceSession())).page,
+              "history",
+            );
+            await page.getByRole("button", { name: "账号管理", exact: true }).click();
+          }
           await page.getByRole("heading", { name: "账号管理", exact: true }).waitFor();
           if (phase === "first") {
-            await page.getByLabel("账号名称").fill("UI persistence test");
-            await page.getByRole("button", { name: "添加账号" }).click();
+            // Keep this persistence test offline; authorization is covered by the UI test.
+            await page.evaluate(() => window.desktop.addAccount("UI persistence test"));
+            await page.reload();
           }
           await page.getByRole("heading", { name: "UI persistence test" }).waitFor();
+          await page.screenshot({
+            path: join(tmpdir(), "media-post-accounts.png"),
+            animations: "disabled",
+          });
           await page.getByRole("button", { name: "内容发布", exact: true }).click();
           await page.getByLabel("发布正文").waitFor();
           if (phase === "first") {
@@ -64,16 +83,39 @@ test(
           } else
             assert.equal(await page.getByLabel("发布正文").inputValue(), "A durable local draft");
           assert(await page.getByRole("button", { name: "发布", exact: true }).isDisabled());
-          await page.mouse.move(800, 90);
+          await page.getByRole("button", { name: "保存草稿" }).click({ trial: true });
+          await page.mouse.move(700, 250);
           await page.getByRole("tooltip").waitFor({ state: "hidden" });
           await page.screenshot({
             path: join(tmpdir(), "media-post-compose.png"),
+            animations: "disabled",
           });
+          await page.getByRole("button", { name: "发布记录", exact: true }).click();
+          await page.getByRole("heading", { name: "发布记录", exact: true }).waitFor();
+          await page.mouse.move(700, 250);
+          await page.screenshot({
+            path: join(tmpdir(), "media-post-history.png"),
+            animations: "disabled",
+          });
+          if (phase === "first") {
+            await page.getByRole("button", { name: "新建标签页", exact: true }).click();
+            await page.waitForFunction(async () => {
+              const saved = await window.desktop.workspaceSession();
+              return (
+                saved?.tabs.length === 1 &&
+                saved.tabs[0].kind === "new" &&
+                saved.activeId === saved.tabs[0].id &&
+                saved.page === "history"
+              );
+            });
+          }
         } finally {
           if (browser) await browser.close();
-          const ended = new Promise((r) => child.once("exit", r));
-          child.kill("SIGTERM");
-          await ended;
+          if (child.exitCode === null && child.signalCode === null) {
+            const ended = new Promise((r) => child.once("exit", r));
+            child.kill("SIGTERM");
+            await ended;
+          }
           clearTimeout(timer);
         }
       }

@@ -17,7 +17,8 @@ export class PublishQueue {
   async resume(id: string): Promise<void> {
     if (this.active) await this.active;
     const target = this.db.targets().find((t) => t.id === id);
-    if (target?.status !== "awaiting_user") throw new Error("该目标不在等待人工处理状态");
+    if (!target || !["awaiting_user", "pending"].includes(target.status))
+      throw new Error("该目标不在等待人工处理状态");
     this.db.transition(id, "pending");
     await this.run();
   }
@@ -26,14 +27,14 @@ export class PublishQueue {
     for (const task of [...this.db.tasks()].reverse()) {
       for (const target of this.db.targets(task.id)) {
         if (target.status !== "pending") continue;
-        const adapter = this.publisher(target),
-          attempt = this.db.startAttempt(target.id);
+        const attempt = this.db.startAttempt(target.id);
         let intent = false;
         const finish = (status: Status, error: string | null = null, url: string | null = null) => {
           this.db.transition(target.id, status, error, url);
           this.db.finishAttempt(attempt, status, error, url);
         };
         try {
+          const adapter = this.publisher(target);
           await adapter.prepare(task, target);
           // Durable intent precedes the click. A crash here requires verification, never blind retry.
           this.db.transition(target.id, "submitted");

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512" fill="none">
+  <title>media-post</title>
+  <desc>Folded document and paper plane, redrawn as a flat vector mark.</desc>
+  <defs>
+    <mask id="document-cutouts" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="white"/>
+      <rect x="157" y="187" width="112" height="19" rx="9.5" fill="black"/>
+      <rect x="157" y="227" width="98" height="19" rx="9.5" fill="black"/>
+      <path d="M223 291 402 223Q426 214 417 238L349 414Q341 434 324 420L283 386 265 365 224 347Q188 331 223 291Z" fill="black"/>
+    </mask>
+  </defs>
+  <path d="M151 106H258L330 178V327Q330 370 287 370H151Q122 370 122 341V135Q122 106 151 106Z" fill="#171717" mask="url(#document-cutouts)"/>
+  <path d="M258 106V150Q258 178 286 178H330Z" fill="#777777"/>
+  <path d="M232 309 400 245Q413 240 408 253L344 419Q340 429 332 422L287 385Q283 382 287 377L365 288 270 365 231 325Q222 315 232 309Z" fill="#171717"/>
+</svg>

@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, screen } from "electron";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
@@ -7,6 +7,9 @@ import { Database } from "./storage/Database";
 import { AccountService } from "./accounts/AccountService";
 import { registerIpc } from "./ipc";
 import { CdpBridge } from "./browser/CdpBridge";
+
+import { DesktopShell } from "./desktop/DesktopShell";
+import { restoreWindowState } from "./desktop/windowState";
 
 app.setName("media-post");
 
@@ -25,6 +28,10 @@ async function unusedPort(): Promise<number> {
 }
 async function start(): Promise<void> {
   if (process.env.MEDIA_POST_USER_DATA) app.setPath("userData", process.env.MEDIA_POST_USER_DATA);
+  if (!app.requestSingleInstanceLock()) {
+    app.quit();
+    return;
+  }
   const port = await unusedPort();
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
   app.commandLine.appendSwitch("remote-debugging-port", String(port));
@@ -110,15 +117,29 @@ async function start(): Promise<void> {
     app.quit();
     return;
   }
+  const db = new Database(join(app.getPath("userData"), "media-post.sqlite"));
+  db.recover();
+  const { maximized, ...bounds } = restoreWindowState(
+    db.setting("mainWindow"),
+    [
+      screen.getPrimaryDisplay(),
+      ...screen.getAllDisplays().filter((d) => d.id !== screen.getPrimaryDisplay().id),
+    ].map((d) => d.workArea),
+  );
   const win = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 960,
-    minHeight: 640,
+    ...bounds,
+    minWidth: Math.min(960, bounds.width),
+    minHeight: Math.min(640, bounds.height),
     title: "",
     titleBarStyle: "hidden",
     trafficLightPosition: { x: 16, y: 17 },
-    backgroundColor: "#ffffff",
+    backgroundColor: process.platform === "darwin" ? "#00000000" : "#f2f2f2",
+    ...(process.platform === "darwin"
+      ? {
+          vibrancy: "under-window" as const,
+          visualEffectState: "followWindow" as const,
+        }
+      : {}),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -126,9 +147,15 @@ async function start(): Promise<void> {
       preload: join(__dirname, "../preload/index.js"),
     },
   });
-  const db = new Database(join(app.getPath("userData"), "media-post.sqlite"));
-  db.recover();
-  registerIpc(db, new AccountService(db, new AccountBrowserManager()), win);
+  const shell = new DesktopShell(win, db);
+  registerIpc(
+    db,
+    new AccountService(db, new AccountBrowserManager(win, endpoint)),
+    win,
+    () => shell.rendererReady(),
+    shell,
+  );
+  if (maximized) win.maximize();
   app.on("will-quit", () => db.close());
   if (process.env.ELECTRON_RENDERER_URL) await win.loadURL(process.env.ELECTRON_RENDERER_URL);
   else await win.loadFile(join(__dirname, "../renderer/index.html"));
@@ -142,4 +169,4 @@ start().catch(async (error) => {
     );
   app.exit(1);
 });
-app.on("window-all-closed", () => app.quit());
+// Closing the main window hides it; explicit Quit owns application shutdown.
