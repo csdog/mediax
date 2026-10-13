@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="zh-CN">
   <meta charset="UTF-8" /><title>media-post</title>
+  <script>
+    document.documentElement.classList.toggle(
+      "dark",
+      window.matchMedia("(prefers-color-scheme: dark)").matches,
+    );
+  </script>
   <div id="root"></div>
   <script type="module" src="/src.tsx"></script>
 </html>

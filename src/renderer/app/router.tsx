@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { WorkspaceProvider } from "./WorkspaceContext";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
+import { RouteError } from "@/components/RouteError";
 import { AccountsPage } from "@/pages/AccountsPage";
 import { ComposePage } from "@/pages/ComposePage";
 import { HistoryPage } from "@/pages/HistoryPage";
@@ -16,6 +17,7 @@ const rootRoute = createRootRoute({
       <WorkspaceShell />
     </WorkspaceProvider>
   ),
+  errorComponent: RouteError,
 });
 const accountsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -54,6 +56,10 @@ export function createWorkspaceRouter() {
     routeTree,
     history: createMemoryHistory({ initialEntries: ["/accounts"] }),
     defaultPendingMinMs: 0,
+    defaultErrorComponent: RouteError,
+    defaultOnCatch: (error) => {
+      console.error("Route render failed", error);
+    },
   });
 }
 declare module "@tanstack/react-router" {

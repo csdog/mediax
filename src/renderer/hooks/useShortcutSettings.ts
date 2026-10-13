@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { defaultShortcutMap } from "../../shared/shortcutCatalog";
+import type { ShortcutSettings } from "../../shared/models";
+
 const shortcutKey = ["desktop", "shortcut"] as const;
+
 export function useShortcutSettings() {
   const client = useQueryClient();
-  const [shortcut, setShortcut] = useState("");
+  const [shortcuts, setShortcuts] = useState<Record<string, string>>(defaultShortcutMap);
   const [shortcutMessage, setShortcutMessage] = useState("");
   const settings = useQuery({
     queryKey: shortcutKey,
@@ -11,7 +15,7 @@ export function useShortcutSettings() {
   });
   useEffect(() => {
     if (settings.data) {
-      setShortcut(settings.data.accelerator);
+      setShortcuts(settings.data.shortcuts ?? defaultShortcutMap());
       if (settings.data.error) setShortcutMessage(settings.data.error);
     }
   }, [settings.data]);
@@ -20,27 +24,70 @@ export function useShortcutSettings() {
   }, [settings.error]);
   const save = useMutation({
     mutationKey: ["desktop", "save-shortcut"],
-    mutationFn: (accelerator: string) => window.desktop.setGlobalShortcut(accelerator),
+    mutationFn: ({ id, accelerator }: { id: string; accelerator: string }) =>
+      id === "global-show"
+        ? window.desktop.setGlobalShortcut(accelerator)
+        : window.desktop.setShortcut(id, accelerator),
+    retry: false,
+    onSuccess: (result, variables) => {
+      client.setQueryData(shortcutKey, result);
+      setShortcuts(result.shortcuts ?? defaultShortcutMap());
+      setShortcutMessage(messageFor(variables.id, result));
+    },
+    onError: (error) => {
+      const previous = client.getQueryData<ShortcutSettings>(shortcutKey);
+      if (previous?.shortcuts) setShortcuts(previous.shortcuts);
+      setShortcutMessage(error.message);
+    },
+  });
+  const reset = useMutation({
+    mutationKey: ["desktop", "reset-shortcuts"],
+    mutationFn: () => window.desktop.resetShortcuts(),
     retry: false,
     onSuccess: (result) => {
       client.setQueryData(shortcutKey, result);
-      setShortcut(result.accelerator);
-      setShortcutMessage(
-        result.registered ? "已保存，可在其他应用中按快捷键呼出窗口。" : "已关闭全局呼出快捷键。",
-      );
+      setShortcuts(result.shortcuts ?? defaultShortcutMap());
+      setShortcutMessage("已全部重置为默认快捷键。");
     },
-    onError: (error) => setShortcutMessage(error.message),
+    onError: (error) => {
+      const previous = client.getQueryData<ShortcutSettings>(shortcutKey);
+      if (previous?.shortcuts) setShortcuts(previous.shortcuts);
+      setShortcutMessage(error.message);
+    },
   });
-  const saveShortcut = () => {
+  const saveAccelerator = async (id: string, accelerator: string) => {
     setShortcutMessage("");
-    save.mutate(shortcut);
+    setShortcuts((current) => ({ ...current, [id]: accelerator }));
+    try {
+      await save.mutateAsync({ id, accelerator });
+    } catch {
+      // onError already restores shortcuts and sets the message.
+    }
+  };
+  const resetAll = async () => {
+    setShortcutMessage("");
+    setShortcuts(defaultShortcutMap());
+    try {
+      await reset.mutateAsync();
+    } catch {
+      // onError already restores shortcuts and sets the message.
+    }
   };
   return {
-    shortcut,
-    setShortcut,
+    shortcuts,
     shortcutMessage,
     setShortcutMessage,
-    shortcutBusy: settings.isFetching || save.isPending,
-    saveShortcut,
+    shortcutBusy: settings.isFetching || save.isPending || reset.isPending,
+    saveAccelerator,
+    resetAll,
   };
+}
+
+function messageFor(id: string, result: ShortcutSettings) {
+  if (id === "global-show") {
+    return result.registered
+      ? "已保存，可在其他应用中按快捷键呼出窗口。"
+      : "已关闭全局呼出快捷键。";
+  }
+  return result.shortcuts?.[id] ? "已保存快捷键。" : "已清除快捷键。";
 }

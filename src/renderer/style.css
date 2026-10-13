@@ -69,6 +69,14 @@
   --sidebar-ring: var(--ring);
 }
 .dark {
+  --surface-under: #000000;
+  --chrome: rgb(255 255 255 / 6%);
+  --page-surface: rgb(28 28 28 / 90%);
+  --hover: #2c2c2c;
+  --selected: #3a3a3a;
+  --hint: #a0a0a0;
+  --emphasis: #339cff;
+  --emphasis-soft: rgb(51 156 255 / 18%);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -88,20 +96,20 @@
   --surface-stroke: var(--border-subtle);
   --border: rgb(255 255 255 / 8%);
   --input: rgb(255 255 255 / 8%);
-  --ring: oklch(0.556 0 0);
+  --ring: #339cff;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: rgb(32 32 32 / 72%);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.922 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: rgb(255 255 255 / 8%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: #339cff;
 }
 @theme inline {
   --font-sans:
@@ -219,6 +227,9 @@ a,
 html {
   color-scheme: light;
   background: var(--surface-under);
+}
+html.dark {
+  color-scheme: dark;
 }
 /* Only the macOS host supplies a native material; other hosts retain a neutral solid base. */
 html[data-desktop-platform="darwin"] {
@@ -834,6 +845,28 @@ body {
 .activity-rail [data-slot="button"]:hover {
   background: var(--hover);
 }
+.activity-rail [data-update-prompt] {
+  width: 20px;
+  height: 20px;
+  color: #fff;
+  background: #339cff;
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+.activity-rail [data-update-prompt]:hover {
+  color: #fff;
+  background: color-mix(in srgb, #339cff 92%, black 8%);
+}
+.activity-rail [data-update-prompt]:disabled {
+  opacity: 1;
+  color: #fff;
+  background: #339cff;
+}
+.activity-rail [data-update-prompt] svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.4;
+}
 .workspace .composer:has(textarea:focus-visible) {
   border-color: var(--emphasis);
   box-shadow: 0 0 0 2px var(--emphasis-soft);
@@ -1411,6 +1444,42 @@ body {
   border-radius: var(--radius-pane);
   background: var(--card);
 }
+.panel-error,
+.route-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 32rem;
+  padding: 24px 8px;
+}
+.panel-error h3,
+.route-error h2 {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  font-weight: 600;
+}
+.panel-error p,
+.route-error p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-control);
+  line-height: 1.5;
+}
+.route-error-detail {
+  max-width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-input);
+  background: var(--muted);
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-word;
+}
+.route-error-actions {
+  display: flex;
+  gap: 8px;
+}
 .settings-active > :not(.app-toolbar):not(.settings-full-page) {
   display: none !important;
 }
@@ -1563,30 +1632,130 @@ body {
 .settings-section-note {
   margin: 12px 0;
 }
-.settings-shortcut-box {
-  padding: 18px 16px;
-}
-.settings-shortcut-box [data-slot="label"] {
-  font-size: var(--font-size-caption);
-  font-weight: 500;
-}
-.settings-shortcut-box [data-slot="input"] {
-  height: 36px;
-  max-width: 240px;
-  border-radius: var(--radius-input);
-  box-shadow: none;
-  font-size: var(--font-size-control);
-}
-.settings-shortcut-box [data-slot="button"] {
-  height: 36px;
+.settings-log-tail {
+  margin-top: 12px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-navigation);
-  font-size: var(--font-size-control);
-  font-weight: 400;
-  box-shadow: none;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
-.settings-shortcut-box [data-slot="dialog-footer"] {
+.shortcut-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+.shortcut-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.shortcut-settings-header h2 {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  font-weight: 600;
+}
+.shortcut-settings-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.shortcut-settings-search > svg {
+  position: absolute;
+  left: 12px;
+  z-index: 1;
+  pointer-events: none;
+}
+.shortcut-settings-search [data-slot="input"] {
+  height: 40px;
+  padding-left: 36px;
+  border-radius: 999px;
+  box-shadow: none;
+  font-size: var(--font-size-control);
+}
+.shortcut-settings-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-popover);
+  background: var(--card);
+  overflow: hidden;
+}
+.shortcut-settings-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  padding: 14px 16px;
   border-top: 1px solid var(--border);
-  padding-top: 16px;
+}
+.shortcut-settings-row:first-child {
+  border-top: 0;
+}
+.shortcut-settings-row[data-recording] {
+  background: var(--emphasis-soft);
+}
+.shortcut-settings-copy h3 {
+  margin: 0;
+  font-size: var(--font-size-control);
+  font-weight: 550;
+}
+.shortcut-settings-copy p {
+  margin: 4px 0 0;
+  font-size: var(--font-size-caption);
+  line-height: 18px;
+  color: var(--muted-foreground);
+}
+.shortcut-settings-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.shortcut-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--muted);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.shortcut-pill-recording {
+  color: var(--emphasis);
+  background: color-mix(in srgb, var(--emphasis) 12%, transparent);
+}
+.shortcut-settings-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  min-width: 72px;
+}
+.shortcut-capture {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: default;
+}
+.shortcut-settings-list .settings-no-results {
+  margin: 0;
+  padding: 20px 16px;
 }
 .history-content {
   display: flex;

@@ -21,8 +21,22 @@ import {
   readPublishSettings,
   type PublishSettings,
 } from "../shared/publishSettings";
+import {
+  mergeNotificationSettings,
+  readNotificationSettings,
+  type NotificationSettings,
+} from "../shared/notificationSettings";
 import type { DesktopShell } from "./desktop/DesktopShell";
+import type { AppUpdater } from "./desktop/AppUpdater";
 import { TabPreviewWindow } from "./desktop/TabPreviewWindow";
+import {
+  buildDiagnosticReport,
+  exportDiagnosticReport,
+  notificationPermissionStatus,
+  openNotificationSettings,
+  revealLogFile,
+} from "./desktop/diagnostics";
+import { getOpenAtLogin, setOpenAtLogin } from "./desktop/loginItem";
 
 function savePublishSettings(
   db: Database,
@@ -46,6 +60,7 @@ export function registerIpc(
   window: BrowserWindow,
   rendererReady: () => void,
   shell: DesktopShell,
+  updater: AppUpdater,
 ) {
   const stopLogging = db.onTargetChange((target) => {
     const write = ["failed", "unknown", "awaiting_user"].includes(target.status)
@@ -116,6 +131,11 @@ export function registerIpc(
   });
   on("shortcutSettings", () => shell.shortcutSettings());
   on("setGlobalShortcut", (accelerator) => shell.setGlobalShortcut(text(accelerator)));
+  on("setShortcut", (id, accelerator) => shell.setShortcut(text(id), text(accelerator)));
+  on("resetShortcuts", () => shell.resetShortcuts());
+  on("updateStatus", () => updater.getStatus());
+  on("checkForUpdates", () => updater.check(true));
+  on("installUpdate", () => updater.install());
   on("publishSettings", () => readPublishSettings((key) => db.setting(key)));
   on("setSilentPublish", (silent) => {
     if (typeof silent !== "boolean") throw new Error("无效设置");
@@ -130,6 +150,29 @@ export function registerIpc(
     const profile = parseProfile(value);
     db.setSetting("profile", profile);
     return profile;
+  });
+  on("notificationSettings", () => readNotificationSettings((key) => db.setting(key)));
+  on("setNotificationSettings", (value) => {
+    if (!value || typeof value !== "object") throw new Error("无效通知设置");
+    const next = mergeNotificationSettings(
+      readNotificationSettings((key) => db.setting(key)),
+      value as Partial<NotificationSettings>,
+    );
+    db.setSetting("notificationsEnabled", next.enabled);
+    db.setSetting("notifyPublishResult", next.publishResult);
+    db.setSetting("notifyAwaitingUser", next.awaitingUser);
+    db.setSetting("notificationPrivacy", next.privacy);
+    return next;
+  });
+  on("notificationPermission", () => notificationPermissionStatus());
+  on("openNotificationSettings", () => openNotificationSettings());
+  on("diagnostics", () => buildDiagnosticReport(db));
+  on("exportDiagnostics", () => exportDiagnosticReport(window, db));
+  on("revealLogFile", () => revealLogFile());
+  on("openAtLogin", () => getOpenAtLogin());
+  on("setOpenAtLogin", (value) => {
+    if (typeof value !== "boolean") throw new Error("无效登录项设置");
+    return setOpenAtLogin(value);
   });
   on("chooseAvatar", async () => {
     const result = await dialog.showOpenDialog(window, {

@@ -15,13 +15,63 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
         commandListener = undefined;
       };
     }),
-    shortcutSettings: vi
-      .fn()
-      .mockResolvedValue({ accelerator: "CommandOrControl+Shift+Space", registered: true }),
-    setGlobalShortcut: vi.fn().mockImplementation(async (accelerator) => ({
-      accelerator,
-      registered: Boolean(accelerator),
-    })),
+    shortcutSettings: vi.fn().mockResolvedValue({
+      accelerator: "CommandOrControl+Shift+Space",
+      registered: true,
+      shortcuts: {
+        "global-show": "CommandOrControl+Shift+Space",
+        "new-tab": "CommandOrControl+T",
+        "close-tab": "CommandOrControl+W",
+        "reopen-tab": "CommandOrControl+Shift+T",
+        "next-tab": "Control+Tab",
+        "previous-tab": "Control+Shift+Tab",
+        settings: "CommandOrControl+,",
+        compose: "CommandOrControl+N",
+        "save-draft": "CommandOrControl+S",
+        "import-markdown": "CommandOrControl+O",
+        accounts: "CommandOrControl+1",
+        "compose-page": "CommandOrControl+2",
+        video: "CommandOrControl+3",
+        history: "CommandOrControl+4",
+        "hide-window": "CommandOrControl+Shift+W",
+      },
+    }),
+    setGlobalShortcut: vi.fn().mockImplementation(async (accelerator) => {
+      const shortcuts = {
+        ...(await window.desktop.shortcutSettings()).shortcuts,
+        "global-show": accelerator,
+      };
+      return { accelerator, registered: Boolean(accelerator), shortcuts };
+    }),
+    setShortcut: vi.fn().mockImplementation(async (id, accelerator) => {
+      const current = await window.desktop.shortcutSettings();
+      const shortcuts = { ...current.shortcuts, [id]: accelerator };
+      return {
+        accelerator: shortcuts["global-show"] ?? "",
+        registered: Boolean(shortcuts["global-show"]),
+        shortcuts,
+      };
+    }),
+    resetShortcuts: vi.fn().mockImplementation(async () => {
+      const shortcuts = {
+        "global-show": "CommandOrControl+M",
+        "new-tab": "CommandOrControl+T",
+        "close-tab": "CommandOrControl+W",
+        "reopen-tab": "CommandOrControl+Shift+T",
+        "next-tab": "Control+Tab",
+        "previous-tab": "Control+Shift+Tab",
+        settings: "CommandOrControl+,",
+        compose: "CommandOrControl+N",
+        "save-draft": "CommandOrControl+S",
+        "import-markdown": "CommandOrControl+O",
+        accounts: "CommandOrControl+1",
+        "compose-page": "CommandOrControl+2",
+        video: "CommandOrControl+3",
+        history: "CommandOrControl+4",
+        "hide-window": "CommandOrControl+Shift+W",
+      };
+      return { accelerator: shortcuts["global-show"], registered: true, shortcuts };
+    }),
     publishSettings: vi
       .fn()
       .mockResolvedValue({ silent: false, concurrency: 3, bandwidthLimitKbps: 0 }),
@@ -36,12 +86,64 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       bandwidthLimitKbps: 0,
       ...patch,
     })),
+    updateStatus: vi.fn().mockResolvedValue({
+      state: "idle",
+      currentVersion: "0.1.0",
+      availableVersion: null,
+      progress: null,
+      message: null,
+      canCheck: true,
+      canInstall: false,
+    }),
+    checkForUpdates: vi.fn(),
+    installUpdate: vi.fn(),
+    onUpdateStatus: vi.fn(() => () => undefined),
     profileSettings: vi.fn(async () => profile),
     setProfile: vi.fn(async (next: { name: string; avatar: string | null }) => {
       profile = next;
       return profile;
     }),
     chooseAvatar: vi.fn().mockResolvedValue(null),
+    notificationSettings: vi.fn().mockResolvedValue({
+      enabled: true,
+      publishResult: true,
+      awaitingUser: true,
+      privacy: false,
+    }),
+    setNotificationSettings: vi.fn().mockImplementation(async (patch) => ({
+      enabled: true,
+      publishResult: true,
+      awaitingUser: true,
+      privacy: false,
+      ...patch,
+    })),
+    notificationPermission: vi.fn().mockResolvedValue({
+      supported: true,
+      label: "由系统控制",
+      detail: "测试环境",
+    }),
+    openNotificationSettings: vi.fn(),
+    diagnostics: vi.fn().mockResolvedValue({
+      generatedAt: "2026-10-13T00:00:00.000Z",
+      app: { name: "media-post", version: "0.1.0", packaged: false },
+      runtime: {
+        electron: "44",
+        chrome: "1",
+        node: "26",
+        platform: "darwin",
+        arch: "arm64",
+      },
+      paths: { userData: "/tmp", logsDir: "/tmp/logs", logFile: "/tmp/logs/main.log" },
+      counts: { accounts: 0, tasks: 0, targets: {} },
+      logTail: "log line",
+    }),
+    exportDiagnostics: vi.fn().mockResolvedValue(null),
+    revealLogFile: vi.fn(),
+    openAtLogin: vi.fn().mockResolvedValue({ openAtLogin: false, detail: null }),
+    setOpenAtLogin: vi.fn().mockImplementation(async (openAtLogin: boolean) => ({
+      openAtLogin,
+      detail: null,
+    })),
     accounts: vi.fn().mockResolvedValue([]),
     addAccount: vi.fn().mockResolvedValue({
       id: "account-1",
@@ -138,9 +240,8 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   fireEvent.click(screen.getByRole("button", { name: "设置", exact: true }));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "用户菜单" })).toBeNull());
   await waitFor(() =>
-    expect((screen.getByLabelText("全局呼出快捷键") as HTMLInputElement).disabled).toBe(false),
+    expect((screen.getByLabelText("个人名称") as HTMLInputElement).value).toBe("media-post"),
   );
-  expect((screen.getByLabelText("个人名称") as HTMLInputElement).value).toBe("media-post");
   expect(screen.getByRole("button", { name: "更换头像" })).toBeTruthy();
   fireEvent.change(screen.getByLabelText("个人名称"), { target: { value: "张三" } });
   fireEvent.blur(screen.getByLabelText("个人名称"));
@@ -149,19 +250,27 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   );
   fireEvent.click(screen.getByRole("switch", { name: "静默发布" }));
   await waitFor(() => expect(window.desktop.setSilentPublish).toHaveBeenCalledWith(true));
-  fireEvent.keyDown(screen.getByLabelText("全局呼出快捷键"), {
+  fireEvent.click(screen.getByRole("button", { name: "键盘快捷键" }));
+  await screen.findByRole("heading", { name: "键盘快捷键" });
+  await waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: "编辑“全局呼出”的快捷键" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "编辑“全局呼出”的快捷键" }));
+  const capture = await screen.findByLabelText("为“全局呼出”录制快捷键");
+  fireEvent.keyDown(capture, {
     key: "F11",
     code: "F11",
     ctrlKey: true,
     altKey: true,
   });
-  fireEvent.click(screen.getByRole("button", { name: "保存设置" }));
   await waitFor(() =>
     expect(window.desktop.setGlobalShortcut).toHaveBeenCalledWith("Control+Alt+F11"),
   );
   await screen.findByText("已保存，可在其他应用中按快捷键呼出窗口。");
-  fireEvent.click(screen.getByRole("button", { name: "清除快捷键" }));
-  fireEvent.click(screen.getByRole("button", { name: "保存设置" }));
+  fireEvent.click(screen.getByRole("button", { name: "清除“全局呼出”的快捷键" }));
   await waitFor(() => expect(window.desktop.setGlobalShortcut).toHaveBeenCalledWith(""));
   await screen.findByText("已关闭全局呼出快捷键。");
   expect(screen.queryByRole("dialog", { name: "设置", exact: true })).toBeNull();
@@ -304,9 +413,7 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   expect(screen.getByRole("dialog", { name: "用户菜单" }).textContent).toContain("张三");
   fireEvent.click(screen.getByRole("button", { name: "设置", exact: true }));
   await screen.findByRole("main", { name: "设置页面" });
-  await waitFor(() =>
-    expect((screen.getByLabelText("全局呼出快捷键") as HTMLInputElement).disabled).toBe(false),
-  );
+  await waitFor(() => expect(screen.getByLabelText("个人名称")).toBeTruthy());
   fireEvent.keyDown(window, { key: "Escape" });
   expect(((await screen.findByLabelText("发布正文")) as HTMLTextAreaElement).value).toBe(
     "Latest draft from menu",

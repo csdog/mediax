@@ -1,16 +1,17 @@
 import { nativeTheme, type BrowserWindow } from "electron";
 
-// The renderer currently ships a light palette. Keep the native material in the same appearance.
+/** Follow the OS appearance so native chrome matches renderer light/dark tokens. */
 export function installWindowBackdrop(window: BrowserWindow) {
-  nativeTheme.themeSource = "light";
+  nativeTheme.themeSource = "system";
   const update = () => {
     if (window.isDestroyed()) return;
+    const dark = nativeTheme.shouldUseDarkColors;
     const material =
       process.platform === "darwin" &&
       window.isFocused() &&
       !nativeTheme.prefersReducedTransparency;
     // Switch the native backdrop, rather than fading the entire web page or its text.
-    window.setBackgroundColor(material ? "#00000000" : "#f9f9f9");
+    window.setBackgroundColor(material ? "#00000000" : dark ? "#000000" : "#f9f9f9");
     if (process.platform === "darwin") window.setVibrancy(material ? "menu" : null);
   };
   window.on("focus", update);

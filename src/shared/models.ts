@@ -99,7 +99,13 @@ export type AccountInfo = Account & {
   message?: string;
   avatar?: string;
 };
-export type ShortcutSettings = { accelerator: string; registered: boolean; error?: string };
+export type ShortcutSettings = {
+  /** @deprecated Prefer `shortcuts["global-show"]`; kept for callers that only care about the global hotkey. */
+  accelerator: string;
+  registered: boolean;
+  error?: string;
+  shortcuts: Record<string, string>;
+};
 export type BrowserBounds = { x: number; y: number; width: number; height: number };
 export type TabPreviewOverlay = {
   x: number;
@@ -129,6 +135,12 @@ export interface DesktopApi {
   closeAccountBrowser(id: string): Promise<void>;
   shortcutSettings(): Promise<ShortcutSettings>;
   setGlobalShortcut(accelerator: string): Promise<ShortcutSettings>;
+  setShortcut(id: string, accelerator: string): Promise<ShortcutSettings>;
+  resetShortcuts(): Promise<ShortcutSettings>;
+  updateStatus(): Promise<UpdateStatus>;
+  checkForUpdates(): Promise<UpdateStatus>;
+  installUpdate(): Promise<UpdateStatus>;
+  onUpdateStatus(listener: (status: UpdateStatus) => void): () => void;
   publishSettings(): Promise<{
     silent: boolean;
     concurrency: number;
@@ -150,6 +162,43 @@ export interface DesktopApi {
     avatar: string | null;
   }>;
   chooseAvatar(): Promise<string | null>;
+  notificationSettings(): Promise<{
+    enabled: boolean;
+    publishResult: boolean;
+    awaitingUser: boolean;
+    privacy: boolean;
+  }>;
+  setNotificationSettings(settings: {
+    enabled?: boolean;
+    publishResult?: boolean;
+    awaitingUser?: boolean;
+    privacy?: boolean;
+  }): Promise<{
+    enabled: boolean;
+    publishResult: boolean;
+    awaitingUser: boolean;
+    privacy: boolean;
+  }>;
+  notificationPermission(): Promise<{ supported: boolean; label: string; detail: string }>;
+  openNotificationSettings(): Promise<void>;
+  diagnostics(): Promise<{
+    generatedAt: string;
+    app: { name: string; version: string; packaged: boolean };
+    runtime: {
+      electron: string;
+      chrome: string;
+      node: string;
+      platform: string;
+      arch: string;
+    };
+    paths: { userData: string; logsDir: string; logFile: string };
+    counts: { accounts: number; tasks: number; targets: Record<string, number> };
+    logTail: string;
+  }>;
+  exportDiagnostics(): Promise<string | null>;
+  revealLogFile(): Promise<void>;
+  openAtLogin(): Promise<{ openAtLogin: boolean; detail: string | null }>;
+  setOpenAtLogin(openAtLogin: boolean): Promise<{ openAtLogin: boolean; detail: string | null }>;
   onCommand(listener: (command: DesktopCommand) => void): () => void;
   accounts(): Promise<AccountInfo[]>;
   addAccount(name: string, platform: PlatformId): Promise<AccountInfo>;
@@ -179,6 +228,23 @@ export interface DesktopApi {
   resume(id: string): Promise<void>;
 }
 
+export type UpdateState =
+  | "idle"
+  | "checking"
+  | "available"
+  | "not-available"
+  | "downloading"
+  | "downloaded"
+  | "error";
+export type UpdateStatus = {
+  state: UpdateState;
+  currentVersion: string;
+  availableVersion: string | null;
+  progress: number | null;
+  message: string | null;
+  canCheck: boolean;
+  canInstall: boolean;
+};
 export type DesktopPage = "accounts" | "compose" | "video" | "history";
 export type DesktopCommand =
   | { action: "tab"; operation: TabAction }

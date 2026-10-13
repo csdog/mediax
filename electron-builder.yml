@@ -1,6 +1,9 @@
 appId: local.media-post.desktop
 productName: media-post
-publish: null
+publish:
+  provider: github
+  owner: csdog
+  repo: media-post
 directories:
   output: dist
   buildResources: build
@@ -9,6 +12,10 @@ files:
   - drizzle/**/*.sql
   - drizzle/meta/_journal.json
   - package.json
+protocols:
+  - name: media-post
+    schemes:
+      - media-post
 mac:
   icon: build/icon.png
   category: public.app-category.productivity

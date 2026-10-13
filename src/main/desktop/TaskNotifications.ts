@@ -1,5 +1,10 @@
 import type { Database } from "../storage/Database";
 import type { TaskTarget } from "../../shared/models";
+import {
+  readNotificationSettings,
+  type NotificationSettings,
+} from "../../shared/notificationSettings";
+
 export type TaskNotice = { title: string; body: string; taskId: string };
 
 // Observe committed business state; never infer success from a submission alone.
@@ -9,6 +14,8 @@ export class TaskNotifications {
   constructor(
     private db: Database,
     private show: (notice: TaskNotice) => void,
+    private settings: () => NotificationSettings = () =>
+      readNotificationSettings((key) => this.db.setting(key)),
   ) {
     this.unsubscribe = db.onTargetChange((target) => this.changed(target));
   }
@@ -17,13 +24,19 @@ export class TaskNotifications {
       this.sent.delete(target.taskId);
       return;
     }
+    const prefs = this.settings();
+    if (!prefs.enabled) return;
     const targets = this.db.targets(target.taskId);
     let title: string, body: string, key: string;
     if (target.status === "awaiting_user") {
+      if (!prefs.awaitingUser) return;
       title = "需要人工处理";
-      body = `${target.name} 需要登录或验证，请打开发布记录查看。`;
-      key = `${target.id}:awaiting_user`;
+      body = prefs.privacy
+        ? "有目标需要登录或验证，请打开发布记录查看。"
+        : `${target.name} 需要登录或验证，请打开发布记录查看。`;
+      key = `${target.id}:awaiting_user:${prefs.privacy ? "private" : "named"}`;
     } else {
+      if (!prefs.publishResult) return;
       if (targets.some((t) => ["pending", "running", "awaiting_user"].includes(t.status))) return;
       key = targets
         .map((t) => `${t.id}:${t.status}`)

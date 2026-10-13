@@ -24,9 +24,11 @@
 <p align="center">
   <a href="#支持的平台">支持的平台</a> ·
   <a href="#特性">特性</a> ·
+  <a href="#主要功能">主要功能</a> ·
   <a href="#快速开始">快速开始</a> ·
   <a href="#打包">打包</a> ·
   <a href="#开发">开发</a> ·
+  <a href="docs/TODO.md">TODO</a> ·
   <a href="AGENTS.md">Agent 约定</a>
 </p>
 
@@ -166,6 +168,8 @@ mise exec -- pnpm run test:packaged
 
 跨平台产物优先用 GitHub Actions（`.github/workflows/build.yml`）：打 `v*` 标签或手动触发。本机交叉打包可能受签名工具与原生模块限制。
 
+打包版通过 `electron-updater` 从 GitHub Releases（`csdog/media-post`）检查更新：启动约 15 秒后后台检查，设置 → 常规 → 更新可手动检查；下载完成后可「重启安装」。开发模式不检查。正式签名与公证仍待补齐。
+
 ## 使用流程
 
 1. **授权账号** — 账号管理点选平台，在独立浏览器标签页登录并检查状态
@@ -239,15 +243,34 @@ mise exec -- pnpm run db:check
 | `MAIN_VITE_LOG_FILE_LEVEL`  | 文件日志等级                |
 | `MAIN_VITE_LOG_MAX_SIZE`    | 单文件轮转阈值，默认 5 MiB  |
 
-开发日志：`logs/main.log`。安装包日志：`<userData>/logs/main.log`（macOS 一般为 `~/Library/Application Support/media-post/logs/main.log`）。不记录正文、Cookie、密码。
+开发日志：`logs/main.log`。安装包日志：`<userData>/logs/main.log`（macOS 一般为 `~/Library/Application Support/media-post/logs/main.log`）。超过大小限制后滚动为 `main.YYYY-MM-DD.log`（同日多次滚动为 `main.YYYY-MM-DD.1.log`…）。不记录正文、Cookie、密码。
 
 ### 桌面行为（macOS 等）
 
 关闭主窗口默认隐藏到托盘；菜单栏 / Dock 可恢复。窗口几何、标签与草稿保存在 SQLite。单实例运行。全局呼出快捷键默认 `⌘M`，可在设置中修改。
 
-## 当前状态
+## 主要功能
 
-多账号独立会话、按内容类型筛选、SQLite 草稿、确认后并行发布（可配并行数与网速限制）、暂停恢复、失败重试与链接核验已可用。开发版与 arm64 未签名 macOS 包通过离线 Electron 端到端测试（会话隔离、持久化、Facebook 图文）。其余平台编辑器已接入，站点改版后需在对应账号再核对。待办见 [docs/TODO.md](docs/TODO.md)。
+| 功能               | 说明                                                   | 状态 |
+| ------------------ | ------------------------------------------------------ | ---- |
+| 多账号会话         | 每账号独立 Electron 分区，登录态互不串扰               | ✅   |
+| 体裁筛选           | 文章 / 动态 / 视频 / 音频，按平台能力筛选可发账号      | ✅   |
+| 本机发布队列       | 确认后并行发布，可配并行数与网速限制                   | ✅   |
+| 草稿与工作区       | SQLite 草稿、标签页与窗口几何可恢复                    | ✅   |
+| 暂停 / 重试 / 核验 | 验证码或改版时暂停，失败可重试，成功可打开结果页       | ✅   |
+| 任务通知           | 成功 / 失败 / 等待处理等系统通知                       | ✅   |
+| 自动更新           | GitHub Releases 检查、设置页手动检查、头像上方更新入口 | ✅   |
+| 主题               | 跟随系统浅色 / 深色                                    | ✅   |
+| 登录时启动         | 系统登录后自动启动，可隐藏到菜单栏                     | ✅   |
+| 深度链接           | `media-post://compose` 等协议打开对应页面              | ✅   |
+| Dock / 任务栏      | 快捷菜单、发布进度、待处理角标与提醒                   | ✅   |
+| 通知与权限         | 开关、隐私、系统通知权限状态                           | ✅   |
+| 日志与诊断         | 查看 / 打开日志，导出本机诊断报告                      | ✅   |
+| 桌面安装包         | macOS / Windows / Linux（CI 打 `v*` 标签）             | ✅   |
+| 代码签名与公证     | 正式签名、macOS 公证                                   | ⏳   |
+| 定时 / 排期发布    | 内容日历、跨平台排期                                   | ⏳   |
+
+后续桌面能力与排期方向见 [docs/TODO.md](docs/TODO.md)。其余平台编辑器已接入，站点改版后需在对应账号再核对。
 
 ## Star History
 

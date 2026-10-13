@@ -14,7 +14,7 @@
 
 `src/main/desktop/windowBackdrop.ts` 管理原生背景：macOS 获得焦点时启用 menu 材质，失焦时移除材质并使用 `#f9f9f9`。系统要求减少透明度时使用实色。以 BrowserWindow 焦点为准，避免账号 WebContentsView 获取输入焦点时误判。显示、隐藏和原生主题更新也会同步背景，关闭窗口后移除原生主题监听。
 
-当前产品提供浅色 UI，因此 nativeTheme 与 CSS color-scheme 同步固定为浅色，防止系统深色材质与浅色界面混搭。以后增加深色模式时应同时扩展原生背景与完整语义 Token。
+`nativeTheme.themeSource` 为 `system`，与系统浅色／深色一致。失焦实色背景浅色为 `#f9f9f9`、深色为 `#000000`；渲染层通过 `.dark` 与 `prefers-color-scheme` 切换语义 Token（含外壳 `--chrome` / `--page-surface` 等）。
 
 渲染层采用共享外壳：28% 中性灰外壳、85% 浅灰圆角底板、65% 白色侧栏导航和不透明白色内容区。顶部与活动栏露出外壳；侧栏与主工作区共享一个底板。面板圆角 24px、右侧和底部留白 8px 是本项目的布局选择；不是宣称恢复了 Codex 所有布局模式的精确参数。设置页使用同一留白与圆角，导航背景为 surface-under。
 

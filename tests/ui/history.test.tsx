@@ -9,9 +9,13 @@ vi.mock("../../src/renderer/lib/logging", () => ({ initializeRendererLogging: vi
 it("lists publish records with filters from the reference layout", async () => {
   window.desktop = {
     onCommand: vi.fn(() => () => undefined),
-    shortcutSettings: vi
-      .fn()
-      .mockResolvedValue({ accelerator: "CommandOrControl+M", registered: true }),
+    shortcutSettings: vi.fn().mockResolvedValue({
+      accelerator: "CommandOrControl+M",
+      registered: true,
+      shortcuts: { "global-show": "CommandOrControl+M" },
+    }),
+    setShortcut: vi.fn(),
+    resetShortcuts: vi.fn(),
     publishSettings: vi
       .fn()
       .mockResolvedValue({ silent: false, concurrency: 3, bandwidthLimitKbps: 0 }),
@@ -24,9 +28,61 @@ it("lists publish records with filters from the reference layout", async () => {
       bandwidthLimitKbps: 0,
       ...patch,
     })),
+    updateStatus: vi.fn().mockResolvedValue({
+      state: "idle",
+      currentVersion: "0.1.0",
+      availableVersion: null,
+      progress: null,
+      message: null,
+      canCheck: true,
+      canInstall: false,
+    }),
+    checkForUpdates: vi.fn(),
+    installUpdate: vi.fn(),
+    onUpdateStatus: vi.fn(() => () => undefined),
     profileSettings: vi.fn().mockResolvedValue({ name: "media-post", avatar: null }),
     setProfile: vi.fn().mockImplementation(async (profile) => profile),
     chooseAvatar: vi.fn().mockResolvedValue(null),
+    notificationSettings: vi.fn().mockResolvedValue({
+      enabled: true,
+      publishResult: true,
+      awaitingUser: true,
+      privacy: false,
+    }),
+    setNotificationSettings: vi.fn().mockImplementation(async (patch) => ({
+      enabled: true,
+      publishResult: true,
+      awaitingUser: true,
+      privacy: false,
+      ...patch,
+    })),
+    notificationPermission: vi.fn().mockResolvedValue({
+      supported: true,
+      label: "由系统控制",
+      detail: "测试环境",
+    }),
+    openNotificationSettings: vi.fn(),
+    diagnostics: vi.fn().mockResolvedValue({
+      generatedAt: "2026-10-13T00:00:00.000Z",
+      app: { name: "media-post", version: "0.1.0", packaged: false },
+      runtime: {
+        electron: "44",
+        chrome: "1",
+        node: "26",
+        platform: "darwin",
+        arch: "arm64",
+      },
+      paths: { userData: "/tmp", logsDir: "/tmp/logs", logFile: "/tmp/logs/main.log" },
+      counts: { accounts: 0, tasks: 0, targets: {} },
+      logTail: "log line",
+    }),
+    exportDiagnostics: vi.fn().mockResolvedValue(null),
+    revealLogFile: vi.fn(),
+    openAtLogin: vi.fn().mockResolvedValue({ openAtLogin: false, detail: null }),
+    setOpenAtLogin: vi.fn().mockImplementation(async (openAtLogin: boolean) => ({
+      openAtLogin,
+      detail: null,
+    })),
     accounts: vi
       .fn()
       .mockResolvedValue([{ id: "account-1", name: "用户K7Wa", login: "logged_in", targets: [] }]),

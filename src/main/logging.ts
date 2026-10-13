@@ -1,7 +1,8 @@
+import { renameSync } from "node:fs";
 import { app, type BrowserWindow } from "electron";
 import log from "electron-log/main";
 import { formatConsoleData, formatLogPrefix, readLogConfig } from "../shared/logging";
-import { logFilePath } from "./log-path";
+import { archivedLogPath, logFilePath } from "./log-path";
 
 export function initializeLogging() {
   const config = readLogConfig(import.meta.env);
@@ -21,6 +22,9 @@ export function initializeLogging() {
   log.transports.file.level = config.fileLevel;
   log.transports.file.maxSize = config.maxSize;
   log.transports.file.resolvePathFn = () => file;
+  log.transports.file.archiveLogFn = (current) => {
+    renameSync(current.toString(), archivedLogPath(current.toString()));
+  };
   log.transports.file.format = ({ data, level, message }) => [
     formatLogPrefix(
       message.date ?? new Date(),

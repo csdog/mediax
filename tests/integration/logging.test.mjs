@@ -110,7 +110,14 @@ test(
         return maxSize;
       });
       await waitForLog(file, "after-rotation-marker");
-      assert((await stat(join(dir, "logs/main.old.log"))).size > 0);
+      const now = new Date();
+      const stamp = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+      ].join("-");
+      const archived = join(dir, `logs/main.${stamp}.log`);
+      assert((await stat(archived)).size > 0);
       assert((await stat(file)).size < maxSize + 1024 * 1024 + 1024);
     } finally {
       if (application) await application.close();

@@ -13,12 +13,34 @@ const api: DesktopApi = {
   closeAccountBrowser: (id) => call("closeAccountBrowser", id),
   shortcutSettings: () => call("shortcutSettings"),
   setGlobalShortcut: (accelerator) => call("setGlobalShortcut", accelerator),
+  setShortcut: (id, accelerator) => call("setShortcut", id, accelerator),
+  resetShortcuts: () => call("resetShortcuts"),
+  updateStatus: () => call("updateStatus"),
+  checkForUpdates: () => call("checkForUpdates"),
+  installUpdate: () => call("installUpdate"),
+  onUpdateStatus: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, status: Parameters<typeof listener>[0]) =>
+      listener(status);
+    ipcRenderer.on("media-post:update-status", receive);
+    return () => {
+      ipcRenderer.removeListener("media-post:update-status", receive);
+    };
+  },
   publishSettings: () => call("publishSettings"),
   setSilentPublish: (silent) => call("setSilentPublish", silent),
   setPublishSettings: (settings) => call("setPublishSettings", settings),
   profileSettings: () => call("profileSettings"),
   setProfile: (profile) => call("setProfile", profile),
   chooseAvatar: () => call("chooseAvatar"),
+  notificationSettings: () => call("notificationSettings"),
+  setNotificationSettings: (settings) => call("setNotificationSettings", settings),
+  notificationPermission: () => call("notificationPermission"),
+  openNotificationSettings: () => call("openNotificationSettings"),
+  diagnostics: () => call("diagnostics"),
+  exportDiagnostics: () => call("exportDiagnostics"),
+  revealLogFile: () => call("revealLogFile"),
+  openAtLogin: () => call("openAtLogin"),
+  setOpenAtLogin: (openAtLogin) => call("setOpenAtLogin", openAtLogin),
   onCommand: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, command: DesktopCommand) =>
       listener(command);

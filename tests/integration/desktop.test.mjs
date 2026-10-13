@@ -298,10 +298,10 @@ test(
         }
         throw new Error("Browser view still covers settings");
       }, account.id);
-      const shortcutInput = page.getByLabel("全局呼出快捷键");
-      await shortcutInput.click();
-      await shortcutInput.press("Control+Alt+F11");
-      await page.getByRole("button", { name: "保存设置" }).click();
+      await page.getByRole("button", { name: "键盘快捷键" }).click();
+      await page.getByRole("heading", { name: "键盘快捷键" }).waitFor();
+      await page.getByRole("button", { name: "编辑“全局呼出”的快捷键" }).click();
+      await page.getByLabel("为“全局呼出”录制快捷键").press("Control+Alt+F11");
       await page.getByRole("status").filter({ hasText: "已保存，可在其他应用中" }).waitFor();
       assert.equal(
         await application.evaluate(({ globalShortcut }) =>
@@ -403,10 +403,12 @@ test(
         savedAvatar,
         "account avatar survives restart",
       );
-      assert.deepEqual(await page.evaluate(() => window.desktop.shortcutSettings()), {
-        accelerator: "Control+Alt+F11",
-        registered: true,
-      });
+      {
+        const settings = await page.evaluate(() => window.desktop.shortcutSettings());
+        assert.equal(settings.accelerator, "Control+Alt+F11");
+        assert.equal(settings.registered, true);
+        assert.equal(settings.shortcuts["global-show"], "Control+Alt+F11");
+      }
       assert.equal(
         await application.evaluate(({ globalShortcut }) =>
           globalShortcut.isRegistered("Control+Alt+F11"),

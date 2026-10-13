@@ -10,10 +10,27 @@ import { registerIpc } from "./ipc";
 import { CdpBridge } from "./browser/CdpBridge";
 
 import { DesktopShell } from "./desktop/DesktopShell";
+import { AppUpdater } from "./desktop/AppUpdater";
+import { findDeepLinkArg, registerDeepLinkProtocol } from "./desktop/deepLinks";
+import { shouldStartHidden } from "./desktop/loginItem";
 import { restoreWindowState } from "./desktop/windowState";
 import { installWindowBackdrop } from "./desktop/windowBackdrop";
 
 app.setName("media-post");
+
+const earlyDeepLinks: string[] = [];
+let deepLinkHandler: ((url: string) => void) | null = null;
+const enqueueDeepLink = (url: string) => {
+  if (deepLinkHandler) deepLinkHandler(url);
+  else earlyDeepLinks.push(url);
+};
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  enqueueDeepLink(url);
+});
+const launchLink = findDeepLinkArg(process.argv);
+if (launchLink) earlyDeepLinks.push(launchLink);
+registerDeepLinkProtocol();
 
 // Configure before ready; port is dynamically reserved, never a public bind.
 async function unusedPort(): Promise<number> {
@@ -136,8 +153,10 @@ async function start(): Promise<void> {
       ...screen.getAllDisplays().filter((d) => d.id !== screen.getPrimaryDisplay().id),
     ].map((d) => d.workArea),
   );
+  const startHidden = shouldStartHidden();
   const win = new BrowserWindow({
     ...bounds,
+    show: !startHidden,
     minWidth: Math.min(960, bounds.width),
     minHeight: Math.min(640, bounds.height),
     title: "",
@@ -158,14 +177,19 @@ async function start(): Promise<void> {
       preload: join(__dirname, "../preload/index.js"),
     },
   });
+  if (startHidden) log.info("Started hidden after login launch");
   observeWindowLogging(win);
   installWindowBackdrop(win);
   const shell = new DesktopShell(win, db);
+  deepLinkHandler = (url) => shell.handleDeepLink(url);
+  for (const url of earlyDeepLinks.splice(0)) shell.handleDeepLink(url);
+  const updater = new AppUpdater(win, db);
   const accounts = new AccountService(db, new AccountBrowserManager(win, endpoint));
   accounts.startAutoRefresh();
   accounts.applyBandwidthLimit();
+  updater.start();
   app.on("will-quit", () => accounts.stopAutoRefresh());
-  registerIpc(db, accounts, win, () => shell.rendererReady(), shell);
+  registerIpc(db, accounts, win, () => shell.rendererReady(), shell, updater);
   if (maximized) win.maximize();
   app.on("will-quit", () => db.close());
   if (process.env.ELECTRON_RENDERER_URL) await win.loadURL(process.env.ELECTRON_RENDERER_URL);
