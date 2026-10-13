@@ -1,4 +1,5 @@
 import type { FrameLocator, Locator, Page } from "playwright-core";
+import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
 import { NeedsUser, NotSubmitted, type Publisher } from "../Publisher";
 import { isVideo } from "../postText";
@@ -46,6 +47,10 @@ async function fillCaption(page: Page, scope: Page | FrameLocator, caption: stri
 export class TikTokAdapter implements Publisher {
   constructor(private readonly page: () => Promise<Page>) {}
 
+  supportedKinds() {
+    return platformKinds("tiktok");
+  }
+
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
     await page.goto("https://www.tiktok.com/tiktokstudio", {
@@ -63,7 +68,7 @@ export class TikTokAdapter implements Publisher {
     return [
       {
         accountId,
-        identityId: handle ?? "account",
+        identityId: "1",
         name: handle ? `@${handle}` : "TikTok 账号",
         kind: "profile",
       },
@@ -71,6 +76,7 @@ export class TikTokAdapter implements Publisher {
   }
 
   async prepare(task: Task, _target: TaskTarget) {
+    if (task.contentKind !== "video") throw new NeedsUser("TikTok 目前只发布视频");
     const video = task.images.find(isVideo);
     if (!video) throw new NeedsUser("TikTok 需要一段视频，请在正文中附上视频后再发布");
     const page = await this.page();

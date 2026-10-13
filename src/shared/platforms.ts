@@ -1,4 +1,4 @@
-import type { PlatformId } from "./models";
+import { platforms, type PlatformId } from "./models";
 
 export type PlatformInfo = { label: string; mark: string; detail: string; color: string };
 
@@ -53,4 +53,106 @@ export const platformInfo: Record<PlatformId, PlatformInfo> = {
   pinterest: { label: "Pinterest", mark: "P", detail: "登录后发布图片", color: "#e60023" },
   alipay: { label: "支付宝生活号", mark: "支", detail: "登录后发布视频", color: "#1677ff" },
   hupu: { label: "虎扑", mark: "虎", detail: "登录后发布视频", color: "#c01d2f" },
+  zsxq: { label: "知识星球", mark: "星", detail: "登录后发布文章或动态", color: "#1aad19" },
+  music163: { label: "网易云音乐", mark: "云", detail: "登录后发布音频", color: "#e60026" },
+  qqmusic: { label: "QQ音乐", mark: "Q", detail: "登录后发布音频", color: "#31c27c" },
+  qingting: { label: "蜻蜓FM", mark: "蜻", detail: "登录后发布音频", color: "#ff5a1f" },
+  lizhi: { label: "荔枝FM", mark: "荔", detail: "登录后发布音频", color: "#ff3b30" },
+  googlebusiness: {
+    label: "Google Business",
+    mark: "G",
+    detail: "登录后发布动态",
+    color: "#4285f4",
+  },
 };
+
+export const platformGroups = [
+  { id: "all", label: "全部" },
+  { id: "video", label: "视频" },
+  { id: "news", label: "新闻" },
+  { id: "moment", label: "图文" },
+  { id: "audio", label: "音频" },
+] as const;
+
+export type PlatformGroupId = (typeof platformGroups)[number]["id"];
+
+const groupedPlatforms: Record<Exclude<PlatformGroupId, "all">, readonly PlatformId[]> = {
+  video: [
+    "douyin",
+    "kuaishou",
+    "channels",
+    "xiaohongshu",
+    "bilibili",
+    "baijiahao",
+    "toutiao",
+    "weibo",
+    "zhihu",
+    "qq",
+    "iqiyi",
+    "weishi",
+    "sohuvideo",
+    "pipixia",
+    "tencentvideo",
+    "duoduo",
+    "meipai",
+    "acfun",
+    "guanghe",
+    "tiktok",
+    "youtube",
+    "facebook",
+    "instagram",
+    "twitter",
+    "alipay",
+    "hupu",
+  ],
+  news: [
+    "bilibili",
+    "baijiahao",
+    "toutiao",
+    "zhihu",
+    "qq",
+    "sohu",
+    "yidian",
+    "dayu",
+    "netease",
+    "wechat",
+    "kuaichuan",
+    "xueqiu",
+    "fengwang",
+    "douban",
+    "csdn",
+    "jianshu",
+    "chejia",
+    "yiche",
+    "dongche",
+    "reddit",
+  ],
+  moment: [
+    "douyin",
+    "kuaishou",
+    "channels",
+    "xiaohongshu",
+    "weibo",
+    "wechat",
+    "dewu",
+    "jd",
+    "douban",
+    "xhsmerchant",
+    "xhsdm",
+    "facebook",
+    "instagram",
+    "threads",
+    "twitter",
+    "linkedin",
+    "pinterest",
+    "zsxq",
+    "googlebusiness",
+  ],
+  audio: ["ximalaya", "xiaoyuzhou", "music163", "qqmusic", "qingting", "lizhi"],
+};
+
+export function platformsInGroup(group: PlatformGroupId): PlatformId[] {
+  if (group === "all") return [...platforms];
+  const members = new Set(groupedPlatforms[group]);
+  return platforms.filter((id) => members.has(id));
+}

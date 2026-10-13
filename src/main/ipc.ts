@@ -8,7 +8,13 @@ import { Database } from "./storage/Database";
 import { AccountService } from "./accounts/AccountService";
 import { markdownToText } from "./content/markdown";
 import { coverDataUrl } from "./content/cover";
-import { isPlatform, type ImageAsset, type TabPreviewOverlay } from "../shared/models";
+import { isAudio, isImage, isVideo } from "../shared/content";
+import {
+  isPlatform,
+  type ContentKind,
+  type ImageAsset,
+  type TabPreviewOverlay,
+} from "../shared/models";
 import { parseProfile, readProfile } from "../shared/profile";
 import type { DesktopShell } from "./desktop/DesktopShell";
 import { TabPreviewWindow } from "./desktop/TabPreviewWindow";
@@ -65,7 +71,7 @@ export function registerIpc(
       !value ||
       !Array.isArray(value.tabs) ||
       value.tabs.length > 100 ||
-      !["accounts", "compose", "history"].includes(value.page)
+      !["accounts", "compose", "video", "history"].includes(value.page)
     )
       throw new Error("无效标签页状态");
     const accountIds = new Set(db.accounts().map((account) => account.id));
@@ -161,43 +167,43 @@ export function registerIpc(
     if (result.canceled) return null;
     return markdownToText(await readFile(result.filePaths[0], "utf8"));
   });
-  on("chooseImages", async () => {
+  on("chooseImages", async (kind?: ContentKind) => {
+    const filters = fileFilters(kind);
     const result = await dialog.showOpenDialog(window, {
-      properties: ["openFile", "multiSelections"],
-      filters: [
-        {
-          name: "图片或视频",
-          extensions: ["png", "jpg", "jpeg", "webp", "mp4", "mov", "m4v", "webm"],
-        },
-      ],
+      properties:
+        kind === "article" || kind === "video" || kind === "audio"
+          ? ["openFile"]
+          : ["openFile", "multiSelections"],
+      filters,
     });
     if (result.canceled) return [];
+    if (kind === "article" && result.filePaths.length > 1) throw new Error("文章只能带一张封面");
     const assets: ImageAsset[] = [];
     for (const path of result.filePaths) {
       const data = await readFile(path);
       if (data.length > 20 * 1024 * 1024) throw new Error("素材限制为 20MB，请压缩后选择");
-      const extension = extname(path).toLowerCase();
-      const video = [".mp4", ".mov", ".m4v", ".webm"].includes(extension);
-      const mime =
-        extension === ".png" ? "image/png" : extension === ".webp" ? "image/webp" : "image/jpeg";
+      if (!acceptsFile(kind, path)) throw new Error("所选文件与当前内容类型不符");
+      const media = isVideo(path) || isAudio(path);
+      const mime = imageMime(path);
       const asset = {
         path,
         name: basename(path),
-        preview: video ? "" : `data:${mime};base64,${data.toString("base64")}`,
+        preview: media ? "" : `data:${mime};base64,${data.toString("base64")}`,
       };
       images.set(path, asset);
       assets.push(asset);
     }
     return assets;
   });
-  on("saveDraft", (body, assets) => {
+  on("saveDraft", (body, assets, kind, title) => {
+    if (!isContentKind(kind)) throw new Error("无效内容类型");
     if (!Array.isArray(assets)) throw new Error("无效素材");
     const selected = assets.map((a) => {
       const known = images.get(a?.path);
       if (!known) throw new Error("请重新选择图片");
       return { path: known.path, name: known.name };
     });
-    db.saveDraft(text(body), selected);
+    db.saveDraft(text(body), selected, kind, typeof title === "string" ? title : null);
   });
   on("loadDraft", async () => {
     const draft = db.draft();
@@ -206,32 +212,33 @@ export function registerIpc(
       try {
         const data = await readFile(a.path);
         if (data.length > 20 * 1024 * 1024) continue;
-        const extension = extname(a.path).toLowerCase();
-        const video = [".mp4", ".mov", ".m4v", ".webm"].includes(extension);
-        const mime =
-          extension === ".png" ? "image/png" : extension === ".webp" ? "image/webp" : "image/jpeg";
+        const media = isVideo(a.path) || isAudio(a.path);
         const asset = {
           ...a,
-          preview: video ? "" : `data:${mime};base64,${data.toString("base64")}`,
+          preview: media ? "" : `data:${imageMime(a.path)};base64,${data.toString("base64")}`,
         };
         images.set(a.path, asset);
         assets.push(asset);
       } catch {}
     }
-    return { body: draft.body, images: assets };
+    return {
+      body: draft.body,
+      images: assets,
+      contentKind: draft.contentKind,
+      title: draft.title,
+    };
   });
   on("history", () => ({
     tasks: db.tasks().map((task) => ({ ...task, cover: coverDataUrl(task.images[0]) })),
     targets: db.targets(),
   }));
-  on("publish", (body, paths, targets) => {
+  on("publish", (kind, title, body, paths, targets) => {
+    if (!isContentKind(kind)) throw new Error("无效内容类型");
     if (!Array.isArray(paths) || !paths.every((path) => typeof path === "string"))
       throw new Error("请重新选择发布图片");
     for (const path of paths) {
       if (images.has(path)) continue;
-      const extension = extname(path).toLowerCase();
-      if (![".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".m4v", ".webm"].includes(extension))
-        throw new Error("请重新选择发布图片");
+      if (!isImage(path) && !isVideo(path) && !isAudio(path)) throw new Error("请重新选择发布素材");
       images.set(path, { path, name: basename(path), preview: "" });
     }
     if (
@@ -245,7 +252,13 @@ export function registerIpc(
       )
     )
       throw new Error("无效发布目标");
-    return publishing.publish(text(body), paths, targets);
+    return publishing.publish(
+      kind,
+      typeof title === "string" ? title : null,
+      text(body),
+      paths,
+      targets,
+    );
   });
   on("retry", (id) => publishing.retry(text(id)));
   on("resume", (id) => publishing.resume(text(id)));
@@ -290,4 +303,36 @@ function previewOverlay(value: unknown): TabPreviewOverlay {
     alt: typeof preview.alt === "string" ? preview.alt.slice(0, 200) : "",
     placeholder: preview.placeholder === true,
   };
+}
+
+function imageMime(path: string) {
+  const extension = extname(path).toLowerCase();
+  if (extension === ".png") return "image/png";
+  if (extension === ".webp") return "image/webp";
+  if (extension === ".gif") return "image/gif";
+  return "image/jpeg";
+}
+
+function isContentKind(value: unknown): value is ContentKind {
+  return value === "article" || value === "moment" || value === "video" || value === "audio";
+}
+
+function fileFilters(kind?: ContentKind) {
+  if (kind === "video") return [{ name: "视频", extensions: ["mp4", "mov", "m4v", "webm"] }];
+  if (kind === "audio") return [{ name: "音频", extensions: ["mp3", "m4a", "wav", "aac", "flac"] }];
+  if (kind === "article" || kind === "moment")
+    return [{ name: "图片", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }];
+  return [
+    {
+      name: "图片或视频",
+      extensions: ["png", "jpg", "jpeg", "webp", "mp4", "mov", "m4v", "webm"],
+    },
+  ];
+}
+
+function acceptsFile(kind: ContentKind | undefined, path: string) {
+  if (kind === "video") return isVideo(path);
+  if (kind === "audio") return isAudio(path);
+  if (kind === "article" || kind === "moment") return isImage(path);
+  return isImage(path) || isVideo(path);
 }

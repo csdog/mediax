@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512" fill="none">
-  <title>media-post</title>
-  <desc>A content card opening into an upward-right publishing arrow.</desc>
-  <g stroke="#171717" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M268 112H156a44 44 0 0 0-44 44v200a44 44 0 0 0 44 44h200a44 44 0 0 0 44-44V244"/>
-    <path d="m248 264 152-152M312 112h88v88"/>
-    <path d="M176 248h24M176 320h104"/>
-  </g>
-</svg>

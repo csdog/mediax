@@ -1,9 +1,15 @@
-import { Monitor, X, ImagePlus, FileText, Save, Users, Send } from "lucide-react";
+import { useState } from "react";
+import { Monitor, X, ImagePlus, FileText, Save, Send, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { isAudio, isVideo, supportedKinds } from "../../shared/content";
+import type { AccountInfo, ContentKind, PlatformId, Target } from "../../shared/models";
+import { platformInfo } from "../../shared/platforms";
+import { platformIcons } from "@/assets/platformIcons";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Dialog,
@@ -20,6 +26,10 @@ export function ComposePage() {
   const {
     body,
     setBody,
+    contentKind,
+    setContentKind,
+    title,
+    setTitle,
     images,
     setImages,
     busy,
@@ -33,25 +43,174 @@ export function ComposePage() {
     setPublishDialogOpen,
     setFocusedTask,
     reload,
+    page,
     setPage,
     silentPublish,
     setActiveBrowser,
   } = useWorkspace();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [platformFilter, setPlatformFilter] = useState<PlatformId | "all">("all");
+  const [platformQuery, setPlatformQuery] = useState("");
+  const [accountQuery, setAccountQuery] = useState("");
+  const [syncedSignature, setSyncedSignature] = useState("");
+  const paths = images.map((image) => image.path);
+  const ready = canPublish(contentKind, title, body, paths);
+  const signature = [
+    contentKind,
+    title,
+    body,
+    paths.join("\n"),
+    selectedTargets
+      .map((target) => `${target.accountId}:${target.identityId}`)
+      .sort()
+      .join("\n"),
+  ].join("\0");
+  const synced = syncedSignature === signature && selectedTargets.length > 0 && ready;
+  const publishing = records.targets.some((target) =>
+    ["pending", "running", "awaiting_user"].includes(target.status),
+  );
+  const eligible = accounts.filter(
+    (account) => supportedKinds(account.platform).includes(contentKind) && account.targets.length,
+  );
+  const switchKind = (kind: ContentKind) => {
+    if (kind === contentKind) return;
+    setContentKind(kind);
+    setImages([]);
+    setSelectedTargets((current) =>
+      current.filter((target) => {
+        const account = accounts.find((item) => item.id === target.accountId);
+        return account ? supportedKinds(account.platform).includes(kind) : false;
+      }),
+    );
+  };
+  const toggleTarget = (target: Target, value: boolean) => {
+    setSelectedTargets((old) =>
+      value
+        ? old.some((item) => sameTarget(item, target))
+          ? old
+          : [...old, target]
+        : old.filter((item) => !sameTarget(item, target)),
+    );
+  };
+  const openPicker = () => {
+    setPlatformFilter("all");
+    setPlatformQuery("");
+    setAccountQuery("");
+    setPickerOpen(true);
+  };
   return (
     <DocumentPage>
-      <div className="editor-workspace">
+      <div className="editor-workspace publish-flow">
+        <aside className="publish-accounts" aria-label="发布账号">
+          <div className="flex items-center justify-between gap-2">
+            <h2>发布账号</h2>
+            <span className="text-xs text-muted-foreground">共 {selectedTargets.length} 个</span>
+          </div>
+          <Button variant="outline" size="sm" className="mt-3 w-full" onClick={openPicker}>
+            <Plus />
+            新增账号
+          </Button>
+          <p className="mt-3 text-xs text-muted-foreground">快速填写后，同步到勾选的账号。</p>
+          <div className="publish-account-list mt-3 space-y-3">
+            {pickerOpen ? (
+              <p className="text-xs text-muted-foreground">在弹窗里勾选账号，确认添加。</p>
+            ) : (
+              eligible.flatMap((account) =>
+                account.targets.map((target) => (
+                  <TargetChoice
+                    key={`${account.id}:${target.identityId}`}
+                    account={account}
+                    target={target}
+                    checked={selectedTargets.some((item) => sameTarget(item, target))}
+                    pending={synced && selectedTargets.some((item) => sameTarget(item, target))}
+                    disabled={busy}
+                    onCheckedChange={(value) => toggleTarget(target, value)}
+                  />
+                )),
+              )
+            )}
+            {!eligible.length && (
+              <p className="text-xs text-muted-foreground">
+                在账号管理中检查登录状态，识别可发布身份。
+              </p>
+            )}
+          </div>
+        </aside>
         <section className="draft-pane" aria-label="内容编辑">
-          <div className="draft-intro">
-            <p className="text-xs text-muted-foreground">Facebook</p>
-            <h2>准备发布的内容</h2>
-            <p>在下方编辑正文，或导入 Markdown。右侧可查看发布效果。</p>
-            <div className="draft-note">
-              <Monitor />
-              正文、图片和草稿保存在这台 Mac 上
+          <div className="publish-toolbar">
+            <div>
+              <p className="text-xs text-muted-foreground">快速填写</p>
+              <h2>发布{kindCaption(contentKind)}</h2>
             </div>
+            <div className="ml-auto flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || !ready || !selectedTargets.length}
+                onClick={() => {
+                  if (!ready || !selectedTargets.length) return;
+                  setSyncedSignature(signature);
+                  setNotice(`已同步到 ${selectedTargets.length} 个账号`);
+                }}
+              >
+                <RefreshCw />
+                同步到账号
+              </Button>
+              <Button
+                size="sm"
+                disabled={busy || !synced || publishing}
+                onClick={() => setPublishDialogOpen(true)}
+              >
+                <Send />
+                一键发布
+              </Button>
+            </div>
+          </div>
+          <div className="draft-note">
+            <Monitor />
+            先勾选账号，填写内容，同步到账号，再一键发布
           </div>
           <div className="composer-dock">
             <Card className="composer">
+              {page === "video" ? null : (
+                <div
+                  className="flex flex-wrap gap-2 px-3 pt-3"
+                  role="radiogroup"
+                  aria-label="内容类型"
+                >
+                  {(
+                    [
+                      ["moment", "图文"],
+                      ["article", "文章"],
+                      ["audio", "音频"],
+                    ] as const
+                  ).map(([kind, label]) => (
+                    <Button
+                      key={kind}
+                      type="button"
+                      role="radio"
+                      aria-checked={contentKind === kind}
+                      variant={contentKind === kind ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => switchKind(kind)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              {contentKind === "article" && (
+                <div className="px-3 pt-3">
+                  <Label htmlFor="post-title">文章标题</Label>
+                  <Input
+                    id="post-title"
+                    value={title}
+                    maxLength={80}
+                    placeholder="填写文章标题"
+                    onChange={(event) => setTitle(event.target.value)}
+                  />
+                </div>
+              )}
               <Label htmlFor="post-body" className="sr-only">
                 发布正文
               </Label>
@@ -59,23 +218,26 @@ export function ComposePage() {
                 id="post-body"
                 placeholder="写下要分享的内容…"
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
+                onChange={(event) => setBody(event.target.value)}
               />
+              <p className={`preview-body px-3 ${body ? "" : "preview-placeholder"}`}>
+                {body || "正文将在这里显示"}
+              </p>
               {images.length > 0 && (
                 <div className="composer-images">
-                  {images.map((i) => (
-                    <div className="relative" key={i.path}>
+                  {images.map((image) => (
+                    <div className="relative" key={image.path}>
                       <img
                         className="size-14 rounded-lg border object-cover"
-                        src={i.preview}
-                        alt={i.name}
+                        src={image.preview}
+                        alt={image.name}
                       />
                       <Button
                         variant="secondary"
                         size="icon-xs"
-                        aria-label={`移除 ${i.name}`}
-                        onClick={() => setImages(images.filter((x) => x.path !== i.path))}
-                        className="absolute -right-1 -top-1 rounded-full"
+                        aria-label={`移除 ${image.name}`}
+                        onClick={() => setImages(images.filter((item) => item.path !== image.path))}
+                        className="absolute -top-1 -right-1 rounded-full"
                       >
                         <X />
                       </Button>
@@ -90,14 +252,16 @@ export function ComposePage() {
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        aria-label="选择图片"
+                        aria-label={mediaLabel(contentKind)}
                         disabled={busy}
                         onClick={() =>
                           void run(async () => {
-                            const added = await window.desktop.chooseImages();
+                            const added = await window.desktop.chooseImages(contentKind);
                             setImages((old) => [
                               ...old,
-                              ...added.filter((a) => !old.some((x) => x.path === a.path)),
+                              ...added.filter(
+                                (item) => !old.some((image) => image.path === item.path),
+                              ),
                             ]);
                           })
                         }
@@ -106,7 +270,7 @@ export function ComposePage() {
                       </Button>
                     }
                   />
-                  <TooltipContent>选择图片</TooltipContent>
+                  <TooltipContent>{mediaLabel(contentKind)}</TooltipContent>
                 </Tooltip>
                 <Button
                   variant="ghost"
@@ -129,7 +293,7 @@ export function ComposePage() {
                   disabled={busy}
                   onClick={() =>
                     void run(async () => {
-                      await window.desktop.saveDraft(body, images);
+                      await window.desktop.saveDraft(body, images, contentKind, title);
                       setNotice("草稿已保存到本机");
                     })
                   }
@@ -140,157 +304,299 @@ export function ComposePage() {
               </div>
             </Card>
             <p className="composer-caption">
-              {images.length ? `${images.length} 张图片 · ` : ""}支持正文与图片 ·
-              发布前请确认目标账号
+              {images.length ? `${images.length} 个素材 · ` : ""}
+              {synced ? `已同步 ${selectedTargets.length} 个账号` : "填写后同步到账号，再一键发布"}
             </p>
           </div>
         </section>
-        <aside className="preview-pane" aria-label="内容预览与发布设置">
-          <div className="preview-toolbar">
-            <FileText />
-            <span>内容预览</span>
-            <span className="ml-auto text-xs text-muted-foreground">Facebook</span>
-          </div>
-          <div className="preview-document">
-            <div className="preview-meta">
-              <span className="preview-avatar">
-                <Users />
-              </span>
-              <div>
-                <span>Facebook 帖子</span>
-                <p>个人主页 / 公共主页</p>
-              </div>
+        <AccountPicker
+          open={pickerOpen}
+          accounts={eligible}
+          selectedTargets={selectedTargets}
+          platformFilter={platformFilter}
+          platformQuery={platformQuery}
+          accountQuery={accountQuery}
+          busy={busy}
+          synced={synced}
+          onOpenChange={setPickerOpen}
+          onPlatformFilter={setPlatformFilter}
+          onPlatformQuery={setPlatformQuery}
+          onAccountQuery={setAccountQuery}
+          onToggle={toggleTarget}
+          onReplace={setSelectedTargets}
+        />
+        <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>确认发布</DialogTitle>
+              <DialogDescription>同一份内容会按账号依次发布，确认后开始。</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              {selectedTargets.map((target) => {
+                const account = accounts.find((item) => item.id === target.accountId);
+                return (
+                  <p key={`${target.accountId}:${target.identityId}`} className="text-sm">
+                    {account ? platformInfo[account.platform].label : "账号"} · {target.name} ·{" "}
+                    {account?.name} · {target.kind === "profile" ? "个人主页" : "公共主页"}
+                  </p>
+                );
+              })}
             </div>
-            <p className={`preview-body ${body ? "" : "preview-placeholder"}`}>
-              {body || "正文将在这里显示"}
+            {contentKind === "article" && <p className="text-sm font-medium">{title}</p>}
+            <div className="max-h-60 overflow-auto rounded-lg border p-3 text-sm whitespace-pre-wrap">
+              {body || "无正文"}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {images.length} 个素材 · {kindCaption(contentKind)}
             </p>
-            {images.length > 0 && (
-              <div className="grid grid-cols-2 gap-2">
-                {images.map((i) => (
-                  <img
-                    key={i.path}
-                    className="aspect-square w-full rounded-lg object-cover"
-                    src={i.preview}
-                    alt={i.name}
-                  />
-                ))}
-              </div>
-            )}
-            <p className="preview-caption">实际排版以 Facebook 为准</p>
-          </div>
-          <div className="publish-inspector">
-            <h2>发布目标</h2>
-            <p>个人主页与公共主页</p>
-            <div className="space-y-3 py-3">
-              {accounts.flatMap((a) =>
-                a.targets.map((target) => {
-                  const checked = selectedTargets.some(
-                    (t) => t.accountId === target.accountId && t.identityId === target.identityId,
-                  );
-                  return (
-                    <label
-                      key={`${a.id}:${target.identityId}`}
-                      className="flex items-start gap-2 text-sm"
-                    >
-                      <Checkbox
-                        checked={checked}
-                        disabled={busy}
-                        onCheckedChange={(value) =>
-                          setSelectedTargets((old) =>
-                            value
-                              ? [...old, target]
-                              : old.filter(
-                                  (t) =>
-                                    t.accountId !== target.accountId ||
-                                    t.identityId !== target.identityId,
-                                ),
-                          )
-                        }
-                      />
-                      <span>
-                        {target.name}
-                        <span className="block text-xs text-muted-foreground">
-                          {a.name} · {target.kind === "profile" ? "个人主页" : "公共主页"}
-                        </span>
-                      </span>
-                    </label>
-                  );
-                }),
-              )}
-              {!accounts.some((a) => a.targets.length) && (
-                <p className="text-xs text-muted-foreground">
-                  在账号管理中检查登录状态，识别可发布身份。
-                </p>
-              )}
-            </div>
-            <div className="publish-actions">
-              <span>已选 {selectedTargets.length} 个目标</span>
-              <Button
-                disabled={
-                  busy ||
-                  !body.trim() ||
-                  !selectedTargets.length ||
-                  records.targets.some((t) =>
-                    ["pending", "running", "awaiting_user"].includes(t.status),
-                  )
-                }
-                size="sm"
-                onClick={() => setPublishDialogOpen(true)}
-              >
-                <Send />
-                发布
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPublishDialogOpen(false)}>
+                取消
               </Button>
-            </div>
-            <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>确认发布</DialogTitle>
-                  <DialogDescription>
-                    将依次向以下目标发布，确认后开始提交。受众沿用 Facebook 当前设置。
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-2">
-                  {selectedTargets.map((t) => (
-                    <p key={`${t.accountId}:${t.identityId}`} className="text-sm">
-                      {t.name} · {t.kind === "profile" ? "个人主页" : "公共主页"} ·{" "}
-                      {accounts.find((a) => a.id === t.accountId)?.name}
-                    </p>
-                  ))}
-                </div>
-                <div className="max-h-60 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm">
-                  {body}
-                </div>
-                <p className="text-xs text-muted-foreground">{images.length} 张图片</p>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setPublishDialogOpen(false)}>
-                    取消
-                  </Button>
-                  <Button
-                    disabled={busy}
-                    onClick={() =>
-                      void run(async () => {
-                        const taskId = await window.desktop.publish(
-                          body,
-                          images.map((i) => i.path),
-                          selectedTargets,
-                        );
-                        setPublishDialogOpen(false);
-                        setFocusedTask(taskId);
-                        if (silentPublish) setActiveBrowser(null);
-                        await reload();
-                        setPage("history");
-                        setNotice("任务已创建，将依次发布。需要人工处理时请打开对应账号标签页。");
-                      })
-                    }
-                  >
-                    确认发布
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </aside>
+              <Button
+                disabled={busy || !ready}
+                onClick={() =>
+                  void run(async () => {
+                    const taskId = await window.desktop.publish(
+                      contentKind,
+                      contentKind === "article" ? title : null,
+                      body,
+                      paths,
+                      selectedTargets,
+                    );
+                    setPublishDialogOpen(false);
+                    setFocusedTask(taskId);
+                    if (silentPublish) setActiveBrowser(null);
+                    await reload();
+                    setPage("history");
+                    setNotice("任务已创建，将依次发布。需要人工处理时请打开对应账号标签页。");
+                  })
+                }
+              >
+                确认发布
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DocumentPage>
   );
+}
+
+function AccountPicker({
+  open,
+  accounts,
+  selectedTargets,
+  platformFilter,
+  platformQuery,
+  accountQuery,
+  busy,
+  synced,
+  onOpenChange,
+  onPlatformFilter,
+  onPlatformQuery,
+  onAccountQuery,
+  onToggle,
+  onReplace,
+}: {
+  open: boolean;
+  accounts: AccountInfo[];
+  selectedTargets: Target[];
+  platformFilter: PlatformId | "all";
+  platformQuery: string;
+  accountQuery: string;
+  busy: boolean;
+  synced: boolean;
+  onOpenChange: (open: boolean) => void;
+  onPlatformFilter: (id: PlatformId | "all") => void;
+  onPlatformQuery: (value: string) => void;
+  onAccountQuery: (value: string) => void;
+  onToggle: (target: Target, value: boolean) => void;
+  onReplace: (targets: Target[]) => void;
+}) {
+  const platformKeyword = platformQuery.trim().toLowerCase();
+  const accountKeyword = accountQuery.trim().toLowerCase();
+  const platforms = [...new Set(accounts.map((account) => account.platform))].filter((id) =>
+    platformInfo[id].label.toLowerCase().includes(platformKeyword),
+  );
+  const visibleAccounts = accounts.filter(
+    (account) => platformFilter === "all" || account.platform === platformFilter,
+  );
+  const visibleTargets = visibleAccounts.flatMap((account) =>
+    account.targets
+      .filter((target) => {
+        const accountName = account.name.toLowerCase();
+        const targetName = target.name.toLowerCase();
+        return accountName.includes(accountKeyword) || targetName.includes(accountKeyword);
+      })
+      .map((target) => ({ account, target })),
+  );
+  const allChecked =
+    visibleTargets.length > 0 &&
+    visibleTargets.every(({ target }) => selectedTargets.some((item) => sameTarget(item, target)));
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[760px]">
+        <DialogHeader>
+          <DialogTitle>选择账号</DialogTitle>
+          <DialogDescription>勾选本次要发布的账号，确认后再同步内容。</DialogDescription>
+        </DialogHeader>
+        <div className="grid min-h-80 grid-cols-[200px_minmax(0,1fr)] gap-3">
+          <div className="space-y-2">
+            <Input
+              aria-label="搜索平台"
+              placeholder="搜索平台"
+              value={platformQuery}
+              onChange={(event) => onPlatformQuery(event.target.value)}
+            />
+            <div className="max-h-64 space-y-1 overflow-auto">
+              {"全部平台".includes(platformQuery.trim()) && (
+                <button
+                  type="button"
+                  className={`w-full rounded-lg px-2 py-1.5 text-left text-sm ${platformFilter === "all" ? "bg-muted" : ""}`}
+                  onClick={() => onPlatformFilter("all")}
+                >
+                  全部平台
+                </button>
+              )}
+              {platforms.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${platformFilter === id ? "bg-muted" : ""}`}
+                  onClick={() => onPlatformFilter(id)}
+                >
+                  <PlatformMark id={id} />
+                  {platformInfo[id].label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="min-w-0">
+            <div className="mb-3 flex items-center gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={allChecked}
+                  disabled={busy || !visibleTargets.length}
+                  onCheckedChange={(value) => {
+                    const keys = new Set(visibleTargets.map(({ target }) => targetKey(target)));
+                    onReplace(
+                      value
+                        ? [
+                            ...selectedTargets.filter((target) => !keys.has(targetKey(target))),
+                            ...visibleTargets.map(({ target }) => target),
+                          ]
+                        : selectedTargets.filter((target) => !keys.has(targetKey(target))),
+                    );
+                  }}
+                />
+                全选
+              </label>
+              <Input
+                aria-label="搜索账号"
+                placeholder="输入账号名称"
+                value={accountQuery}
+                onChange={(event) => onAccountQuery(event.target.value)}
+              />
+            </div>
+            <div className="grid max-h-64 grid-cols-2 gap-2 overflow-auto">
+              {visibleTargets.map(({ account, target }) => (
+                <TargetChoice
+                  key={`${account.id}:${target.identityId}`}
+                  account={account}
+                  target={target}
+                  checked={selectedTargets.some((item) => sameTarget(item, target))}
+                  pending={synced && selectedTargets.some((item) => sameTarget(item, target))}
+                  disabled={busy}
+                  onCheckedChange={(value) => onToggle(target, value)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <DialogFooter className="items-center sm:justify-between">
+          <span className="text-sm text-muted-foreground">
+            已选择 {selectedTargets.length} 个账号
+          </span>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              取消
+            </Button>
+            <Button onClick={() => onOpenChange(false)}>确认添加</Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TargetChoice({
+  account,
+  target,
+  checked,
+  pending,
+  disabled,
+  onCheckedChange,
+}: {
+  account: AccountInfo;
+  target: Target;
+  checked: boolean;
+  pending: boolean;
+  disabled: boolean;
+  onCheckedChange: (value: boolean) => void;
+}) {
+  const info = platformInfo[account.platform];
+  return (
+    <label className="flex items-start gap-2 text-sm">
+      <Checkbox checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
+      <PlatformMark id={account.platform} />
+      <span>
+        {target.name}
+        <span className="block text-xs text-muted-foreground">
+          {info.label} · {account.name} · {target.kind === "profile" ? "个人主页" : "公共主页"}
+          {pending ? " · 待发布" : ""}
+        </span>
+      </span>
+    </label>
+  );
+}
+
+function PlatformMark({ id }: { id: PlatformId }) {
+  const icon = platformIcons[id];
+  const info = platformInfo[id];
+  if (icon) return <img src={icon} alt="" className="mt-0.5 size-4 rounded object-cover" />;
+  return (
+    <span
+      className="platform-mark mt-0.5 text-[10px]"
+      style={{ background: info.color, width: 16, height: 16 }}
+      aria-hidden="true"
+    >
+      {info.mark}
+    </span>
+  );
+}
+
+function sameTarget(left: Target, right: Target) {
+  return left.accountId === right.accountId && left.identityId === right.identityId;
+}
+
+function targetKey(target: Target) {
+  return `${target.accountId}:${target.identityId}`;
+}
+
+const kindCaption = (kind: ContentKind) =>
+  kind === "article" ? "文章" : kind === "moment" ? "图文" : kind === "video" ? "视频" : "音频";
+
+function mediaLabel(kind: ContentKind) {
+  if (kind === "article") return "选择封面";
+  if (kind === "video") return "选择视频";
+  if (kind === "audio") return "选择音频";
+  return "选择图片";
+}
+
+function canPublish(kind: ContentKind, title: string, body: string, paths: string[]) {
+  if (kind === "article") return Boolean(title.trim() && body.trim());
+  if (kind === "video") return paths.some(isVideo);
+  if (kind === "audio") return paths.some(isAudio);
+  return Boolean(body.trim());
 }

@@ -49,6 +49,12 @@ export const platforms = [
   "pinterest",
   "alipay",
   "hupu",
+  "zsxq",
+  "music163",
+  "qqmusic",
+  "qingting",
+  "lizhi",
+  "googlebusiness",
 ] as const;
 export type PlatformId = (typeof platforms)[number];
 export function isPlatform(value: unknown): value is PlatformId {
@@ -69,8 +75,11 @@ export type Status =
   | "verified"
   | "failed"
   | "unknown";
+export type ContentKind = "article" | "moment" | "video" | "audio";
 export type Task = {
   id: string;
+  contentKind: ContentKind;
+  title: string | null;
   body: string;
   images: string[];
   createdAt: string;
@@ -135,10 +144,21 @@ export interface DesktopApi {
   refreshAccount(id: string): Promise<AccountInfo>;
   deleteAccount(id: string): Promise<void>;
   importMarkdown(): Promise<string | null>;
-  chooseImages(): Promise<ImageAsset[]>;
-  saveDraft(body: string, images: ImageAsset[]): Promise<void>;
-  loadDraft(): Promise<{ body: string; images: ImageAsset[] }>;
-  publish(body: string, images: string[], targets: Target[]): Promise<string>;
+  chooseImages(kind?: ContentKind): Promise<ImageAsset[]>;
+  saveDraft(body: string, images: ImageAsset[], kind: ContentKind, title: string): Promise<void>;
+  loadDraft(): Promise<{
+    body: string;
+    images: ImageAsset[];
+    contentKind: ContentKind;
+    title: string | null;
+  }>;
+  publish(
+    kind: ContentKind,
+    title: string | null,
+    body: string,
+    images: string[],
+    targets: Target[],
+  ): Promise<string>;
   history(): Promise<{ tasks: Task[]; targets: TaskTarget[] }>;
   openPost(url: string): Promise<void>;
   verifyTarget(id: string, url?: string): Promise<void>;
@@ -146,7 +166,7 @@ export interface DesktopApi {
   resume(id: string): Promise<void>;
 }
 
-export type DesktopPage = "accounts" | "compose" | "history";
+export type DesktopPage = "accounts" | "compose" | "video" | "history";
 export type DesktopCommand =
   | { action: "tab"; operation: TabAction }
   | { action: "settings" }

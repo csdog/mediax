@@ -82,7 +82,7 @@ test(
             await page.getByRole("status").filter({ hasText: "草稿已保存" }).waitFor();
           } else
             assert.equal(await page.getByLabel("发布正文").inputValue(), "A durable local draft");
-          assert(await page.getByRole("button", { name: "发布", exact: true }).isDisabled());
+          assert(await page.getByRole("button", { name: "一键发布", exact: true }).isDisabled());
           await page.getByRole("button", { name: "保存草稿" }).click({ trial: true });
           await page.mouse.move(700, 250);
           await page.getByRole("tooltip").waitFor({ state: "hidden" });

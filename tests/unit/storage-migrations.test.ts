@@ -34,6 +34,12 @@ function legacyDatabase(file: string, version: 1 | 2) {
       "2026-10-01T00:00:00.000Z",
     );
   sqlite
+    .prepare("INSERT INTO tasks VALUES (?, ?, ?, ?)")
+    .run("legacy-video", "Clip", JSON.stringify(["/tmp/clip.mp4"]), "2026-09-01T00:00:00.000Z");
+  sqlite
+    .prepare("INSERT INTO tasks VALUES (?, ?, ?, ?)")
+    .run("legacy-article", "Only text", JSON.stringify([]), "2026-08-01T00:00:00.000Z");
+  sqlite
     .prepare("INSERT INTO targets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
     .run(
       "legacy-target",
@@ -77,15 +83,29 @@ it.each([1, 2] as const)(
     legacyDatabase(file, version);
     const db = new Database(file);
     try {
-      expect(db.schemaVersion()).toBe(4);
+      expect(db.schemaVersion()).toBe(5);
       expect(db.accounts()).toEqual([
         { id: "legacy-account", name: "Existing account", platform: "facebook" },
       ]);
-      expect(db.draft()).toEqual({ body: "Existing draft 中文", images: draftImages });
-      expect(db.tasks()[0]).toMatchObject({
-        id: "legacy-task",
+      expect(db.draft()).toEqual({
+        body: "Existing draft 中文",
+        images: draftImages,
+        contentKind: "moment",
+        title: null,
+      });
+      expect(db.tasks().find((task) => task.id === "legacy-task")).toMatchObject({
         body: "Article 中文",
         images: ["/tmp/中文.png"],
+        contentKind: "moment",
+        title: null,
+      });
+      expect(db.tasks().find((task) => task.id === "legacy-video")).toMatchObject({
+        contentKind: "video",
+        title: null,
+      });
+      expect(db.tasks().find((task) => task.id === "legacy-article")).toMatchObject({
+        contentKind: "article",
+        title: null,
       });
       expect(db.targets("legacy-task")[0]).toMatchObject({
         status: "verified",
@@ -103,7 +123,12 @@ it.each([1, 2] as const)(
     const reopened = new Database(file);
     try {
       expect(reopened.setting("mainWindow")).toMatchObject({ width: 1200, height: 740 });
-      expect(reopened.draft()).toEqual({ body: "Updated draft", images: draftImages });
+      expect(reopened.draft()).toEqual({
+        body: "Updated draft",
+        images: draftImages,
+        contentKind: "moment",
+        title: null,
+      });
       expect(() => reopened.retry("legacy-target")).toThrow("仅明确失败项允许重试");
     } finally {
       reopened.close();
@@ -111,7 +136,7 @@ it.each([1, 2] as const)(
     const sqlite = new Sqlite(file);
     try {
       expect(sqlite.prepare("SELECT count(*) AS count FROM __drizzle_migrations").get()).toEqual({
-        count: 2,
+        count: 3,
       });
       expect(
         sqlite.prepare("SELECT status, url FROM attempts WHERE id='legacy-attempt'").get(),
@@ -129,11 +154,11 @@ it("rejects future legacy versions and future Drizzle migrations", () => {
   db.addAccount("Preserve me");
   db.close();
   const sqlite = new Sqlite(file);
-  sqlite.pragma("user_version=5");
+  sqlite.pragma("user_version=6");
   sqlite.close();
   expect(() => new Database(file)).toThrow("不能降级读取");
   const next = new Sqlite(file);
-  next.pragma("user_version=4");
+  next.pragma("user_version=5");
   next.prepare("UPDATE __drizzle_migrations SET created_at=created_at+1").run();
   next.close();
   expect(() => new Database(file)).toThrow("不能降级读取");

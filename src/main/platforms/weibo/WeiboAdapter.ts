@@ -1,5 +1,7 @@
 import type { Page } from "playwright-core";
+import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
+import { openKindEditor, submitKindEditor } from "../editor";
 import { NeedsUser, NotSubmitted, type Publisher } from "../Publisher";
 import { coverImage, discoverProfile, replaceText, requireVideo, waitUntil } from "../form";
 import { postTitle } from "../postText";
@@ -10,7 +12,12 @@ function loggedOut(url: string) {
 
 export class WeiboAdapter implements Publisher {
   private composer: Page | null = null;
+  private usingEditor = false;
   constructor(private readonly page: () => Promise<Page>) {}
+
+  supportedKinds() {
+    return platformKinds("weibo");
+  }
 
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
@@ -21,6 +28,20 @@ export class WeiboAdapter implements Publisher {
   }
 
   async prepare(task: Task, _target: TaskTarget) {
+    this.usingEditor = task.contentKind === "article" || task.contentKind === "moment";
+    if (this.usingEditor) {
+      this.composer = null;
+      await openKindEditor(await this.page(), task, {
+        url:
+          task.contentKind === "article"
+            ? "https://card.weibo.com/article/v5/editor"
+            : "https://weibo.com/",
+        loggedOut,
+        hint: "请先在账号浏览器中登录 微博",
+        files: task.contentKind === "article" ? "cover" : "images",
+      });
+      return;
+    }
     const video = requireVideo(task, "微博");
     const cover = coverImage(task);
     if (!cover) throw new NeedsUser("微博视频需要一张封面，请在正文中附上图片");
@@ -69,6 +90,10 @@ export class WeiboAdapter implements Publisher {
   }
 
   async submit(_task: Task, _target: TaskTarget, markSubmitted: () => void) {
+    if (this.usingEditor) {
+      await submitKindEditor(await this.page(), markSubmitted);
+      return;
+    }
     const page = this.composer;
     if (!page) throw new NotSubmitted("微博发布页还没打开");
     const button = page.getByRole("button", { name: "发布" }).first();

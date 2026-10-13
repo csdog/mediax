@@ -48,8 +48,23 @@ import {
 } from "@/components/ui/dialog";
 import { platforms, type AccountInfo, type PlatformId } from "../../shared/models";
 import { platformInfo } from "../../shared/platforms";
+import { platformIcons } from "@/assets/platformIcons";
 function platformOf(account: AccountInfo): PlatformId {
   return account.platform ?? "facebook";
+}
+
+function PlatformGlyph({ id }: { id: PlatformId }) {
+  const icon = platformIcons[id];
+  if (icon) return <img src={icon} alt="" className="platform-icon" />;
+  return (
+    <span
+      className={id === "facebook" ? "facebook-mark" : "platform-mark"}
+      style={id === "facebook" ? undefined : { background: platformInfo[id].color }}
+      aria-hidden="true"
+    >
+      {platformInfo[id].mark}
+    </span>
+  );
 }
 
 const loginLabels = {
@@ -102,17 +117,7 @@ export function AccountManagement({
       <div className="min-w-0">
         <h2 className="truncate font-medium">{account.name}</h2>
         <p className="account-platform-label">
-          <span
-            className={platformOf(account) === "facebook" ? "facebook-mark" : "platform-mark"}
-            style={
-              platformOf(account) === "facebook"
-                ? undefined
-                : { background: platformInfo[platformOf(account)].color }
-            }
-            aria-hidden="true"
-          >
-            {platformInfo[platformOf(account)].mark}
-          </span>
+          <PlatformGlyph id={platformOf(account)} />
           {platformInfo[platformOf(account)].label}
         </p>
       </div>
@@ -164,11 +169,12 @@ export function AccountManagement({
             <Button
               variant="ghost"
               size="icon"
+              className="account-delete text-destructive hover:bg-destructive/10 hover:text-destructive"
               aria-label={`删除 ${account.name}`}
               disabled={busy}
               onClick={() => setPendingDelete(account)}
             >
-              <Trash2 />
+              <Trash2 className="text-destructive" />
             </Button>
           }
         />
@@ -249,13 +255,7 @@ export function AccountManagement({
                   aria-pressed={platform === id}
                   onClick={() => setPlatform(id)}
                 >
-                  <span
-                    className={id === "facebook" ? "facebook-mark" : "platform-mark"}
-                    style={id === "facebook" ? undefined : { background: platformInfo[id].color }}
-                    aria-hidden="true"
-                  >
-                    {platformInfo[id].mark}
-                  </span>
+                  <PlatformGlyph id={id} />
                   {platformInfo[id].label}
                   <span>{accounts.filter((account) => platformOf(account) === id).length}</span>
                 </Button>

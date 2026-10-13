@@ -1,14 +1,14 @@
 import type { Locator, Page } from "playwright-core";
 import type { Target, Task } from "../../shared/models";
 import { NeedsUser, NotSubmitted } from "./Publisher";
-import { isVideo } from "./postText";
+import { isAudio, isVideo } from "../../shared/content";
 
 export function selectAll() {
   return process.platform === "darwin" ? "Meta+A" : "Control+A";
 }
 
 export function photos(task: Task) {
-  return task.images.filter((path) => !isVideo(path));
+  return task.images.filter((path) => !isVideo(path) && !isAudio(path));
 }
 
 export function coverImage(task: Task) {
@@ -22,7 +22,7 @@ export async function discoverProfile(
   loggedOut: (url: string) => boolean,
 ): Promise<Target[]> {
   if (loggedOut(page.url())) return [];
-  return [{ accountId, identityId: "account", name, kind: "profile" }];
+  return [{ accountId, identityId: "1", name, kind: "profile" }];
 }
 
 export async function replaceText(page: Page, box: Locator, text: string) {

@@ -1,18 +1,26 @@
 import type { Page } from "playwright-core";
+import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
+import { openKindEditor, submitKindEditor } from "../editor";
 import { NeedsUser, type Publisher } from "../Publisher";
 import { discoverProfile, photos, replaceText, requireFile, waitUntil } from "../form";
 import { isVideo, postTitle } from "../postText";
 
 const videoUrl = "https://creator.xiaohongshu.com/publish/publish?from=homepage&target=video";
 const imageUrl = "https://creator.xiaohongshu.com/publish/publish?from=homepage&target=image";
+const articleUrl = "https://creator.xiaohongshu.com/publish/publish?from=homepage&target=article";
 
 function loggedOut(url: string) {
   return /login|signin/i.test(url) || !url.includes("creator.xiaohongshu.com");
 }
 
 export class XiaohongshuAdapter implements Publisher {
+  private usingEditor = false;
   constructor(private readonly page: () => Promise<Page>) {}
+
+  supportedKinds() {
+    return platformKinds("xiaohongshu");
+  }
 
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
@@ -26,7 +34,17 @@ export class XiaohongshuAdapter implements Publisher {
   }
 
   async prepare(task: Task, _target: TaskTarget) {
-    const video = task.images.find(isVideo);
+    this.usingEditor = task.contentKind === "article";
+    if (this.usingEditor) {
+      await openKindEditor(await this.page(), task, {
+        url: articleUrl,
+        loggedOut,
+        hint: "请先在账号浏览器中登录 小红书",
+        files: "cover",
+      });
+      return;
+    }
+    const video = task.contentKind === "video" ? task.images.find(isVideo) : undefined;
     const images = photos(task);
     if (!video && !images.length)
       throw new NeedsUser("小红书需要一段视频或图片，请附上素材后再发布");
@@ -62,6 +80,10 @@ export class XiaohongshuAdapter implements Publisher {
 
   async submit(_task: Task, _target: TaskTarget, markSubmitted: () => void) {
     const page = await this.page();
+    if (this.usingEditor) {
+      await submitKindEditor(page, markSubmitted);
+      return;
+    }
     const button = page.locator('button:has-text("发布")').last();
     await button.waitFor({ state: "visible", timeout: 15000 });
     markSubmitted();

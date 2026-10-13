@@ -6,7 +6,7 @@ files:
   - drizzle/meta/_journal.json
   - package.json
 mac:
-  icon: build/icon.icns
+  icon: build/icon.png
   target: dir
   identity: null
 

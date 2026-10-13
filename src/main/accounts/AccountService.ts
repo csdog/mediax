@@ -1,4 +1,4 @@
-import { app, session } from "electron";
+import { app, nativeImage, session } from "electron";
 import type { AccountInfo, BrowserBounds, PlatformId, Target } from "../../shared/models";
 import { FacebookAdapter } from "../platforms/facebook/FacebookAdapter";
 import { createPublisher } from "../platforms/registry";
@@ -14,6 +14,7 @@ import {
 } from "../platforms/catalog";
 import { platformInfo } from "../../shared/platforms";
 import { NeedsUser, type Publisher } from "../platforms/Publisher";
+import { discoveredAccountName, shouldAdoptAccountName, usableAccountName } from "./accountName";
 import { Database } from "../storage/Database";
 import { AccountBrowserManager } from "../browser/AccountBrowserManager";
 
@@ -32,9 +33,10 @@ export class AccountService {
     private browsers: AccountBrowserManager,
   ) {}
   list() {
-    return this.db
-      .accounts()
-      .map((account) => this.states.get(account.id) ?? this.stored(account.id));
+    return this.db.accounts().map((account) => {
+      const info = this.states.get(account.id) ?? this.stored(account.id);
+      return this.adoptName(account.id, info);
+    });
   }
   startAutoRefresh() {
     if (this.timer) return;
@@ -54,7 +56,7 @@ export class AccountService {
     const account = this.db.account(id);
     await this.browsers.open(id, platformHome[account.platform], { platform: account.platform });
     this.browsers.show(id);
-    if (account.platform === "facebook") await this.updateAvatar(id);
+    await this.updateAvatar(id);
   }
   private cachedAvatar(id: string) {
     const value = this.db.setting(`avatar:${id}`) as {
@@ -69,15 +71,21 @@ export class AccountService {
       : null;
   }
   private async updateAvatar(id: string): Promise<string | undefined> {
-    if (this.db.account(id).platform !== "facebook") return this.cachedAvatar(id)?.image;
+    const account = this.db.account(id);
     const view = this.browsers.get(id);
     if (!view || view.webContents.isDestroyed()) return this.cachedAvatar(id)?.image;
     try {
       const cookies = await view.webContents.session.cookies.get({
-        url: "https://www.facebook.com",
+        url: platformCookieUrl[account.platform],
       });
-      const owner = cookies.find((cookie) => cookie.name === "c_user")?.value;
-      const actor = cookies.find((cookie) => cookie.name === "i_user")?.value || owner;
+      const pageUrl = view.webContents.getURL();
+      const owner =
+        sessionOwner(account.platform, cookies) ??
+        (urlLooksLoggedIn(account.platform, pageUrl) ? account.platform : null);
+      const actor =
+        account.platform === "facebook"
+          ? cookies.find((cookie) => cookie.name === "i_user")?.value || owner
+          : owner;
       const cached = this.cachedAvatar(id);
       const previous =
         cached && cached.owner === owner && cached.actor === actor ? cached.image : undefined;
@@ -87,36 +95,50 @@ export class AccountService {
         if (state) this.states.set(id, { ...state, avatar: undefined });
       }
       if (!owner) return;
-      // Capture only the current account menu's loaded image, never feed/user pictures.
-      // Local pixels avoid exposing the account's CDN URL or cookies to the renderer.
-      const rect = await view.webContents.executeJavaScript(`(() => {
-        const button = [...document.querySelectorAll('[role="button"],button')].find((el) =>
-          /^(Account|Your profile|你的个人主页|账户|帐户|账号)$/i.test(el.getAttribute('aria-label') || '') && el.getBoundingClientRect().width > 0);
-        if (!button) return null;
-        for (const image of button.querySelectorAll('img,svg image')) {
-          if (image.tagName.toLowerCase() === 'img' && (!image.complete || !image.naturalWidth)) continue;
-          const r = image.getBoundingClientRect();
-          if (r.width < 16 || r.height < 16 || r.width > 160 || r.height > 160 || r.x < 0 || r.y < 0 || r.right > innerWidth || r.bottom > innerHeight) continue;
-          return { x: Math.floor(r.x), y: Math.floor(r.y), width: Math.ceil(r.width), height: Math.ceil(r.height) };
-        }
-        return null;
-      })()`);
+      const found = (await view.webContents.executeJavaScript(avatarProbe)) as {
+        href?: string | null;
+        rect?: { x: number; y: number; width: number; height: number } | null;
+        name?: string | null;
+      } | null;
       let image = previous;
-      if (rect) {
-        const pixels = await view.webContents.capturePage(rect, {
+      if (found?.href)
+        image = (await this.downloadAvatar(view.webContents.session, found.href)) ?? image;
+      if (image === previous && found?.rect) {
+        const pixels = await view.webContents.capturePage(found.rect, {
           stayHidden: true,
           stayAwake: true,
         });
-        if (!pixels.isEmpty()) {
+        if (!pixels.isEmpty())
           image = pixels.resize({ width: 80, height: 80, quality: "good" }).toDataURL();
-          this.db.setSetting(`avatar:${id}`, { owner, actor, image });
-        }
       }
+      if (image && image !== previous) this.db.setSetting(`avatar:${id}`, { owner, actor, image });
+      const named = usableAccountName(account.platform, found?.name);
+      if (named && shouldAdoptAccountName(account.name, named)) this.db.renameAccount(id, named);
       const state = this.states.get(id);
-      if (state) this.states.set(id, { ...state, avatar: image });
+      if (state)
+        this.states.set(id, {
+          ...state,
+          avatar: image,
+          name: named && shouldAdoptAccountName(state.name, named) ? named : state.name,
+        });
       return image;
     } catch {
       return this.cachedAvatar(id)?.image;
+    }
+  }
+  private async downloadAvatar(partition: Electron.Session, href: string) {
+    try {
+      const response = await partition.fetch(href);
+      if (!response.ok) return null;
+      const type = response.headers.get("content-type") ?? "";
+      if (type && !type.startsWith("image/")) return null;
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (!bytes.length || bytes.length > 2_000_000) return null;
+      const image = nativeImage.createFromBuffer(bytes);
+      if (image.isEmpty()) return null;
+      return image.resize({ width: 80, height: 80, quality: "good" }).toDataURL();
+    } catch {
+      return null;
     }
   }
   async preview(id: string) {
@@ -235,6 +257,7 @@ export class AccountService {
       targets: (this.states.get(id) ?? this.stored(id)).targets,
       message: loginPrompt(a.platform),
     };
+    result.name = this.db.account(id).name;
     if (result.login === "logged_in") {
       try {
         const found = await this.adapter(id).discover(id);
@@ -255,6 +278,9 @@ export class AccountService {
         result.message = error instanceof Error ? error.message : String(error);
         if (!(error instanceof NeedsUser)) result.message = `身份检查失败：${result.message}`;
       }
+      result.avatar = (await this.updateAvatar(id)) ?? result.avatar;
+      result.name = this.db.account(id).name;
+      Object.assign(result, this.adoptName(id, result));
     } else if (result.login === "needs_verification")
       result.message =
         a.platform === "facebook"
@@ -262,6 +288,16 @@ export class AccountService {
           : "请在账号浏览器中完成安全验证后重新检查";
     this.remember(result);
     return result;
+  }
+  private adoptName(id: string, info: AccountInfo) {
+    const discovered = discoveredAccountName(info.platform, info.targets);
+    const cleaned = usableAccountName(info.platform, info.name);
+    const name = discovered ?? (cleaned && cleaned !== info.name ? cleaned : null);
+    if (!name || name === info.name) return info;
+    this.db.renameAccount(id, name);
+    const renamed = { ...info, name };
+    this.states.set(id, renamed);
+    return renamed;
   }
   private stored(id: string): AccountInfo {
     const account = this.db.account(id);
@@ -388,6 +424,67 @@ function loginPrompt(platform: PlatformId) {
   if (platform === "youtube") return "请在账号标签页中登录 Google / YouTube";
   return `请在账号标签页中登录 ${platformInfo[platform].label}`;
 }
+
+const avatarProbe = `(() => {
+  const hrefOf = (image) => {
+    const raw = image.currentSrc || image.src || image.getAttribute("href") || "";
+    if (!raw || raw.startsWith("data:") || raw.startsWith("blob:")) return null;
+    try {
+      const url = new URL(raw, location.href);
+      if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+      return url.href;
+    } catch {
+      return null;
+    }
+  };
+  const rectOf = (image) => {
+    const tag = image.tagName.toLowerCase();
+    if (tag === "img" && (!image.complete || !image.naturalWidth)) return null;
+    const r = image.getBoundingClientRect();
+    if (
+      r.width < 16 || r.height < 16 || r.width > 160 || r.height > 160 ||
+      r.x < 0 || r.y < 0 || r.right > innerWidth || r.bottom > innerHeight
+    ) return null;
+    return { x: Math.floor(r.x), y: Math.floor(r.y), width: Math.ceil(r.width), height: Math.ceil(r.height) };
+  };
+  const nameOf = (image) => {
+    let alt = (image.getAttribute("alt") || "").trim();
+    const wrapped = alt.match(/^(?:点击)?(?:打开|进入)(.+?)的(?:个人)?主页$/);
+    if (wrapped) alt = wrapped[1].trim();
+    if (!alt || alt.length > 40) return null;
+    if (/avatar|头像|logo|icon|profile|账号|账户|帐户|个人主页/i.test(alt)) return null;
+    return alt;
+  };
+  const pack = (image) => {
+    const href = hrefOf(image);
+    const rect = rectOf(image);
+    const name = nameOf(image);
+    return href || rect || name ? { href, rect, name } : null;
+  };
+  const menu = [...document.querySelectorAll('[role="button"],button')].find((el) =>
+    /^(Account|Your profile|你的个人主页|账户|帐户|账号)$/i.test(el.getAttribute("aria-label") || "") &&
+    el.getBoundingClientRect().width > 0);
+  if (menu) {
+    for (const image of menu.querySelectorAll("img,svg image")) {
+      const found = pack(image);
+      if (found) return found;
+    }
+    return null;
+  }
+  for (const image of document.querySelectorAll("img")) {
+    const text = [image.alt, image.getAttribute("aria-label") || "", image.className, image.getAttribute("src") || ""].join(" ");
+    if (!/avatar|头像|portrait/i.test(text)) continue;
+    const found = pack(image);
+    if (found) return found;
+  }
+  for (const el of document.querySelectorAll("[class*='avatar'],[class*='Avatar']")) {
+    const match = /url\\((['"]?)(https?:\\/\\/[^'")]+)\\1\\)/.exec(getComputedStyle(el).backgroundImage || "");
+    if (!match) continue;
+    const rect = rectOf(el);
+    return { href: match[2], rect };
+  }
+  return null;
+})()`;
 
 function discoveredMessage(platform: PlatformId, targets: Target[]) {
   if (platform === "youtube")

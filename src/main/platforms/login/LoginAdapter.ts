@@ -1,5 +1,5 @@
 import type { Page } from "playwright-core";
-import type { Target, Task, TaskTarget } from "../../../shared/models";
+import type { ContentKind, Target, Task, TaskTarget } from "../../../shared/models";
 import { NeedsUser, type Publisher } from "../Publisher";
 
 const loginPage = /login|signin|passport|userAuth/i;
@@ -10,10 +10,14 @@ export class LoginAdapter implements Publisher {
     private readonly label: string,
   ) {}
 
+  supportedKinds(): ContentKind[] {
+    return [];
+  }
+
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
     if (loginPage.test(page.url())) return [];
-    return [{ accountId, identityId: "account", name: this.label, kind: "profile" }];
+    return [{ accountId, identityId: "1", name: this.label, kind: "profile" }];
   }
 
   async prepare(): Promise<void> {

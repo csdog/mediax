@@ -36,6 +36,7 @@ export class DesktopShell {
       Menu.buildFromTemplate([
         { label: "打开主窗口", click: () => this.show() },
         { label: "编辑内容", click: () => this.navigate("compose") },
+        { label: "视频", click: () => this.navigate("video") },
         { label: "发布记录", click: () => this.navigate("history") },
         { type: "separator" },
         { label: "退出 media-post", click: () => app.quit() },
@@ -286,9 +287,15 @@ export class DesktopShell {
               click: () => this.navigate("compose"),
             },
             {
+              id: "desktop.video",
+              label: "视频",
+              accelerator: "CmdOrCtrl+3",
+              click: () => this.navigate("video"),
+            },
+            {
               id: "desktop.history",
               label: "发布记录",
-              accelerator: "CmdOrCtrl+3",
+              accelerator: "CmdOrCtrl+4",
               click: () => this.navigate("history"),
             },
             { type: "separator" },

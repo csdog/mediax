@@ -1,4 +1,5 @@
 import type { Page } from "playwright-core";
+import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
 import { NeedsUser, NotSubmitted, type Publisher } from "../Publisher";
 import { isVideo, postTitle } from "../postText";
@@ -37,6 +38,10 @@ async function fillEditable(page: Page, selector: string, text: string) {
 export class YouTubeAdapter implements Publisher {
   constructor(private readonly page: () => Promise<Page>) {}
 
+  supportedKinds() {
+    return platformKinds("youtube");
+  }
+
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
     await page.goto("https://studio.youtube.com/", {
@@ -46,7 +51,7 @@ export class YouTubeAdapter implements Publisher {
     await page.waitForTimeout(2500);
     const url = page.url();
     if (url.includes("accounts.google.com") || /signin/i.test(url)) return [];
-    const identityId = url.match(/\/channel\/(UC[\w-]+)/)?.[1] ?? "channel";
+    const identityId = "1";
     const entity = page.locator("#entity-name, ytcp-entity-name").first();
     const name =
       ((await entity.count()) ? await entity.textContent() : "")?.trim() || "YouTube 频道";
@@ -54,6 +59,7 @@ export class YouTubeAdapter implements Publisher {
   }
 
   async prepare(task: Task, _target: TaskTarget) {
+    if (task.contentKind !== "video") throw new NeedsUser("YouTube 目前只发布视频");
     const video = task.images.find(isVideo);
     if (!video) throw new NeedsUser("YouTube 需要一段视频，请在正文中附上视频后再发布");
     const page = await this.page();

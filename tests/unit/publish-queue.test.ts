@@ -19,6 +19,7 @@ it("serializes targets and never repeats verified targets", async () => {
   const db = setup(),
     calls: string[] = [];
   const p: Publisher = {
+    supportedKinds: () => [],
     prepare: async () => {},
     submit: async (_, t) => {
       calls.push(t.identityId);
@@ -38,6 +39,7 @@ it("pauses on verification and resumes only after another preparation", async ()
   let blocked = true;
   let submitted = 0;
   const p: Publisher = {
+    supportedKinds: () => [],
     prepare: async () => {
       if (blocked) throw new NeedsUser("login");
     },
@@ -58,6 +60,7 @@ it("pauses on verification and resumes only after another preparation", async ()
 it("keeps ambiguous submit unknown and refuses retry", async () => {
   const db = setup();
   const p: Publisher = {
+    supportedKinds: () => [],
     prepare: async () => {},
     submit: async (_task, _target, markSubmitted) => {
       markSubmitted();
@@ -76,6 +79,7 @@ it("allows a clear preparation failure to retry without rerunning success", asyn
   let failed = true;
   const submits: string[] = [];
   const p: Publisher = {
+    supportedKinds: () => [],
     prepare: async (_, t) => {
       if (t.identityId === "1" && failed) throw new Error("unreadable image");
     },

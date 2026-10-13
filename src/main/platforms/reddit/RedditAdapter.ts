@@ -1,4 +1,5 @@
 import type { Page } from "playwright-core";
+import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
 import { NeedsUser, type Publisher } from "../Publisher";
 import { isVideo, postTitle } from "../postText";
@@ -7,6 +8,10 @@ import { isVideo, postTitle } from "../postText";
 // (u_username), which is the session this app already stores.
 export class RedditAdapter implements Publisher {
   constructor(private readonly page: () => Promise<Page>) {}
+
+  supportedKinds() {
+    return platformKinds("reddit");
+  }
 
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
@@ -22,10 +27,11 @@ export class RedditAdapter implements Publisher {
       ?.replace(/^u\//, "")
       .trim();
     if (!user || /log\s*in|登录/i.test(user)) return [];
-    return [{ accountId, identityId: user, name: `u/${user}`, kind: "profile" }];
+    return [{ accountId, identityId: "1", name: `u/${user}`, kind: "profile" }];
   }
 
   async prepare(task: Task, target: TaskTarget) {
+    if (task.contentKind !== "article") throw new NeedsUser("Reddit 目前只发布文章");
     if (task.images.some(isVideo))
       throw new NeedsUser("Reddit 目前发布文字帖。视频请改用 YouTube。");
     if (task.images.length) throw new NeedsUser("Reddit 目前发布文字帖。图片请改用 Facebook。");
@@ -36,10 +42,11 @@ export class RedditAdapter implements Publisher {
     });
     if (page.url().includes("/login")) throw new NeedsUser("请先在账号浏览器中登录 Reddit");
     const community = page.locator('input[name="sr"]').first();
-    if (await community.count()) await community.fill(`u_${target.identityId}`);
+    const handle = target.name.replace(/^u\//, "");
+    if (await community.count()) await community.fill(`u_${handle}`);
     const title = page.locator('textarea[name="title"], input[name="title"]').first();
     await title.waitFor({ state: "visible", timeout: 20000 });
-    await title.fill(postTitle(task.body, 300, "未命名帖子"));
+    await title.fill((task.title?.trim() || postTitle(task.body, 300, "未命名帖子")).slice(0, 300));
     const body = page.locator('textarea[name="text"]').first();
     if (await body.count()) await body.fill(task.body.slice(0, 40000));
   }

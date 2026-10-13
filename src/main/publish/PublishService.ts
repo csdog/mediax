@@ -1,7 +1,8 @@
 import { mkdir, copyFile, rm, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Target } from "../../shared/models";
+import { validatePublish } from "../../shared/content";
+import type { ContentKind, Target } from "../../shared/models";
 import { Database } from "../storage/Database";
 import { AccountService } from "../accounts/AccountService";
 import { PublishQueue } from "./PublishQueue";
@@ -27,21 +28,34 @@ export class PublishService {
       this.running = null;
     }
   }
-  async publish(body: string, paths: string[], selected: Target[]): Promise<string> {
+  async publish(
+    kind: ContentKind,
+    title: string | null,
+    body: string,
+    paths: string[],
+    selected: Target[],
+  ): Promise<string> {
     if (this.creating) throw new Error("正在创建发布任务，请勿重复提交");
     this.creating = true;
     try {
-      return await this.create(body, paths, selected);
+      return await this.create(kind, title, body, paths, selected);
     } finally {
       this.creating = false;
     }
   }
-  private async create(body: string, paths: string[], selected: Target[]): Promise<string> {
-    if (!body.trim() || !selected.length) throw new Error("请填写正文并选择发布目标");
+  private async create(
+    kind: ContentKind,
+    title: string | null,
+    body: string,
+    paths: string[],
+    selected: Target[],
+  ): Promise<string> {
+    if (!selected.length) throw new Error("请填写正文并选择发布目标");
     if (this.running) throw new Error("已有发布任务正在执行");
     if (this.db.targets().some((t) => t.status === "awaiting_user" || t.status === "pending"))
       throw new Error("请先在发布记录中处理尚未完成的任务");
-    const known = this.accounts.list().flatMap((a) => a.targets);
+    const listed = this.accounts.list();
+    const known = listed.flatMap((a) => a.targets);
     const targets = selected.map((t) => {
       const target = known.find(
         (k) => k.accountId === t.accountId && k.identityId === t.identityId && k.kind === t.kind,
@@ -51,6 +65,17 @@ export class PublishService {
     });
     if (new Set(targets.map((t) => `${t.accountId}:${t.identityId}`)).size !== targets.length)
       throw new Error("发布目标重复");
+    validatePublish({
+      kind,
+      title,
+      body,
+      paths,
+      platforms: targets.map((target) => {
+        const account = listed.find((item) => item.id === target.accountId);
+        if (!account) throw new Error("账号不存在");
+        return account.platform;
+      }),
+    });
     const directory = join(this.assetsDirectory, randomUUID());
     await mkdir(directory, { recursive: true });
     let id: string;
@@ -59,12 +84,12 @@ export class PublishService {
       for (const [index, source] of paths.entries()) {
         const info = await stat(source);
         if (!info.isFile() || info.size > 20 * 1024 * 1024)
-          throw new Error("图片不可读或超过 20MB");
+          throw new Error("素材不可读或超过 20MB");
         const path = join(directory, `${index}${extname(source).toLowerCase()}`);
         await copyFile(source, path);
         images.push(path);
       }
-      id = this.db.createTask(body, images, targets).id;
+      id = this.db.createTask(body, images, targets, { contentKind: kind, title }).id;
     } catch (error) {
       await rm(directory, { recursive: true, force: true });
       throw error;

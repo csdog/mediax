@@ -6,7 +6,7 @@ export function DocumentPage({ children }: { children: ReactNode }) {
   const { page, pageTitle, notice } = useWorkspace();
   return (
     <main
-      className={`document-content ${page === "compose" ? "compose-content" : page === "accounts" ? "accounts-content" : page === "history" ? "history-content" : ""}`}
+      className={`document-content ${page === "compose" || page === "video" ? "compose-content" : page === "accounts" ? "accounts-content" : page === "history" ? "history-content" : ""}`}
     >
       <h1 className="sr-only">{pageTitle}</h1>
       {notice && (

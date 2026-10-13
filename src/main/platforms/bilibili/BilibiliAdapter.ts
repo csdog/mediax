@@ -1,5 +1,7 @@
 import type { Page } from "playwright-core";
+import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
+import { openKindEditor, submitKindEditor } from "../editor";
 import { NeedsUser, type Publisher } from "../Publisher";
 import {
   discoverProfile,
@@ -18,7 +20,12 @@ function loggedOut(url: string) {
 }
 
 export class BilibiliAdapter implements Publisher {
+  private usingEditor = false;
   constructor(private readonly page: () => Promise<Page>) {}
+
+  supportedKinds() {
+    return platformKinds("bilibili");
+  }
 
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
@@ -32,6 +39,16 @@ export class BilibiliAdapter implements Publisher {
   }
 
   async prepare(task: Task, _target: TaskTarget) {
+    this.usingEditor = task.contentKind === "article";
+    if (this.usingEditor) {
+      await openKindEditor(await this.page(), task, {
+        url: "https://member.bilibili.com/platform/upload/text/edit",
+        loggedOut,
+        hint: "请先在账号浏览器中登录 哔哩哔哩",
+        files: "cover",
+      });
+      return;
+    }
     const video = requireVideo(task, "哔哩哔哩");
     const page = await this.page();
     await page.goto(uploadUrl, { waitUntil: "domcontentloaded", timeout: 90000 });
@@ -74,6 +91,10 @@ export class BilibiliAdapter implements Publisher {
 
   async submit(_task: Task, _target: TaskTarget, markSubmitted: () => void) {
     const page = await this.page();
+    if (this.usingEditor) {
+      await submitKindEditor(page, markSubmitted);
+      return;
+    }
     const button = page.locator('button:has-text("立即投稿")').first();
     await button.waitFor({ state: "visible", timeout: 15000 });
     if (!(await button.isEnabled())) throw new NeedsUser("请在投稿页选择分区后再发布");

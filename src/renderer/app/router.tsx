@@ -27,6 +27,11 @@ const composeRoute = createRoute({
   path: "/compose",
   component: ComposePage,
 });
+const videoRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/video",
+  component: ComposePage,
+});
 const historyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/history",
@@ -37,7 +42,13 @@ const settingsRoute = createRoute({
   path: "/settings",
   component: SettingsPage,
 });
-const routeTree = rootRoute.addChildren([accountsRoute, composeRoute, historyRoute, settingsRoute]);
+const routeTree = rootRoute.addChildren([
+  accountsRoute,
+  composeRoute,
+  videoRoute,
+  historyRoute,
+  settingsRoute,
+]);
 export function createWorkspaceRouter() {
   return createRouter({
     routeTree,

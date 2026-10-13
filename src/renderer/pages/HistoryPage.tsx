@@ -5,6 +5,7 @@ import {
   ExternalLink,
   FileText,
   Image as ImageIcon,
+  Music,
   Video,
   LayoutGrid,
   List,
@@ -145,7 +146,7 @@ export function HistoryPage() {
         }))
         .filter(({ task, targets }) => {
           const names = publisherNames(targets, accounts);
-          const workKind = contentKind(task.images);
+          const workKind = task.contentKind;
           const text = `${task.body} ${names.join(" ")}`.toLocaleLowerCase();
           return (
             text.includes(query.trim().toLocaleLowerCase()) &&
@@ -169,7 +170,7 @@ export function HistoryPage() {
         const accountCount = new Set(targets.map((target) => target.accountId)).size;
         return [
           titleOf(task.body),
-          kindLabel[contentKind(task.images)],
+          kindLabel[task.contentKind],
           names.join("、"),
           "立即发布",
           `${accountCount} 账号 · ${targets.length} 任务`,
@@ -241,8 +242,9 @@ export function HistoryPage() {
                   options={[
                     { value: "all", label: "全部作品类型" },
                     { value: "article", label: "文章" },
-                    { value: "image", label: "图文" },
+                    { value: "moment", label: "图文" },
                     { value: "video", label: "视频" },
+                    { value: "audio", label: "音频" },
                   ]}
                 />
                 <Filter
@@ -426,15 +428,17 @@ function Filter({
   );
 }
 
-function contentKind(paths: string[]) {
-  if (paths.some((path) => /\.(mp4|mov|m4v|webm)$/i.test(path))) return "video" as const;
-  if (paths.length) return "image" as const;
-  return "article" as const;
-}
-const kindLabel = { article: "文章", image: "图文", video: "视频" };
+const kindLabel = { article: "文章", moment: "图文", video: "视频", audio: "音频" };
 function Work({ task, cover = task.cover }: { task: Task; cover?: string | null }) {
-  const kind = contentKind(task.images);
-  const Icon = kind === "video" ? Video : kind === "image" || cover ? ImageIcon : FileText;
+  const kind = task.contentKind;
+  const Icon =
+    kind === "video"
+      ? Video
+      : kind === "audio"
+        ? Music
+        : kind === "moment" || cover
+          ? ImageIcon
+          : FileText;
   return (
     <div className="history-work">
       <span className="history-thumb">
@@ -611,7 +615,7 @@ function RecordMenu({ task, targets }: { task: Task; targets: TaskTarget[] }) {
 }
 
 function DraftPane() {
-  const { body, images, setPage } = useWorkspace();
+  const { body, images, contentKind, title, setPage } = useWorkspace();
   if (!body.trim() && !images.length)
     return (
       <Empty className="m-auto py-16">
@@ -627,7 +631,14 @@ function DraftPane() {
   return (
     <div className="history-draft">
       <Work
-        task={{ id: "draft", body, images: images.map((image) => image.path), createdAt: "" }}
+        task={{
+          id: "draft",
+          body,
+          title: title || null,
+          contentKind,
+          images: images.map((image) => image.path),
+          createdAt: "",
+        }}
         cover={images[0]?.preview}
       />
       <p className="text-muted-foreground">

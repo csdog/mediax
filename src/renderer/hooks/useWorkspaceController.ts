@@ -3,6 +3,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import type {
   AccountInfo,
+  ContentKind,
   ImageAsset,
   Task,
   TaskTarget,
@@ -14,6 +15,7 @@ import type {
 import { useTabPreview } from "./useTabPreview";
 import { useAccountBrowserLayout } from "./useAccountBrowserLayout";
 import { usePublishSettings } from "./usePublishSettings";
+import { supportedKinds } from "../../shared/content";
 import { navigation } from "@/app/navigation";
 import { accountsOptions, historyOptions } from "@/app/queries";
 const emptyAccounts: AccountInfo[] = [];
@@ -26,8 +28,11 @@ export function useWorkspaceController() {
   const settingsOpen = pathname === "/settings";
   const routePage = navigation.find((item) => pathname === `/${item.id}`)?.id;
   const page = routePage ?? lastPage;
+  const selectKindRef = useRef<(kind: ContentKind) => void>(() => {});
   const setPage = (next: DesktopPage) => {
     setLastPage(next);
+    if (next === "compose") selectKindRef.current("moment");
+    if (next === "video") selectKindRef.current("video");
     void navigate({ to: `/${next}` });
   };
   const setSettingsOpen = (open: boolean) => {
@@ -49,12 +54,18 @@ export function useWorkspaceController() {
     refetchIntervalInBackground: true,
   });
   const accounts = accountsQuery.data ?? emptyAccounts;
+  const accountsRef = useRef(accounts);
+  accountsRef.current = accounts;
   const records = historyQuery.data ?? emptyRecords;
   const setAccounts = (next: React.SetStateAction<AccountInfo[]>) =>
     queryClient.setQueryData(accountsOptions.queryKey, (old: AccountInfo[] | undefined) =>
       typeof next === "function" ? next(old ?? []) : next,
     );
   const [name, setName] = useState("");
+  const [contentKind, setContentKind] = useState<ContentKind>("moment");
+  const contentKindRef = useRef(contentKind);
+  contentKindRef.current = contentKind;
+  const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [images, setImages] = useState<ImageAsset[]>([]);
   const [notice, setNotice] = useState("");
@@ -65,6 +76,18 @@ export function useWorkspaceController() {
     if (error) setNotice(error.message);
   }, [accountsQuery.error, historyQuery.error]);
   const [selectedTargets, setSelectedTargets] = useState<Target[]>([]);
+  selectKindRef.current = (kind: ContentKind) => {
+    if (contentKindRef.current === kind) return;
+    contentKindRef.current = kind;
+    setContentKind(kind);
+    setImages([]);
+    setSelectedTargets((targets) =>
+      targets.filter((target) => {
+        const account = accountsRef.current.find((item) => item.id === target.accountId);
+        return account ? supportedKinds(account.platform).includes(kind) : false;
+      }),
+    );
+  };
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [platform, setPlatform] = useState<PlatformId | null>(null);
@@ -122,6 +145,18 @@ export function useWorkspaceController() {
     }
   };
   useEffect(() => {
+    setBrowserTabs((tabs) => {
+      let changed = false;
+      const next = tabs.map((tab) => {
+        const account = accounts.find((item) => item.id === tab.id);
+        if (!account || account.name === tab.name) return tab;
+        changed = true;
+        return { ...tab, name: account.name };
+      });
+      return changed ? next : tabs;
+    });
+  }, [accounts]);
+  useEffect(() => {
     void run(async () => {
       const loadedAccounts = await queryClient.fetchQuery(accountsOptions);
       setAccounts(loadedAccounts);
@@ -146,8 +181,20 @@ export function useWorkspaceController() {
         setActiveBrowser(restored.some((tab) => tab.id === saved.activeId) ? saved.activeId : null);
       }
       const d = await window.desktop.loadDraft();
+      const restoredPage = saved?.page;
+      let kind: ContentKind = d.contentKind ?? "moment";
+      let nextImages = d.images;
+      if (restoredPage === "video") {
+        if (kind !== "video") nextImages = [];
+        kind = "video";
+      } else if (restoredPage === "compose" && kind === "video") {
+        kind = "moment";
+        nextImages = [];
+      }
+      setContentKind(kind);
+      setTitle(d.title ?? "");
       setBody(d.body);
-      setImages(d.images);
+      setImages(nextImages);
       setInitialized(true);
     });
   }, []);
@@ -175,11 +222,11 @@ export function useWorkspaceController() {
         setPage(command.page);
         setFocusedTask(command.taskId);
         void run(reload);
-        if (command.page === "compose")
+        if (command.page === "compose" || command.page === "video")
           requestAnimationFrame(() => document.getElementById("post-body")?.focus());
       } else if (command.action === "save-draft") {
         void run(async () => {
-          await window.desktop.saveDraft(body, images);
+          await window.desktop.saveDraft(body, images, contentKind, title);
           setNotice("草稿已保存到本机");
         });
       } else if (command.action === "import-markdown") {
@@ -194,6 +241,8 @@ export function useWorkspaceController() {
   }, [
     body,
     images,
+    contentKind,
+    title,
     initialized,
     busy,
     browserTabs,
@@ -244,6 +293,10 @@ export function useWorkspaceController() {
     setAccounts,
     name,
     setName,
+    contentKind,
+    setContentKind,
+    title,
+    setTitle,
     body,
     setBody,
     images,

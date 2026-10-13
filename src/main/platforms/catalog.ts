@@ -120,6 +120,12 @@ const sessions: Record<PlatformId, Session> = {
   xiaoyuzhou: login("https://podcaster.xiaoyuzhoufm.com/"),
   guanghe: login("https://creator.guanghe.taobao.com/"),
   xhsdm: login("https://pro.xiaohongshu.com/"),
+  zsxq: login("https://wx.zsxq.com/"),
+  music163: login("https://music.163.com/st/musician"),
+  qqmusic: login("https://y.qq.com/artists/"),
+  qingting: login("https://www.qingting.fm/"),
+  lizhi: login("https://www.lizhi.fm/"),
+  googlebusiness: login("https://business.google.com/"),
 };
 
 export const platformHome = Object.fromEntries(

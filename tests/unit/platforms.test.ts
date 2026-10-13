@@ -6,7 +6,10 @@ import {
 } from "../../src/main/platforms/catalog";
 import { isVideo, postTitle } from "../../src/main/platforms/postText";
 import { createPublisher } from "../../src/main/platforms/registry";
+import { supportedKinds } from "../../src/shared/content";
 import { Database } from "../../src/main/storage/Database";
+import { platforms } from "../../src/shared/models";
+import { platformGroups, platformsInGroup } from "../../src/shared/platforms";
 
 it("names a post from the first line and detects video files", () => {
   expect(postTitle("第一行标题\n后面是正文", 100, "未命名")).toBe("第一行标题");
@@ -46,7 +49,53 @@ it("gives implemented platforms their own publisher", () => {
   expect(createPublisher("alipay", open).constructor.name).toBe("AlipayAdapter");
   expect(createPublisher("youtube", open).constructor.name).toBe("YouTubeAdapter");
   expect(createPublisher("sohu", open).constructor.name).toBe("LoginAdapter");
-  expect(createPublisher("instagram", open).constructor.name).toBe("LoginAdapter");
+  const instagram = createPublisher("instagram", open);
+  expect(instagram.constructor.name).toBe("InstagramAdapter");
+  expect(instagram.supportedKinds()).toEqual(supportedKinds("instagram"));
+  const zsxq = createPublisher("zsxq", open);
+  expect(zsxq.constructor.name).toBe("ZsxqAdapter");
+  expect(zsxq.supportedKinds()).toEqual(["article", "moment"]);
+  expect(urlLooksLoggedIn("zsxq", "https://wx.zsxq.com/dweb2/index")).toBe(true);
+  expect(urlLooksLoggedIn("zsxq", "https://wx.zsxq.com/login")).toBe(false);
+  expect(urlLooksLoggedIn("googlebusiness", "https://business.google.com/locations")).toBe(true);
+  expect(createPublisher("music163", open).constructor.name).toBe("Music163Adapter");
+  expect(createPublisher("qqmusic", open).constructor.name).toBe("QqmusicAdapter");
+  expect(createPublisher("qingting", open).constructor.name).toBe("QingtingAdapter");
+  expect(createPublisher("lizhi", open).constructor.name).toBe("LizhiAdapter");
+  expect(createPublisher("wechat", open).supportedKinds()).toEqual(supportedKinds("wechat"));
+  expect(createPublisher("reddit", open).supportedKinds()).toEqual(["article"]);
+  expect(createPublisher("hupu", open).supportedKinds()).toEqual(["video"]);
+});
+
+it("groups add-account platforms into all, video, news, posts, and audio", () => {
+  expect(platformGroups.map((group) => group.label)).toEqual([
+    "全部",
+    "视频",
+    "新闻",
+    "图文",
+    "音频",
+  ]);
+  expect(platformsInGroup("all")).toEqual([...platforms]);
+  expect(platformsInGroup("video")).toContain("douyin");
+  expect(platformsInGroup("video")).not.toContain("jianshu");
+  expect(platformsInGroup("news")).toContain("toutiao");
+  expect(platformsInGroup("news")).toContain("jianshu");
+  expect(platformsInGroup("moment")).toContain("xiaohongshu");
+  expect(platformsInGroup("audio")).toEqual([
+    "ximalaya",
+    "xiaoyuzhou",
+    "music163",
+    "qqmusic",
+    "qingting",
+    "lizhi",
+  ]);
+  const grouped = new Set([
+    ...platformsInGroup("video"),
+    ...platformsInGroup("news"),
+    ...platformsInGroup("moment"),
+    ...platformsInGroup("audio"),
+  ]);
+  expect(platforms.filter((id) => !grouped.has(id))).toEqual([]);
 });
 
 it("stores the selected platform on a new account", () => {

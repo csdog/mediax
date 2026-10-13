@@ -1,17 +1,32 @@
 import type { Page } from "playwright-core";
+import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
+import { openKindEditor, submitKindEditor } from "../editor";
 import { NeedsUser, type Publisher } from "../Publisher";
-import { discoverProfile, photos, replaceText, requireFile, waitUntil } from "../form";
-import { isVideo, postTitle } from "../postText";
+import {
+  discoverProfile,
+  photos,
+  replaceText,
+  requireFile,
+  requireVideo,
+  waitUntil,
+} from "../form";
+import { postTitle } from "../postText";
 
 const uploadUrl = "https://creator.douyin.com/creator-micro/content/upload";
+const articleUrl = "https://creator.douyin.com/creator-micro/content/post/article";
 
 function loggedOut(url: string) {
   return /login|passport/i.test(url) || !url.includes("creator.douyin.com");
 }
 
 export class DouyinAdapter implements Publisher {
+  private usingEditor = false;
   constructor(private readonly page: () => Promise<Page>) {}
+
+  supportedKinds() {
+    return platformKinds("douyin");
+  }
 
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
@@ -23,13 +38,28 @@ export class DouyinAdapter implements Publisher {
 
   async prepare(task: Task, _target: TaskTarget) {
     const page = await this.page();
+    this.usingEditor = task.contentKind === "article";
+    if (this.usingEditor) {
+      await openKindEditor(page, task, {
+        url: articleUrl,
+        loggedOut,
+        hint: "请先在账号浏览器中登录 抖音",
+        files: "cover",
+      });
+      return;
+    }
     await page.goto(uploadUrl, { waitUntil: "domcontentloaded", timeout: 90000 });
     if (loggedOut(page.url()) || (await page.getByText("手机号登录").count()))
       throw new NeedsUser("请先在账号浏览器中登录 抖音");
-    const video = task.images.find(isVideo);
-    if (video) await this.prepareVideo(page, task, video);
-    else if (photos(task).length) await this.prepareNote(page, task);
-    else throw new NeedsUser("抖音需要一段视频或图片，请附上素材后再发布");
+    if (task.contentKind === "video") {
+      await this.prepareVideo(page, task, requireVideo(task, "抖音"));
+      return;
+    }
+    if (photos(task).length) {
+      await this.prepareNote(page, task);
+      return;
+    }
+    throw new NeedsUser("抖音需要一段视频或图片，请附上素材后再发布");
   }
 
   private async prepareVideo(page: Page, task: Task, video: string) {
@@ -89,6 +119,10 @@ export class DouyinAdapter implements Publisher {
 
   async submit(_task: Task, _target: TaskTarget, markSubmitted: () => void) {
     const page = await this.page();
+    if (this.usingEditor) {
+      await submitKindEditor(page, markSubmitted);
+      return;
+    }
     const button = page.getByRole("button", { name: "发布", exact: true });
     await button.waitFor({ state: "visible", timeout: 15000 });
     markSubmitted();

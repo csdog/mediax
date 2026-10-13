@@ -140,7 +140,13 @@ test(
       await ui.evaluate((id) => window.desktop.closeAccountBrowser(id), b.id);
       const taskId = await ui.evaluate(
         ({ path, targets }) =>
-          window.desktop.publish("Fixture publication body", Array(11).fill(path), targets),
+          window.desktop.publish(
+            "moment",
+            null,
+            "Fixture publication body",
+            Array(11).fill(path),
+            targets,
+          ),
         { path: image, targets: [pageTarget, second.targets[0]] },
       );
       await rm(image);
@@ -188,6 +194,8 @@ test(
         ui.evaluate(
           ({ id }) =>
             window.desktop.publish(
+              "article",
+              "标题",
               "bad target",
               [],
               [{ accountId: id, identityId: "9999", name: "forged", kind: "page" }],
@@ -232,7 +240,7 @@ test(
         { id: a.id, html: fixture("2002", "1001", true) },
       );
       const pausedId = await ui.evaluate(
-        (t) => window.desktop.publish("Pause safely", [], [t]),
+        (t) => window.desktop.publish("article", "暂停", "Pause safely", [], [t]),
         pageTarget,
       );
       let paused;

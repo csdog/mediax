@@ -1,5 +1,7 @@
 import type { Locator, Page } from "playwright-core";
+import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
+import { openKindEditor, submitKindEditor } from "../editor";
 import { NeedsUser, type Publisher } from "../Publisher";
 import { discoverProfile, replaceText, requireVideo, selectAll, waitUntil } from "../form";
 import { postTitle } from "../postText";
@@ -32,7 +34,12 @@ async function fileInput(page: Page): Promise<Locator> {
 }
 
 export class ChannelsAdapter implements Publisher {
+  private usingEditor = false;
   constructor(private readonly page: () => Promise<Page>) {}
+
+  supportedKinds() {
+    return platformKinds("channels");
+  }
 
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
@@ -43,6 +50,16 @@ export class ChannelsAdapter implements Publisher {
   }
 
   async prepare(task: Task, _target: TaskTarget) {
+    this.usingEditor = task.contentKind === "moment";
+    if (this.usingEditor) {
+      await openKindEditor(await this.page(), task, {
+        url: "https://channels.weixin.qq.com/platform/post/create",
+        loggedOut,
+        hint: "请先在账号浏览器中登录 视频号",
+        files: "images",
+      });
+      return;
+    }
     const video = requireVideo(task, "视频号");
     const page = await this.page();
     await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 90000 });
@@ -73,6 +90,10 @@ export class ChannelsAdapter implements Publisher {
 
   async submit(_task: Task, _target: TaskTarget, markSubmitted: () => void) {
     const page = await this.page();
+    if (this.usingEditor) {
+      await submitKindEditor(page, markSubmitted);
+      return;
+    }
     const button = page.getByRole("button", { name: "发表", exact: true }).first();
     await button.waitFor({ state: "visible", timeout: 15000 });
     markSubmitted();

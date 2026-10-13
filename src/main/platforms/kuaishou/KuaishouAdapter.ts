@@ -1,4 +1,5 @@
 import type { Page } from "playwright-core";
+import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
 import { NeedsUser, type Publisher } from "../Publisher";
 import { discoverProfile, photos, selectAll, waitUntil } from "../form";
@@ -22,6 +23,10 @@ async function focusDescription(page: Page) {
 export class KuaishouAdapter implements Publisher {
   constructor(private readonly page: () => Promise<Page>) {}
 
+  supportedKinds() {
+    return platformKinds("kuaishou");
+  }
+
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
     if (!page.url().includes("cp.kuaishou.com")) {
@@ -31,7 +36,9 @@ export class KuaishouAdapter implements Publisher {
   }
 
   async prepare(task: Task, _target: TaskTarget) {
-    const video = task.images.find(isVideo);
+    const video = task.contentKind === "moment" ? undefined : task.images.find(isVideo);
+    if (task.contentKind === "video" && !video)
+      throw new NeedsUser("快手需要一段视频，请附上视频后再发布");
     const images = photos(task);
     if (!video && !images.length) throw new NeedsUser("快手需要一段视频或图片，请附上素材后再发布");
     const page = await this.page();

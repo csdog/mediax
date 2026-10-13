@@ -1,6 +1,7 @@
 import type { Page, Locator } from "playwright-core";
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
+import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
 import { NeedsUser, NotSubmitted, type Publisher } from "../Publisher";
 import { labels } from "./selectors";
@@ -54,6 +55,10 @@ export function postUrl(href: string): string | null {
   }
 }
 export class FacebookAdapter implements Publisher {
+  supportedKinds() {
+    return platformKinds("facebook");
+  }
+
   private authorPath: string | null = null;
   private prepared?: { taskId: string; targetId: string; before: Set<string> };
   constructor(
@@ -256,7 +261,13 @@ export class FacebookAdapter implements Publisher {
     const page = await this.getPage();
     await this.ready(page);
     await this.selectTarget(page, target);
-    if (!task.body.trim()) throw new Error("正文不能为空");
+    if (task.contentKind === "video" && !task.images.some(isVideo))
+      throw new NeedsUser("Facebook 视频需要一段视频");
+    if (task.contentKind === "moment" && task.images.some(isVideo))
+      throw new NeedsUser("动态不能包含视频");
+    if (task.contentKind === "article" && task.images.some(isVideo))
+      throw new NeedsUser("文章不能包含视频");
+    if (task.contentKind !== "video" && !task.body.trim()) throw new Error("正文不能为空");
     // Validate all files before touching the composer.
     for (const path of task.images) await readFile(path);
     if ((await this.dialog(page).count()) === 0) {

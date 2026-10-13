@@ -1,8 +1,4 @@
-import { extname } from "node:path";
-
-export function isVideo(path: string) {
-  return [".mp4", ".mov", ".m4v", ".webm"].includes(extname(path).toLowerCase());
-}
+export { isVideo } from "../../shared/content";
 
 export function postTitle(body: string, limit: number, fallback: string) {
   const line = body

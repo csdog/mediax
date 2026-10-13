@@ -5,9 +5,11 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
+import { inferContentKind } from "../../shared/content";
 import {
   isPlatform,
   type Account,
+  type ContentKind,
   type PlatformId,
   type Task,
   type Target,
@@ -29,7 +31,7 @@ export class Database {
     try {
       this.db.pragma("foreign_keys = ON");
       this.db.pragma("journal_mode = WAL");
-      if (this.schemaVersion() > 4) throw new Error("数据库版本高于当前应用，不能降级读取");
+      if (this.schemaVersion() > 5) throw new Error("数据库版本高于当前应用，不能降级读取");
       const migrations = readMigrationFiles({ migrationsFolder });
       if (!migrations.length) throw new Error("数据库迁移文件缺失");
       const journal = this.orm.get(
@@ -143,34 +145,65 @@ export class Database {
     this.orm.insert(schema.accounts).values(account).run();
     return account;
   }
+  renameAccount(id: string, name: string) {
+    const trimmed = name.trim().slice(0, 80);
+    if (!trimmed) throw new Error("请输入账号名称");
+    this.account(id);
+    this.orm.update(schema.accounts).set({ name: trimmed }).where(eq(schema.accounts.id, id)).run();
+    return this.account(id);
+  }
   account(id: string): Account {
     const account = this.orm.select().from(schema.accounts).where(eq(schema.accounts.id, id)).get();
     if (!account) throw new Error("账号不存在");
     return account;
   }
-  saveDraft(body: string, images: DraftImage[]) {
+  saveDraft(
+    body: string,
+    images: DraftImage[],
+    contentKind: ContentKind = inferContentKind(images.map((image) => image.path)),
+    title: string | null = null,
+  ) {
     this.orm
       .insert(schema.drafts)
-      .values({ id: 1, body, images })
+      .values({ id: 1, contentKind, title, body, images })
       .onConflictDoUpdate({
         target: schema.drafts.id,
-        set: { body, images },
+        set: { contentKind, title, body, images },
       })
       .run();
   }
-  draft(): { body: string; images: DraftImage[] } {
+  draft(): { body: string; images: DraftImage[]; contentKind: ContentKind; title: string | null } {
     const draft = this.orm
-      .select({ body: schema.drafts.body, images: schema.drafts.images })
+      .select({
+        body: schema.drafts.body,
+        images: schema.drafts.images,
+        contentKind: schema.drafts.contentKind,
+        title: schema.drafts.title,
+      })
       .from(schema.drafts)
       .where(eq(schema.drafts.id, 1))
       .get();
-    return draft ?? { body: "", images: [] };
+    return draft ?? { body: "", images: [], contentKind: "article", title: null };
   }
-  createTask(body: string, images: string[], targets: Target[]): Task {
-    if (!body.trim() || !targets.length) throw new Error("需要正文和至少一个目标");
+  createTask(
+    body: string,
+    images: string[],
+    targets: Target[],
+    meta?: { contentKind?: ContentKind; title?: string | null },
+  ): Task {
+    const contentKind = meta?.contentKind ?? inferContentKind(images);
+    const needsBody = contentKind === "article" || contentKind === "moment";
+    if ((needsBody && !body.trim()) || !targets.length) throw new Error("需要正文和至少一个目标");
     const keys = new Set(targets.map((target) => `${target.accountId}:${target.identityId}`));
     if (keys.size !== targets.length) throw new Error("目标重复");
-    const task: Task = { id: randomUUID(), body, images, createdAt: new Date().toISOString() };
+    const task: Task = {
+      id: randomUUID(),
+      contentKind,
+      title: meta?.title ?? null,
+      body,
+      images,
+      createdAt: new Date().toISOString(),
+    };
     this.orm.transaction((tx) => {
       tx.insert(schema.tasks).values(task).run();
       for (const target of targets) {

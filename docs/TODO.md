@@ -14,4 +14,4 @@
 - [ ] 用户可查看或导出的故障日志及诊断信息。
 - [ ] 通知开关、通知隐私和系统权限状态展示。
 
-业务待办仍以 implementation-status.md 与实施计划为准，Facebook 发布流程已接通，真实发帖验收待用户提供明确内容和目标。
+业务待办见 [implementation-status.md](implementation-status.md)。发布已覆盖文章、动态、视频和音频；未列入能力表的平台仍只有登录。

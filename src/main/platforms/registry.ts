@@ -15,6 +15,27 @@ import { TikTokAdapter } from "./tiktok/TikTokAdapter";
 import { WeiboAdapter } from "./weibo/WeiboAdapter";
 import { XiaohongshuAdapter } from "./xiaohongshu/XiaohongshuAdapter";
 import { YouTubeAdapter } from "./youtube/YouTubeAdapter";
+import {
+  DoubanAdapter,
+  GoogleBusinessAdapter,
+  InstagramAdapter,
+  JianshuAdapter,
+  LinkedinAdapter,
+  LizhiAdapter,
+  Music163Adapter,
+  PinterestAdapter,
+  QingtingAdapter,
+  QqAdapter,
+  QqmusicAdapter,
+  ThreadsAdapter,
+  ToutiaoAdapter,
+  TwitterAdapter,
+  WechatAdapter,
+  XimalayaAdapter,
+  XiaoyuzhouAdapter,
+  ZhihuAdapter,
+  ZsxqAdapter,
+} from "./web/adapters";
 
 export type PlatformPublisher = Publisher & {
   discover(accountId: string): Promise<Target[]>;
@@ -49,6 +70,44 @@ export function createPublisher(
       return new HupuAdapter(openPage);
     case "alipay":
       return new AlipayAdapter(openPage);
+    case "wechat":
+      return new WechatAdapter(openPage);
+    case "toutiao":
+      return new ToutiaoAdapter(openPage);
+    case "zhihu":
+      return new ZhihuAdapter(openPage);
+    case "qq":
+      return new QqAdapter(openPage);
+    case "douban":
+      return new DoubanAdapter(openPage);
+    case "jianshu":
+      return new JianshuAdapter(openPage);
+    case "zsxq":
+      return new ZsxqAdapter(openPage);
+    case "ximalaya":
+      return new XimalayaAdapter(openPage);
+    case "xiaoyuzhou":
+      return new XiaoyuzhouAdapter(openPage);
+    case "music163":
+      return new Music163Adapter(openPage);
+    case "qqmusic":
+      return new QqmusicAdapter(openPage);
+    case "qingting":
+      return new QingtingAdapter(openPage);
+    case "lizhi":
+      return new LizhiAdapter(openPage);
+    case "instagram":
+      return new InstagramAdapter(openPage);
+    case "threads":
+      return new ThreadsAdapter(openPage);
+    case "twitter":
+      return new TwitterAdapter(openPage);
+    case "pinterest":
+      return new PinterestAdapter(openPage);
+    case "linkedin":
+      return new LinkedinAdapter(openPage);
+    case "googlebusiness":
+      return new GoogleBusinessAdapter(openPage);
     default:
       return new LoginAdapter(openPage, platformInfo[platform].label);
   }

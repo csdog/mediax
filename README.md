@@ -1,12 +1,14 @@
 # media-post
 
-macOS 本地 Facebook 内容工具。Electron + TypeScript + React + TanStack Router / Query + Tailwind CSS + shadcn/ui 官方组件；Drizzle ORM + better-sqlite3 保存 SQLite 业务数据，Drizzle Kit 生成迁移。
+macOS 本地多平台发布工具。Electron + TypeScript + React + TanStack Router / Query + Tailwind CSS + shadcn/ui 官方组件；Drizzle ORM + better-sqlite3 保存 SQLite 业务数据，Drizzle Kit 生成迁移。
+
+创作页分为文章、动态、视频和音频。正文是纯文本，可以导入 Markdown。各账号使用应用内独立浏览器登录，发布时由 Playwright 操作这个浏览器里的平台编辑器。定时发布不在范围内。
 
 ## 当前状态
 
-已实现多账号独立会话、个人主页与公共主页身份发现、Markdown 转文本、图文预览、SQLite 草稿、确认发布、串行任务、暂停恢复、失败重试和永久链接核验。关闭账号标签页后，任务会自动重开同一账号的本地会话。
+已实现多账号独立会话、按内容类型筛选可发布账号、SQLite 草稿、确认后串行发布、暂停恢复、失败重试和链接核验。关闭账号标签页后，任务会自动重开同一账号的本地会话。设置里可以改本机显示名称和头像。
 
-开发版和 arm64 未签名 macOS 打包版均通过离线 Electron 端到端测试，覆盖双会话隔离、持久化、图文发布和防重复提交。真实账号已完成两类身份发现、切换与空白编辑器检查；真实发帖仍需明确的验收内容、图片和目标，尚未执行。实施计划保留在 `.scratch/to-plan/media-post.md`。
+开发版和 arm64 未签名 macOS 打包版通过离线 Electron 端到端测试，覆盖会话隔离、持久化和 Facebook 图文发布。其余平台的编辑器流程已接入，线上页面改版后需要在对应账号里再核对。给代理的工作约定见 [AGENTS.md](AGENTS.md)。
 
 ## 开发
 
@@ -30,11 +32,7 @@ mise exec -- pnpm run package:mac
 mise exec -- pnpm run test:packaged
 ```
 
-应用数据位于 Electron userData；`media-post.sqlite` 保存业务数据，账号会话由 Electron persistent partition 保存。测试使用临时目录，不操作真实 Facebook、不读取日常浏览器 Cookie。
-
-## 下一步真实页面验证
-
-在账号管理添加账号、打开浏览器并手动登录。由用户允许后，只读检查当前个人身份及可管理 Page；不点击发布。若无法可靠识别或 Facebook 拒绝嵌入登录，按计划停止并重新讨论方案。真实发帖验收需要单独明确授权目标和测试内容。
+应用数据位于 Electron userData；`media-post.sqlite` 保存业务数据，账号会话由 Electron persistent partition 保存。测试使用临时目录，不读取日常浏览器 Cookie。
 
 ## 本地工具链
 
@@ -76,17 +74,35 @@ Git 与工具配置均位于 `media-post-desktop/`；外层 `media-post/` 仅作
 
 账号浏览器在主窗口顶部以标签页打开；每个账号保持独立会话，重复打开复用标签页，关闭标签页保留登录数据。最小化快捷键调整为 `⌘⌥M`，避免与全局呼出冲突。
 
-标签页顺序、当前选中的标签页与工作区页面保存在 SQLite，下次启动自动恢复。账号标签页重新加载 Facebook 首页并沿用原登录会话；不恢复未提交的网页编辑器内容。工作区标签页固定保留。
+标签页顺序、当前选中的标签页与工作区页面保存在 SQLite，下次启动自动恢复。账号标签页重新打开该平台首页并沿用原登录会话；不恢复未提交的网页编辑器内容。工作区标签页固定保留。
 
 常用标签页快捷键（账号浏览器获得焦点时也有效）：`⌘/Control+T` 新建、`⌘/Control+W` 关闭、`⌘/Control+Shift+T` 重新打开最近关闭的标签页、`Control+Tab` / `Control+Shift+Tab` 前后切换，`⌘/Control+,` 打开设置。重新打开关闭标签页的历史仅在本次运行中保留。完整清单见设置中的「键盘快捷键」。
 
-## Facebook 本地发布
+## 本地发布
 
-在账号管理打开账号标签页并登录，点击「检查状态」发现个人主页及可管理公共主页。进入「内容发布」填写正文、选择图片与目标，预览后点击发布并确认。受众沿用 Facebook 当前设置。
+在账号管理点选平台，在账号浏览器里登录，再检查状态。内容发布先选择类型：
 
-任务在本机依次执行，图片会复制到任务目录。发布记录分别展示各目标状态和成功链接；登录或安全验证需要人工处理后继续。失败可重试；已提交或结果未知仅核验，不自动重发。提供帖子链接时，会检查作者与内容。
+| 类型 | 要求                     |
+| ---- | ------------------------ |
+| 文章 | 标题和正文，最多一张封面 |
+| 动态 | 正文；附件只能是图片     |
+| 视频 | 一个视频文件，正文可空   |
+| 音频 | 一个音频文件，正文可空   |
 
-真实账号已验证身份发现与两类空白编辑器，尚未执行真实发帖验收。
+右侧只列出支持该类型的账号。任务在本机依次执行，素材复制到任务目录，单文件 20MB。登录、验证或找不到控件时暂停，等人处理后继续。失败可重试；已提交或结果未知只核验，不自动重发。
+
+| 类型             | 平台                                                 |
+| ---------------- | ---------------------------------------------------- |
+| 文章、动态、视频 | 头条号、知乎、抖音、小红书、微博、百家号、Facebook   |
+| 文章、动态       | 微信公众号、豆瓣、知识星球                           |
+| 文章、视频       | 哔哩哔哩、企鹅号                                     |
+| 文章             | 简书、Reddit                                         |
+| 动态、视频       | 快手、视频号、Instagram、X                           |
+| 动态             | Threads、Pinterest、LinkedIn、Google Business        |
+| 音频             | 喜马拉雅、小宇宙、网易云音乐、QQ音乐、蜻蜓FM、荔枝FM |
+| 视频             | YouTube、TikTok、虎扑、支付宝生活号                  |
+
+抖音、快手、小红书已有的图文按动态发布。授权网格里的其他平台可以登录，发布流程尚未接入。能力表在 `src/shared/content.ts`。
 
 ## UI 组件基础
 
@@ -109,7 +125,7 @@ src/renderer/
 
 TanStack Query 管理账号、发布记录、快捷键设置与标签预览；发布记录每 1.5 秒刷新，由 Query 管理请求生命周期，替代手写定时器。写操作使用 Mutation；发布等副作用关闭自动重试。预览截图仅保存在内存，关闭预览后立即清理对应查询缓存。草稿编辑状态由工作区持有，页面切换和打开设置不会清空正文、图片或目标选择。
 
-通用能力优先使用已有依赖和成熟、维护活跃的 npm 包：路由与数据状态用 TanStack，界面优先组合 shadcn / Base UI，表单与校验可复用已安装的 React Hook Form / Zod，日期处理可复用 date-fns。新增依赖前检查现有依赖是否已满足需要；业务规则、Electron 原生视图协调与 Facebook 平台适配保留在项目代码中。避免为简单局部逻辑引入不必要依赖，也避免重复实现成熟库已有的能力。
+通用能力优先使用已有依赖和成熟、维护活跃的 npm 包：路由与数据状态用 TanStack，界面优先组合 shadcn / Base UI，表单与校验可复用已安装的 React Hook Form / Zod，日期处理可复用 date-fns。新增依赖前检查现有依赖是否已满足需要；业务规则、Electron 原生视图协调与各平台适配保留在项目代码中。避免为简单局部逻辑引入不必要依赖，也避免重复实现成熟库已有的能力。
 
 ## SQLite 与数据库迁移
 
@@ -175,6 +191,6 @@ MAIN_VITE_LOG_MAX_SIZE=10485760
 
 达到阈值后由 electron-log 轮转为 `main.old.log`，只保留一个旧文件；阈值在写入时检查，不是每条消息的硬截断。生产模式测试传入 `MEDIA_POST_USER_DATA` 时，日志随测试数据目录隔离。日志包含带本地时区偏移的时间、大写等级、进程来源与异常堆栈。控制台里的等级按级别着色：错误红色、警告黄色、信息青色、调试灰色。文件日志保持纯文本。
 
-主进程使用 `import { log } from "./logging"`；渲染进程可使用 `import log from "electron-log/renderer"`，也可沿用 console。库的 preload 桥仅打包进应用自己的 sandbox preload，不向 Facebook 账号会话注入脚本，不收集远程网页 console。
+主进程使用 `import { log } from "./logging"`；渲染进程可使用 `import log from "electron-log/renderer"`，也可沿用 console。库的 preload 桥仅打包进应用自己的 sandbox preload，不向账号会话注入脚本，不收集远程网页 console。
 
 实现依据：[electron-log](https://github.com/megahertz/electron-log)、[electron-vite 环境变量与模式](https://electron-vite.org/guide/env-and-mode)。

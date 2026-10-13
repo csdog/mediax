@@ -24,6 +24,8 @@ it("lists publish records with filters from the reference layout", async () => {
       tasks: [
         {
           id: "task-1",
+          contentKind: "moment",
+          title: null,
           body: "吐槽网上线 Skill：让发布更稳",
           images: ["/tmp/cover.png"],
           cover: "data:image/png;base64,aaaa",

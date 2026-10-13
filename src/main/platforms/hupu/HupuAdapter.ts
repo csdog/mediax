@@ -1,4 +1,5 @@
 import type { Page } from "playwright-core";
+import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
 import { NeedsUser, type Publisher } from "../Publisher";
 import { discoverProfile, replaceText, requireVideo, waitUntil } from "../form";
@@ -18,6 +19,10 @@ function titleOf(body: string) {
 export class HupuAdapter implements Publisher {
   constructor(private readonly page: () => Promise<Page>) {}
 
+  supportedKinds() {
+    return platformKinds("hupu");
+  }
+
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
     if (!page.url().includes("hupu.com")) {
@@ -27,6 +32,7 @@ export class HupuAdapter implements Publisher {
   }
 
   async prepare(task: Task, _target: TaskTarget) {
+    if (task.contentKind !== "video") throw new NeedsUser("虎扑目前只发布视频");
     const video = requireVideo(task, "虎扑");
     const page = await this.page();
     await page.goto(publishUrl, { waitUntil: "domcontentloaded", timeout: 90000 });

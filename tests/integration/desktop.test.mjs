@@ -94,7 +94,9 @@ test(
       assert.equal(frame.surface, "rgba(249, 249, 249, 0.85)");
       assert.equal(frame.toolbarDrag, "drag");
       assert.notEqual(frame.tabStripDrag, "no-drag");
-      const account = await page.evaluate(() => window.desktop.addAccount("Browser tab fixture"));
+      const account = await page.evaluate(() =>
+        window.desktop.addAccount("Browser tab fixture", "facebook"),
+      );
       await application.evaluate(async ({ session }, id) => {
         const s = session.fromPartition(`persist:facebook-${id}`);
         await s.cookies.set({ url: "https://www.facebook.com", name: "c_user", value: "1001" });
