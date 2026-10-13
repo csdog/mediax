@@ -27,12 +27,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 26.9.0
-          cache: pnpm
+
+      - name: Install pnpm
+        run: npm install -g pnpm@12.4.2
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
