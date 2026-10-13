@@ -75,7 +75,7 @@ it("lists publish records with filters from the reference layout", async () => {
     screen.getByRole("img", { name: "吐槽网上线 Skill：让发布更稳 封面" }).getAttribute("src"),
   ).toBe("data:image/png;base64,aaaa");
   expect(screen.getByRole("cell", { name: "用户K7Wa" })).toBeTruthy();
-  expect(screen.getByText("全部发布成功")).toBeTruthy();
+  expect(screen.getByText("成功")).toBeTruthy();
   expect(screen.getByText("1 账号 · 1 任务")).toBeTruthy();
   expect(screen.getByRole("button", { name: "新增发布" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "操作 吐槽网上线 Skill：让发布更稳" }));

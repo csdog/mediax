@@ -1725,19 +1725,23 @@ body {
   width: 12px;
   height: 12px;
 }
-.history-status-success {
+.history-status-badge.status-success {
+  background: #e5f6eb;
   color: #008635;
 }
-.history-status-warning {
+.history-status-badge.status-warning {
+  background: #fff1e8;
   color: #b9480d;
 }
-.history-status-danger {
+.history-status-badge.status-danger {
+  background: color-mix(in srgb, var(--destructive) 12%, transparent);
   color: var(--destructive);
 }
-.history-status-muted {
+.history-status-badge.status-muted {
   color: var(--muted-foreground);
 }
-.history-status-progress {
+.history-status-badge.status-progress {
+  background: color-mix(in srgb, var(--emphasis) 12%, transparent);
   color: var(--emphasis);
 }
 .history-record-menu {

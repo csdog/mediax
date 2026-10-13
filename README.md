@@ -1,6 +1,6 @@
 # media-post
 
-macOS 本地多平台发布工具。Electron + TypeScript + React + TanStack Router / Query + Tailwind CSS + shadcn/ui 官方组件；Drizzle ORM + better-sqlite3 保存 SQLite 业务数据，Drizzle Kit 生成迁移。
+本地多平台内容发布工具，支持 macOS、Windows 与 Linux。Electron + TypeScript + React + TanStack Router / Query + Tailwind CSS + shadcn/ui 官方组件；Drizzle ORM + better-sqlite3 保存 SQLite 业务数据，Drizzle Kit 生成迁移。
 
 创作页分为文章、动态、视频和音频。正文是纯文本，可以导入 Markdown。各账号使用应用内独立浏览器登录，发布时由 Playwright 操作这个浏览器里的平台编辑器。定时发布不在范围内。
 
@@ -31,6 +31,18 @@ mise exec -- pnpm run test:integration
 mise exec -- pnpm run package:mac
 mise exec -- pnpm run test:packaged
 ```
+
+### 多平台打包
+
+| 命令                        | 产物                               |
+| --------------------------- | ---------------------------------- |
+| `pnpm run package:mac`      | macOS 未打包目录（本地测试用）     |
+| `pnpm run package:mac:dist` | macOS `dmg` / `zip`（arm64 + x64） |
+| `pnpm run package:win`      | Windows `nsis` / `portable`（x64） |
+| `pnpm run package:linux`    | Linux `AppImage` / `deb`（x64）    |
+| `pnpm run package`          | 在当前机器上尽量打出三端产物       |
+
+跨平台产物优先用 GitHub Actions（`.github/workflows/build.yml`）：打 `v*` 标签或手动触发 workflow。本机交叉打包可能受签名工具与原生模块限制。
 
 应用数据位于 Electron userData；`media-post.sqlite` 保存业务数据，账号会话由 Electron persistent partition 保存。测试使用临时目录，不读取日常浏览器 Cookie。
 

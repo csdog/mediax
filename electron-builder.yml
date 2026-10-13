@@ -1,5 +1,8 @@
 appId: local.media-post.desktop
 productName: media-post
+directories:
+  output: dist
+  buildResources: build
 files:
   - out/**/*
   - drizzle/**/*.sql
@@ -7,9 +10,40 @@ files:
   - package.json
 mac:
   icon: build/icon.png
-  target: dir
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+    - target: zip
+      arch:
+        - arm64
+        - x64
   identity: null
-
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+linux:
+  icon: build/icon.png
+  category: Office
+  maintainer: media-post
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
 extraResources:
   - from: build/icon.png
     to: icon.png

@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Search,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -55,7 +56,7 @@ type Tone = "success" | "warning" | "danger" | "muted" | "progress";
 
 const statusFilters = [
   { value: "all", label: "全部发布状态" },
-  { value: "success", label: "全部发布成功" },
+  { value: "success", label: "成功" },
   { value: "failed", label: "发布失败" },
   { value: "active", label: "发布中" },
 ];
@@ -79,7 +80,7 @@ function summary(targets: TaskTarget[]): { label: string; tone: Tone } {
   const statuses = targets.map((target) => target.status);
   const has = (status: Status) => statuses.includes(status);
   if (statuses.length && statuses.every((status) => status === "verified"))
-    return { label: "全部发布成功", tone: "success" };
+    return { label: "成功", tone: "success" };
   if (has("verified") && has("failed")) return { label: "部分发布成功", tone: "warning" };
   if (has("failed") && statuses.every((status) => status === "failed"))
     return { label: "发布失败", tone: "danger" };
@@ -105,7 +106,7 @@ function publisherNames(targets: TaskTarget[], accounts: AccountInfo[]) {
 function matchesStatus(targets: TaskTarget[], filter: string) {
   if (filter === "all") return true;
   const state = summary(targets);
-  if (filter === "success") return state.label === "全部发布成功";
+  if (filter === "success") return state.label === "成功";
   if (filter === "failed")
     return targets.some((target) => target.status === "failed" || target.status === "unknown");
   if (filter === "active")
@@ -460,6 +461,18 @@ function Work({ task, cover = task.cover }: { task: Task; cover?: string | null 
   );
 }
 
+function StatusBadge({ state, title }: { state: { label: string; tone: Tone }; title?: string }) {
+  return (
+    <Badge
+      variant="secondary"
+      className={`history-status-badge status-${state.tone}`}
+      title={title}
+    >
+      {state.label}
+    </Badge>
+  );
+}
+
 function RecordFacts({ task, targets }: { task: Task; targets: TaskTarget[] }) {
   const { accounts } = useWorkspace();
   const names = publisherNames(targets, accounts);
@@ -472,7 +485,7 @@ function RecordFacts({ task, targets }: { task: Task; targets: TaskTarget[] }) {
       <span className="text-muted-foreground">
         {accountCount} 账号 · {targets.length} 任务
       </span>
-      <span className={`history-status history-status-${state.tone}`}>{state.label}</span>
+      <StatusBadge state={state} />
       <span className="text-muted-foreground">{stamp(task.createdAt)}</span>
     </>
   );
@@ -502,15 +515,13 @@ function RecordRow({
         {accountCount} 账号 · {targets.length} 任务
       </TableCell>
       <TableCell>
-        <span
-          className={`history-status history-status-${state.tone}`}
+        <StatusBadge
+          state={state}
           title={targets
             .map((target) => target.error)
             .filter((error): error is string => Boolean(error))
             .join("\n")}
-        >
-          {state.label}
-        </span>
+        />
       </TableCell>
       <TableCell className="text-muted-foreground">{stamp(task.createdAt)}</TableCell>
       <TableCell>

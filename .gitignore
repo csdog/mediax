@@ -4,6 +4,7 @@ dist/
 .DS_Store
 *.log
 logs/
+build/icon-source*.png
 
 .husky/_/
 
