@@ -3,6 +3,8 @@ import React from "react";
 import { it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { App } from "../../src/renderer/src";
+// jsdom has no native preload; exercise real logging in Electron integration instead.
+vi.mock("../../src/renderer/lib/logging", () => ({ initializeRendererLogging: vi.fn() }));
 it("imports and saves content, manages desktop tabs/settings, and requires target selection plus publish confirmation", async () => {
   let commandListener: ((command: any) => void) | undefined;
   window.desktop = {
@@ -19,6 +21,8 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       accelerator,
       registered: Boolean(accelerator),
     })),
+    publishSettings: vi.fn().mockResolvedValue({ silent: false }),
+    setSilentPublish: vi.fn().mockImplementation(async (silent: boolean) => ({ silent })),
     accounts: vi.fn().mockResolvedValue([]),
     addAccount: vi.fn().mockResolvedValue({
       id: "account-1",
@@ -107,6 +111,8 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   await waitFor(() =>
     expect((screen.getByLabelText("全局呼出快捷键") as HTMLInputElement).disabled).toBe(false),
   );
+  fireEvent.click(screen.getByRole("switch", { name: "静默发布" }));
+  await waitFor(() => expect(window.desktop.setSilentPublish).toHaveBeenCalledWith(true));
   fireEvent.keyDown(screen.getByLabelText("全局呼出快捷键"), {
     key: "F11",
     code: "F11",
@@ -203,6 +209,10 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       false,
     ),
   );
+  fireEvent.click(screen.getByRole("button", { name: "删除 Facebook 账号 1" }));
+  expect(screen.getByRole("heading", { name: "删除账号" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "取消" }));
+  expect(screen.queryByRole("heading", { name: "删除账号" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "检查状态" }));
   await waitFor(() => expect(window.desktop.refreshAccount).toHaveBeenCalled());
   await waitFor(() =>

@@ -3,9 +3,14 @@ out/
 dist/
 .DS_Store
 *.log
+logs/
 
 .husky/_/
 
 # Local IDE metadata and implementation plans
 .idea/
 .scratch/
+
+# Local environment overrides (never committed)
+.env.local
+.env.*.local

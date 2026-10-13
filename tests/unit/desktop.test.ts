@@ -50,7 +50,7 @@ it("separates manual checkpoints, uncertain results and retry failures from succ
   db.transition(targets[0].id, "pending");
   db.transition(targets[0].id, "unknown");
   db.transition(targets[1].id, "verified");
-  expect(notices.at(-1)?.title).toBe("发布结果待核验");
+  expect(notices.at(-1)?.title).toBe("发布失败");
   db.transition(targets[0].id, "failed");
   expect(notices.at(-1)?.title).toBe("发布任务有失败项");
   const count = notices.length;

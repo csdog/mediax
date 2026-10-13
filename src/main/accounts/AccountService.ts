@@ -1,24 +1,38 @@
-import type { AccountInfo, BrowserBounds } from "../../shared/models";
+import { app, session } from "electron";
+import type { AccountInfo, BrowserBounds, Target } from "../../shared/models";
 import { FacebookAdapter } from "../platforms/facebook/FacebookAdapter";
 import { NeedsUser } from "../platforms/Publisher";
 import { Database } from "../storage/Database";
 import { AccountBrowserManager } from "../browser/AccountBrowserManager";
+
+const logins = new Set<AccountInfo["login"]>([
+  "unchecked",
+  "logged_out",
+  "logged_in",
+  "needs_verification",
+]);
+
 export class AccountService {
   private states = new Map<string, AccountInfo>();
+  private timer: ReturnType<typeof setInterval> | null = null;
   constructor(
     private db: Database,
     private browsers: AccountBrowserManager,
   ) {}
   list() {
-    return this.db.accounts().map(
-      (a) =>
-        this.states.get(a.id) ?? {
-          ...a,
-          avatar: this.cachedAvatar(a.id)?.image,
-          login: "unchecked" as const,
-          targets: [],
-        },
-    );
+    return this.db
+      .accounts()
+      .map((account) => this.states.get(account.id) ?? this.stored(account.id));
+  }
+  startAutoRefresh() {
+    if (this.timer) return;
+    void this.syncAll();
+    this.timer = setInterval(() => void this.syncAll(), 20_000);
+  }
+  stopAutoRefresh() {
+    if (!this.timer) return;
+    clearInterval(this.timer);
+    this.timer = null;
   }
   add(name: string) {
     const a = this.db.addAccount(name);
@@ -117,11 +131,26 @@ export class AccountService {
     this.db.account(id);
     this.browsers.close(id);
   }
+  async remove(id: string) {
+    if (this.operating) throw new Error("账号正在执行身份检查或发布任务，请稍后再试");
+    this.db.deleteAccount(id);
+    this.states.delete(id);
+    this.browsers.close(id);
+    if (!app?.isReady()) return;
+    const partition = session.fromPartition(`persist:facebook-${id}`);
+    await partition.clearStorageData();
+    await partition.clearCache();
+  }
   adapter(id: string) {
     this.db.account(id);
     return new FacebookAdapter(
       async () => {
-        if (!this.browsers.get(id)) await this.browsers.open(id, "https://www.facebook.com/");
+        const silent = this.db.setting("silentPublish") === true;
+        if (!this.browsers.get(id))
+          await this.browsers.open(id, "https://www.facebook.com/", { focus: !silent });
+        const view = this.browsers.get(id);
+        if (silent && view && !view.webContents.isDestroyed())
+          view.webContents.setBackgroundThrottling(false);
         return this.browsers.page(id);
       },
       async () => {
@@ -161,14 +190,13 @@ export class AccountService {
   private async inspect(id: string): Promise<AccountInfo> {
     const a = this.db.account(id),
       view = this.browsers.get(id);
-    if (!view)
+    if (!view) {
+      const current = this.states.get(id) ?? this.stored(id);
       return {
-        ...a,
-        avatar: this.cachedAvatar(id)?.image,
-        login: "unchecked",
-        targets: [],
-        message: "请先打开账号浏览器并登录",
+        ...current,
+        message: current.login === "unchecked" ? "请先打开账号浏览器并登录" : current.message,
       };
+    }
     const url = view.webContents.getURL();
     const cookies = await view.webContents.session.cookies.get({
       url: "https://www.facebook.com",
@@ -182,7 +210,7 @@ export class AccountService {
         : hasSession
           ? "logged_in"
           : "logged_out",
-      targets: [],
+      targets: (this.states.get(id) ?? this.stored(id)).targets,
       message: "请在账号标签页中完成登录",
     };
     if (result.login === "logged_in") {
@@ -205,7 +233,110 @@ export class AccountService {
       }
     } else if (result.login === "needs_verification")
       result.message = "请在 Facebook 完成安全验证后重新检查";
-    this.states.set(id, result);
+    this.remember(result);
     return result;
+  }
+  private stored(id: string): AccountInfo {
+    const account = this.db.account(id);
+    const status = this.readStatus(id);
+    const identities = this.readIdentities(id);
+    const targets = status?.targets.length ? status.targets : (identities?.targets ?? []);
+    return {
+      ...account,
+      avatar: this.cachedAvatar(id)?.image,
+      login: status?.login ?? (targets.length ? "logged_in" : "unchecked"),
+      targets,
+      message: status?.message,
+    };
+  }
+  private readStatus(
+    id: string,
+  ): { login: AccountInfo["login"]; message?: string; targets: Target[] } | null {
+    const value = this.db.setting(`account-status:${id}`) as {
+      login?: AccountInfo["login"];
+      message?: unknown;
+      targets?: Target[];
+    } | null;
+    if (!value || !value.login || !logins.has(value.login)) return null;
+    return {
+      login: value.login,
+      message: typeof value.message === "string" ? value.message : undefined,
+      targets: this.targetsOf(id, value.targets),
+    };
+  }
+  private readIdentities(id: string) {
+    const saved = this.db.setting(`identities:${id}`) as {
+      owner?: string;
+      targets?: Target[];
+    } | null;
+    if (!saved || typeof saved.owner !== "string") return null;
+    return { owner: saved.owner, targets: this.targetsOf(id, saved.targets) };
+  }
+  private targetsOf(id: string, value: Target[] | undefined): Target[] {
+    if (!Array.isArray(value)) return [];
+    return value.filter(
+      (target) =>
+        target &&
+        target.accountId === id &&
+        typeof target.identityId === "string" &&
+        typeof target.name === "string" &&
+        (target.kind === "profile" || target.kind === "page"),
+    );
+  }
+  private remember(account: AccountInfo) {
+    this.states.set(account.id, account);
+    this.db.setSetting(`account-status:${account.id}`, {
+      login: account.login,
+      message: account.message ?? null,
+      targets: account.targets,
+    });
+  }
+  private async syncAll() {
+    if (this.operating) return;
+    for (const account of this.db.accounts()) {
+      try {
+        await this.syncStatus(account.id);
+      } catch {
+        // Keep the last persisted status when a session cannot be read.
+      }
+    }
+  }
+  private async syncStatus(id: string) {
+    const view = this.browsers.get(id);
+    const partition =
+      view && !view.webContents.isDestroyed()
+        ? view.webContents.session
+        : session.fromPartition(`persist:facebook-${id}`);
+    const cookies = await partition.cookies.get({ url: "https://www.facebook.com" });
+    const url = view && !view.webContents.isDestroyed() ? view.webContents.getURL() : "";
+    const owner = cookies.find((cookie) => cookie.name === "c_user")?.value;
+    const previous = this.states.get(id) ?? this.stored(id);
+    let login: AccountInfo["login"];
+    let message = previous.message;
+    if (/checkpoint|two_step_verification/.test(url)) {
+      login = "needs_verification";
+      message = "请在 Facebook 完成安全验证后重新检查";
+    } else if (owner) login = "logged_in";
+    else login = "logged_out";
+    if (login === "logged_out") message = "请在账号标签页中完成登录";
+    const identities = this.readIdentities(id);
+    const discovered =
+      login === "logged_in" && identities && identities.owner === owner ? identities.targets : [];
+    const targets = login === "logged_in" ? discovered : previous.targets;
+    if (login === "logged_in" && previous.login !== "logged_in")
+      message = targets.length
+        ? `已识别 ${targets.length} 个发布身份。`
+        : "已登录。打开账号后可检查发布身份。";
+    const sameTargets =
+      previous.targets.length === targets.length &&
+      previous.targets.every((target, index) => target.identityId === targets[index]?.identityId);
+    if (previous.login === login && previous.message === message && sameTargets) return;
+    this.remember({
+      ...previous,
+      login,
+      targets,
+      message,
+      avatar: this.cachedAvatar(id)?.image ?? previous.avatar,
+    });
   }
 }

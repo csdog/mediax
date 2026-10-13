@@ -12,6 +12,7 @@ import type {
 } from "../../shared/models";
 import { useTabPreview } from "./useTabPreview";
 import { useAccountBrowserLayout } from "./useAccountBrowserLayout";
+import { usePublishSettings } from "./usePublishSettings";
 import { navigation } from "@/app/navigation";
 import { accountsOptions, historyOptions } from "@/app/queries";
 const emptyAccounts: AccountInfo[] = [];
@@ -35,7 +36,11 @@ export function useWorkspaceController() {
     } else void navigate({ to: `/${page}` });
   };
   const [initialized, setInitialized] = useState(false);
-  const accountsQuery = useQuery(accountsOptions);
+  const accountsQuery = useQuery({
+    ...accountsOptions,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: true,
+  });
   const historyQuery = useQuery({
     ...historyOptions,
     enabled: initialized,
@@ -58,8 +63,6 @@ export function useWorkspaceController() {
     const error = accountsQuery.error ?? historyQuery.error;
     if (error) setNotice(error.message);
   }, [accountsQuery.error, historyQuery.error]);
-  const [verifyDialogTarget, setVerifyDialogTarget] = useState<TaskTarget | null>(null);
-  const [verifyUrl, setVerifyUrl] = useState("");
   const [selectedTargets, setSelectedTargets] = useState<Target[]>([]);
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
@@ -70,11 +73,19 @@ export function useWorkspaceController() {
   const isNewTab = browserTabs.some((tab) => tab.id === activeBrowser && tab.kind === "new");
   const activeAccountId = isNewTab ? null : activeBrowser;
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
-  const tabPreview = useTabPreview({ hoveredTab, activeAccountId, browserTabs });
+  const tabPreview = useTabPreview({ hoveredTab, browserTabs });
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const openSettings = () => setSettingsOpen(true);
   const [focusedTask, setFocusedTask] = useState<string | undefined>();
+  const removeAccount = async (id: string) => {
+    setBrowserTabs((tabs) => tabs.filter((tab) => tab.id !== id));
+    setActiveBrowser((current) => (current === id ? null : current));
+    setSelectedTargets((targets) => targets.filter((target) => target.accountId !== id));
+    await window.desktop.deleteAccount(id);
+    setAccounts((old) => old.filter((account) => account.id !== id));
+    await queryClient.fetchQuery(historyOptions);
+  };
   const openBrowser = async (account: { id: string; name: string }) => {
     setHoveredTab(null);
     setBrowserTabs((tabs) => {
@@ -85,13 +96,14 @@ export function useWorkspaceController() {
     await window.desktop.openAccount(account.id);
     await queryClient.fetchQuery({ ...accountsOptions, staleTime: 0 });
   };
-  const { browserPane, overlayCover } = useAccountBrowserLayout({
+  const { silentPublish, setSilentPublish } = usePublishSettings();
+  const concealBrowser =
+    silentPublish &&
+    records.targets.some((target) => ["pending", "running", "submitted"].includes(target.status));
+  const { browserPane } = useAccountBrowserLayout({
     activeBrowser,
     settingsOpen,
-    accountDialogOpen,
-    avatarMenuOpen,
-    hoveredTab,
-    tabPreview,
+    concealBrowser,
     setNotice,
   });
   const reload = async () => {
@@ -153,7 +165,7 @@ export function useWorkspaceController() {
     return window.desktop.onCommand?.((command) => {
       if (busy && command.action !== "navigate") return;
       if (command.action === "tab") {
-        if (!settingsOpen && !accountDialogOpen && !publishDialogOpen && !verifyDialogTarget)
+        if (!settingsOpen && !accountDialogOpen && !publishDialogOpen)
           handleTabCommand(command.operation);
       } else if (command.action === "settings") {
         void openSettings();
@@ -188,7 +200,6 @@ export function useWorkspaceController() {
     settingsOpen,
     accountDialogOpen,
     publishDialogOpen,
-    verifyDialogTarget,
   ]);
   const closeBrowserTab = async (id: string) => {
     setHoveredTab(null);
@@ -240,10 +251,6 @@ export function useWorkspaceController() {
     setNotice,
     busy,
     records,
-    verifyDialogTarget,
-    setVerifyDialogTarget,
-    verifyUrl,
-    setVerifyUrl,
     selectedTargets,
     setSelectedTargets,
     publishDialogOpen,
@@ -255,12 +262,14 @@ export function useWorkspaceController() {
     browserTabs,
     activeBrowser,
     setActiveBrowser,
+    silentPublish,
+    setSilentPublish,
+    concealBrowser,
     isNewTab,
     hoveredTab,
     setHoveredTab,
     tabPreview,
     browserPane,
-    overlayCover,
     avatarMenuOpen,
     setAvatarMenuOpen,
     sidebarOpen,
@@ -271,6 +280,7 @@ export function useWorkspaceController() {
     focusedTask,
     setFocusedTask,
     openBrowser,
+    removeAccount,
     reload,
     run,
     closeBrowserTab,

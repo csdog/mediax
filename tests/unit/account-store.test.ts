@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Database } from "../../src/main/storage/Database";
+import { AccountService } from "../../src/main/accounts/AccountService";
+import { AccountBrowserManager } from "../../src/main/browser/AccountBrowserManager";
 describe("SQLite storage", () => {
   it("migrates and isolates accounts", () => {
     const db = new Database(":memory:");
@@ -42,6 +44,38 @@ describe("SQLite storage", () => {
     db.recover();
     expect(db.targets(task.id)[0].status).toBe("unknown");
     expect(() => db.retry(t.id)).toThrow();
+    db.close();
+  });
+  it("restores saved login status and deletes an account after its publish records", async () => {
+    const db = new Database(":memory:");
+    const accounts = new AccountService(db, new AccountBrowserManager());
+    const account = db.addAccount("A");
+    const target = {
+      accountId: account.id,
+      identityId: "1001",
+      name: "A",
+      kind: "profile" as const,
+    };
+    db.setSetting(`identities:${account.id}`, { owner: "1001", targets: [target] });
+    db.setSetting(`account-status:${account.id}`, {
+      login: "logged_in",
+      message: "已识别 1 个发布身份。",
+      targets: [target],
+    });
+    expect(accounts.list()[0]).toMatchObject({
+      login: "logged_in",
+      message: "已识别 1 个发布身份。",
+      targets: [target],
+    });
+    const task = db.createTask("text", [], [target]);
+    expect(() => db.deleteAccount(account.id)).toThrow(/未完成的发布/);
+    db.transition(db.targets(task.id)[0].id, "verified");
+    await accounts.remove(account.id);
+    expect(db.accounts()).toHaveLength(0);
+    expect(db.targets()).toHaveLength(0);
+    expect(db.tasks()).toHaveLength(0);
+    expect(accounts.list()).toHaveLength(0);
+    accounts.stopAutoRefresh();
     db.close();
   });
 });

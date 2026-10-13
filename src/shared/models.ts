@@ -18,6 +18,7 @@ export type Task = {
   body: string;
   images: string[];
   createdAt: string;
+  cover?: string | null;
 };
 export type TaskTarget = Target & {
   id: string;
@@ -35,6 +36,17 @@ export type AccountInfo = Account & {
 };
 export type ShortcutSettings = { accelerator: string; registered: boolean; error?: string };
 export type BrowserBounds = { x: number; y: number; width: number; height: number };
+export type TabPreviewOverlay = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label: string;
+  lines: string[];
+  image: string | null;
+  alt: string;
+  placeholder: boolean;
+};
 export type BrowserPreview = { title: string; hostname: string; image: string | null };
 export type WorkspaceSession = {
   tabs: { id: string; kind?: "new" }[];
@@ -47,14 +59,19 @@ export interface DesktopApi {
   saveWorkspaceSession(session: WorkspaceSession): Promise<void>;
   previewAccountBrowser(id: string): Promise<BrowserPreview>;
   layoutAccountBrowser(id: string | null, bounds?: BrowserBounds): Promise<void>;
+  showTabPreview?(preview: TabPreviewOverlay): Promise<void>;
+  hideTabPreview?(): Promise<void>;
   closeAccountBrowser(id: string): Promise<void>;
   shortcutSettings(): Promise<ShortcutSettings>;
   setGlobalShortcut(accelerator: string): Promise<ShortcutSettings>;
+  publishSettings(): Promise<{ silent: boolean }>;
+  setSilentPublish(silent: boolean): Promise<{ silent: boolean }>;
   onCommand(listener: (command: DesktopCommand) => void): () => void;
   accounts(): Promise<AccountInfo[]>;
   addAccount(name: string): Promise<AccountInfo>;
   openAccount(id: string): Promise<void>;
   refreshAccount(id: string): Promise<AccountInfo>;
+  deleteAccount(id: string): Promise<void>;
   importMarkdown(): Promise<string | null>;
   chooseImages(): Promise<ImageAsset[]>;
   saveDraft(body: string, images: ImageAsset[]): Promise<void>;

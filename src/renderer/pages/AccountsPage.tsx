@@ -12,6 +12,7 @@ export function AccountsPage() {
     run,
     openBrowser,
     setAccounts,
+    removeAccount,
   } = useWorkspace();
   return (
     <DocumentPage>
@@ -32,6 +33,7 @@ export function AccountsPage() {
             }
           })
         }
+        onDelete={(account) => void run(() => removeAccount(account.id))}
       />
     </DocumentPage>
   );

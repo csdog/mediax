@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { useWorkspace } from "@/app/WorkspaceContext";
+import { useNativeTabPreview } from "@/hooks/useNativeTabPreview";
 
 export function WorkspaceToolbar() {
   const {
@@ -23,6 +24,8 @@ export function WorkspaceToolbar() {
     closeBrowserTab,
     newBrowserTab,
   } = useWorkspace();
+  const nativePreview = typeof window.desktop.showTabPreview === "function";
+  useNativeTabPreview(nativePreview ? hoveredTab : null);
   return (
     <div className="app-toolbar window-drag">
       <div className="toolbar-navigation">
@@ -62,10 +65,14 @@ export function WorkspaceToolbar() {
         >
           <HoverCard
             open={hoveredTab === "workspace"}
-            onOpenChange={(open) => setHoveredTab(open ? "workspace" : null)}
+            onOpenChange={(open) =>
+              setHoveredTab((current) =>
+                open ? "workspace" : current === "workspace" ? null : current,
+              )
+            }
           >
             <HoverCardTrigger
-              delay={400}
+              delay={hoveredTab ? 0 : 400}
               closeDelay={100}
               render={
                 <button
@@ -86,8 +93,9 @@ export function WorkspaceToolbar() {
               side="bottom"
               align="start"
               sideOffset={8}
-              className="w-72 overflow-hidden p-0"
+              className={`w-72 overflow-hidden p-0${nativePreview ? " tab-preview-source" : ""}`}
               aria-label="工作区预览"
+              data-preview-tab="workspace"
             >
               <div className="space-y-1 px-3 py-2.5">
                 <p className="text-sm font-medium">{pageTitle}</p>
@@ -110,10 +118,12 @@ export function WorkspaceToolbar() {
             <HoverCard
               key={tab.id}
               open={hoveredTab === tab.id}
-              onOpenChange={(open) => setHoveredTab(open ? tab.id : null)}
+              onOpenChange={(open) =>
+                setHoveredTab((current) => (open ? tab.id : current === tab.id ? null : current))
+              }
             >
               <HoverCardTrigger
-                delay={400}
+                delay={hoveredTab ? 0 : 400}
                 closeDelay={100}
                 render={
                   <div
@@ -151,8 +161,9 @@ export function WorkspaceToolbar() {
                 side="bottom"
                 align="start"
                 sideOffset={8}
-                className="w-72 overflow-hidden p-0"
+                className={`w-72 overflow-hidden p-0${nativePreview ? " tab-preview-source" : ""}`}
                 aria-label={`${tab.name} 页面预览`}
+                data-preview-tab={tab.id}
               >
                 <div className="space-y-1 px-3 py-2.5">
                   <p className="truncate text-sm font-medium">{tab.name}</p>

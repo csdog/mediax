@@ -8,7 +8,7 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { useWorkspace } from "@/app/WorkspaceContext";
 
 export function SettingsPage() {
-  const { setSettingsOpen } = useWorkspace();
+  const { setSettingsOpen, silentPublish, setSilentPublish } = useWorkspace();
   const { shortcut, setShortcut, shortcutMessage, setShortcutMessage, shortcutBusy, saveShortcut } =
     useShortcutSettings();
   useEffect(() => {
@@ -24,7 +24,11 @@ export function SettingsPage() {
   }, [shortcutBusy]);
   return (
     <main className="settings-full-page" aria-label="设置页面">
-      <SettingsLayout onBack={() => setSettingsOpen(false)}>
+      <SettingsLayout
+        onBack={() => setSettingsOpen(false)}
+        silentPublish={silentPublish}
+        onSilentPublish={setSilentPublish}
+      >
         <form
           className="space-y-4"
           onSubmit={(event) => {

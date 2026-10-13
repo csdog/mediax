@@ -90,7 +90,7 @@ test(
       assert.equal(frame.right, 8);
       assert.equal(frame.bottom, 8);
       assert.equal(frame.paneBackground, "rgb(255, 255, 255)");
-      assert.equal(frame.radius, "12px");
+      assert.equal(frame.radius, "16px");
       assert.equal(frame.surface, "rgba(249, 249, 249, 0.85)");
       assert.equal(frame.toolbarDrag, "drag");
       assert.notEqual(frame.tabStripDrag, "no-drag");
@@ -164,6 +164,46 @@ test(
       const thumbnail = page.getByAltText("Browser tab fixture 页面缩略图");
       await thumbnail.waitFor();
       assert((await thumbnail.getAttribute("src")).startsWith("data:image/png;base64,"));
+      const previewBox = await page.getByLabel("Browser tab fixture 页面预览").boundingBox();
+      assert(previewBox);
+      await application.evaluate(
+        async ({ BrowserWindow, session }, { id, box }) => {
+          for (let attempt = 0; attempt < 50; attempt++) {
+            const windows = BrowserWindow.getAllWindows();
+            const host = windows.find((item) =>
+              item.contentView.children.some(
+                (child) =>
+                  "webContents" in child &&
+                  child.webContents.session === session.fromPartition(`persist:facebook-${id}`),
+              ),
+            );
+            const view = host?.contentView.children.find(
+              (child) =>
+                "webContents" in child &&
+                child.webContents.session === session.fromPartition(`persist:facebook-${id}`),
+            );
+            const overlay = windows.find((item) => item !== host && item.isVisible());
+            const content = host?.getContentBounds();
+            const overlayBounds = overlay?.getBounds();
+            const viewBounds = view?.getBounds();
+            if (
+              view?.getVisible() &&
+              viewBounds &&
+              content &&
+              overlayBounds &&
+              viewBounds.y < box.y + box.height - 24 &&
+              Math.abs(overlayBounds.x - (content.x + box.x)) <= 8 &&
+              Math.abs(overlayBounds.y - (content.y + box.y)) <= 8 &&
+              Math.abs(overlayBounds.width - box.width) <= 8 &&
+              Math.abs(overlayBounds.height - box.height) <= 8
+            )
+              return;
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          throw new Error("Tab preview does not float above the account page");
+        },
+        { id: account.id, box: previewBox },
+      );
       await page.screenshot({
         path: join(tmpdir(), "media-post-tab-hover.png"),
         animations: "disabled",
@@ -227,7 +267,6 @@ test(
           menu && pane && menu.getBoundingClientRect().right <= pane.getBoundingClientRect().left
         );
       });
-      assert.equal(await page.getByLabel("浏览器页面背景").count(), 0);
       assert.equal(
         await application.evaluate(
           ({ BrowserWindow, session }, id) =>

@@ -34,6 +34,8 @@ export function ComposePage() {
     setFocusedTask,
     reload,
     setPage,
+    silentPublish,
+    setActiveBrowser,
   } = useWorkspace();
   return (
     <DocumentPage>
@@ -274,6 +276,7 @@ export function ComposePage() {
                         );
                         setPublishDialogOpen(false);
                         setFocusedTask(taskId);
+                        if (silentPublish) setActiveBrowser(null);
                         await reload();
                         setPage("history");
                         setNotice("任务已创建，将依次发布。需要人工处理时请打开对应账号标签页。");

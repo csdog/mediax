@@ -1,4 +1,5 @@
 import { ipcMain, dialog, BrowserWindow, app, shell as electronShell } from "electron";
+import { log } from "./logging";
 import { readFile } from "node:fs/promises";
 import { extname, basename, join } from "node:path";
 import { postUrl } from "./platforms/facebook/FacebookAdapter";
@@ -6,7 +7,10 @@ import { PublishService } from "./publish/PublishService";
 import { Database } from "./storage/Database";
 import { AccountService } from "./accounts/AccountService";
 import { markdownToText } from "./content/markdown";
+import { coverDataUrl } from "./content/cover";
 import type { DesktopShell } from "./desktop/DesktopShell";
+import { TabPreviewWindow } from "./desktop/TabPreviewWindow";
+import type { TabPreviewOverlay } from "../shared/models";
 import type { ImageAsset } from "../shared/models";
 export function registerIpc(
   db: Database,
@@ -15,17 +19,44 @@ export function registerIpc(
   rendererReady: () => void,
   shell: DesktopShell,
 ) {
+  const stopLogging = db.onTargetChange((target) => {
+    const write = ["failed", "unknown", "awaiting_user"].includes(target.status)
+      ? log.warn
+      : log.info;
+    write("Publish target state changed", {
+      taskId: target.taskId,
+      targetId: target.id,
+      status: target.status,
+    });
+  });
+  app.once("will-quit", stopLogging);
   const images = new Map<string, ImageAsset>();
+  const tabPreview = new TabPreviewWindow(window);
   const publishing = new PublishService(db, accounts, join(app.getPath("userData"), "task-assets"));
   const text = (value: unknown) => {
     if (typeof value !== "string") throw new Error("无效文本");
     return value;
   };
   const on = (name: string, fn: (...args: any[]) => unknown) =>
-    ipcMain.handle(`media-post:${name}`, (event, ...args) => {
-      if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame)
+    ipcMain.handle(`media-post:${name}`, async (event, ...args) => {
+      if (
+        event.sender !== window.webContents ||
+        event.senderFrame !== window.webContents.mainFrame
+      ) {
+        log.warn("Rejected IPC call", { method: name });
         throw new Error("拒绝非应用页面调用");
-      return fn(...args);
+      }
+      log.debug("IPC call", { method: name });
+      try {
+        return await fn(...args);
+      } catch (error) {
+        // Do not log arguments, post bodies, image previews, cookies or passwords.
+        log.warn("IPC call failed", {
+          method: name,
+          error: error instanceof Error ? error.message.split("\n")[0] : "Unknown error",
+        });
+        throw error;
+      }
     });
   on("rendererReady", rendererReady);
   on("workspaceSession", () => db.setting("workspaceSession") ?? null);
@@ -57,6 +88,12 @@ export function registerIpc(
   });
   on("shortcutSettings", () => shell.shortcutSettings());
   on("setGlobalShortcut", (accelerator) => shell.setGlobalShortcut(text(accelerator)));
+  on("publishSettings", () => ({ silent: db.setting("silentPublish") === true }));
+  on("setSilentPublish", (silent) => {
+    if (typeof silent !== "boolean") throw new Error("无效设置");
+    db.setSetting("silentPublish", silent);
+    return { silent };
+  });
   on("accounts", () => accounts.list());
   on("addAccount", (name) => accounts.add(text(name)));
   on("previewAccountBrowser", (id) => accounts.preview(text(id)));
@@ -80,7 +117,10 @@ export function registerIpc(
     });
   });
   on("closeAccountBrowser", (id) => accounts.close(text(id)));
+  on("showTabPreview", (value) => tabPreview.show(previewOverlay(value)));
+  on("hideTabPreview", () => tabPreview.hide());
   on("refreshAccount", (id) => accounts.refresh(text(id)));
+  on("deleteAccount", (id) => accounts.remove(text(id)));
   on("importMarkdown", async () => {
     const result = await dialog.showOpenDialog(window, {
       properties: ["openFile"],
@@ -147,7 +187,10 @@ export function registerIpc(
     }
     return { body: draft.body, images: assets };
   });
-  on("history", () => ({ tasks: db.tasks(), targets: db.targets() }));
+  on("history", () => ({
+    tasks: db.tasks().map((task) => ({ ...task, cover: coverDataUrl(task.images[0]) })),
+    targets: db.targets(),
+  }));
   on("publish", (body, paths, targets) => {
     if (
       !Array.isArray(paths) ||
@@ -177,4 +220,37 @@ export function registerIpc(
   on("verifyTarget", (id, url) =>
     publishing.verify(text(id), url === undefined ? undefined : text(url)),
   );
+}
+
+function previewOverlay(value: unknown): TabPreviewOverlay {
+  if (!value || typeof value !== "object") throw new Error("无效预览");
+  const preview = value as Record<string, unknown>;
+  const number = (item: unknown, name: string) => {
+    if (typeof item !== "number" || !Number.isFinite(item)) throw new Error(`无效预览${name}`);
+    return item;
+  };
+  const line = (item: unknown) => {
+    if (typeof item !== "string") throw new Error("无效预览文本");
+    return item.slice(0, 200);
+  };
+  const width = number(preview.width, "宽度");
+  const height = number(preview.height, "高度");
+  if (width < 1 || height < 1 || width > 800 || height > 800) throw new Error("无效预览尺寸");
+  let image: string | null = null;
+  if (typeof preview.image === "string" && preview.image.length > 0) {
+    if (!preview.image.startsWith("data:image/") || preview.image.length > 3_000_000)
+      throw new Error("无效预览图片");
+    image = preview.image;
+  }
+  return {
+    x: number(preview.x, "位置"),
+    y: number(preview.y, "位置"),
+    width,
+    height,
+    label: line(preview.label),
+    lines: Array.isArray(preview.lines) ? preview.lines.slice(0, 4).map(line) : [],
+    image,
+    alt: typeof preview.alt === "string" ? preview.alt.slice(0, 200) : "",
+    placeholder: preview.placeholder === true,
+  };
 }

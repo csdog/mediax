@@ -52,14 +52,15 @@ it("pauses on verification and resumes only after another preparation", async ()
   blocked = false;
   await q.resume(db.targets()[0].id);
   expect(submitted).toBe(2);
-  expect(db.targets().every((t) => t.status === "submitted")).toBe(true);
+  expect(db.targets().every((t) => t.status === "verified")).toBe(true);
   db.close();
 });
 it("keeps ambiguous submit unknown and refuses retry", async () => {
   const db = setup();
   const p: Publisher = {
     prepare: async () => {},
-    submit: async () => {
+    submit: async (_task, _target, markSubmitted) => {
+      markSubmitted();
       throw new Error("connection lost");
     },
     verify: async () => null,

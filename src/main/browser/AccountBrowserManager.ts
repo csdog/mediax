@@ -89,10 +89,14 @@ export class AccountBrowserManager {
     if (win && !win.isDestroyed()) win.destroy();
     if (this.activeId === id) this.activeId = null;
   }
-  async open(accountId: string, url: string): Promise<WebContentsView> {
+  async open(
+    accountId: string,
+    url: string,
+    options?: { focus?: boolean },
+  ): Promise<WebContentsView> {
     const existing = this.views.get(accountId);
     if (existing) {
-      this.show(accountId);
+      if (options?.focus !== false) this.show(accountId);
       return existing;
     }
     if (!/^[a-zA-Z0-9-]+$/.test(accountId)) throw new Error("Invalid account ID");
@@ -110,6 +114,7 @@ export class AccountBrowserManager {
     if (this.host) view.setBorderRadius(12);
     view.setBounds({ x: 0, y: 44, width: 1000, height: 700 });
     view.setVisible(!this.host);
+    view.webContents.setBackgroundThrottling(false);
     win.contentView.addChildView(view);
     this.views.set(accountId, view);
     view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

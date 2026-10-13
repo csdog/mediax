@@ -199,7 +199,7 @@ it("keeps transaction rollback, attempt recovery and corrupt setting handling wi
     db.recover();
     expect(db.targets(task.id)[0]).toMatchObject({
       status: "unknown",
-      error: "应用中断，请先人工核验是否已发布",
+      error: "应用中断，发布未完成",
     });
     expect(() => db.retry(id)).toThrow();
   } finally {

@@ -7,6 +7,7 @@ import {
   List,
   Monitor,
   RefreshCw,
+  Trash2,
   Users,
   Folder,
 } from "lucide-react";
@@ -37,6 +38,14 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { AccountInfo } from "../../shared/models";
 
 const loginLabels = {
@@ -52,15 +61,24 @@ type Props = {
   onAuthorize(): void;
   onOpen(account: AccountInfo): void;
   onRefresh(ids: string[]): void;
+  onDelete(account: AccountInfo): void;
 };
 
-export function AccountManagement({ accounts, busy, onAuthorize, onOpen, onRefresh }: Props) {
+export function AccountManagement({
+  accounts,
+  busy,
+  onAuthorize,
+  onOpen,
+  onRefresh,
+  onDelete,
+}: Props) {
   const [query, setQuery] = useState("");
   const [platformQuery, setPlatformQuery] = useState("");
   const [platform, setPlatform] = useState("all");
   const [status, setStatus] = useState("all");
   const [view, setView] = useState<"list" | "grid">("list");
   const [selected, setSelected] = useState<string[]>([]);
+  const [pendingDelete, setPendingDelete] = useState<AccountInfo | null>(null);
   const filtered = accounts.filter(
     (a) =>
       a.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) &&
@@ -127,10 +145,59 @@ export function AccountManagement({ accounts, busy, onAuthorize, onOpen, onRefre
         />
         <TooltipContent>检查状态与发布身份</TooltipContent>
       </Tooltip>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`删除 ${account.name}`}
+              disabled={busy}
+              onClick={() => setPendingDelete(account)}
+            >
+              <Trash2 />
+            </Button>
+          }
+        />
+        <TooltipContent>删除</TooltipContent>
+      </Tooltip>
     </div>
   );
   return (
     <section className="account-management" aria-label="账号管理工作区">
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>删除账号</DialogTitle>
+            <DialogDescription>
+              删除「{pendingDelete?.name}
+              」会关闭它的浏览器，并移除这个账号的发布记录。未完成的发布需要先处理完。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingDelete(null)}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={busy || !pendingDelete}
+              onClick={() => {
+                if (!pendingDelete) return;
+                const account = pendingDelete;
+                setPendingDelete(null);
+                onDelete(account);
+              }}
+            >
+              删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="account-section-header">
         <span>账号管理</span>
         <span className="account-total">{accounts.length} 个账号</span>

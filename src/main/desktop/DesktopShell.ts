@@ -28,10 +28,10 @@ export class DesktopShell {
     private db: Database,
   ) {
     const assets = app.isPackaged ? process.resourcesPath : join(__dirname, "../../build");
-    const trayImage = nativeImage.createFromPath(join(assets, "trayTemplate.png"));
-    if (trayImage.isEmpty()) throw new Error("菜单栏图标加载失败");
-    trayImage.setTemplateImage(true);
-    this.tray = new Tray(trayImage);
+    const iconPath = join(assets, "icon.png");
+    const source = nativeImage.createFromPath(iconPath);
+    if (source.isEmpty()) throw new Error("菜单栏图标加载失败");
+    this.tray = new Tray(menuBarIcon(source));
     this.tray.setToolTip("media-post · 本地发布工具");
     this.tray.setContextMenu(
       Menu.buildFromTemplate([
@@ -43,8 +43,7 @@ export class DesktopShell {
       ]),
     );
     this.tray.on("double-click", () => this.show());
-    if (process.platform === "darwin" && !app.isPackaged)
-      app.dock?.setIcon(join(assets, "icon.png"));
+    if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(iconPath);
     const attachShortcuts = (contents: Electron.WebContents) => {
       contents.on("before-input-event", (event, input) => {
         const operation = tabShortcut(input);
@@ -101,7 +100,7 @@ export class DesktopShell {
         const answer = dialog.showMessageBoxSync(window, {
           type: "question",
           title: "退出 media-post",
-          message: "仍有未完成或待核验的发布任务",
+          message: "仍有未完成的发布任务",
           detail:
             "退出会停止本机任务。再次启动后，请先检查发布记录，避免重复发布。关闭窗口可以继续在后台运行。",
           buttons: ["取消", "退出"],
@@ -336,4 +335,12 @@ export class DesktopShell {
       ]),
     );
   }
+}
+
+function menuBarIcon(source: Electron.NativeImage) {
+  const mac = process.platform === "darwin";
+  const pixels = mac ? 44 : 32;
+  const resized = source.resize({ width: pixels, height: pixels, quality: "best" });
+  if (!mac) return resized;
+  return nativeImage.createFromBuffer(resized.toPNG(), { scaleFactor: 2 });
 }

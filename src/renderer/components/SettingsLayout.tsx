@@ -2,9 +2,10 @@ import { useState, type ReactNode } from "react";
 import { Search, Settings, Keyboard, Bell, Database, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 const categories = [
-  { id: "general", title: "常规", icon: Settings, keywords: "菜单栏 窗口 快捷键" },
+  { id: "general", title: "常规", icon: Settings, keywords: "菜单栏 窗口 快捷键 静默 发布" },
   { id: "notifications", title: "通知", icon: Bell, keywords: "发布 任务" },
   { id: "shortcuts", title: "键盘快捷键", icon: Keyboard, keywords: "全局 呼出" },
   { id: "storage", title: "存储", icon: Database, keywords: "本地 数据 会话" },
@@ -28,7 +29,17 @@ function InfoRow({
     </div>
   );
 }
-export function SettingsLayout({ children, onBack }: { children: ReactNode; onBack(): void }) {
+export function SettingsLayout({
+  children,
+  onBack,
+  silentPublish,
+  onSilentPublish,
+}: {
+  children: ReactNode;
+  onBack(): void;
+  silentPublish: boolean;
+  onSilentPublish(silent: boolean): void;
+}) {
   const [category, setCategory] = useState("general");
   const [query, setQuery] = useState("");
   const items = categories.filter((item) =>
@@ -98,6 +109,24 @@ export function SettingsLayout({ children, onBack }: { children: ReactNode; onBa
               </div>
             </section>
           )}
+          {category === "general" && (
+            <section className="settings-section">
+              <h3>发布</h3>
+              <div className="settings-section-box">
+                <div className="settings-row">
+                  <div>
+                    <h3>静默发布</h3>
+                    <p>开启后，发布在后台进行，不把窗口和账号页面带到前台。</p>
+                  </div>
+                  <Switch
+                    checked={silentPublish}
+                    onCheckedChange={(checked) => onSilentPublish(checked === true)}
+                    aria-label="静默发布"
+                  />
+                </div>
+              </div>
+            </section>
+          )}
           {(category === "general" || category === "shortcuts") && (
             <section className="settings-section">
               <h3>快捷键</h3>
@@ -138,7 +167,7 @@ export function SettingsLayout({ children, onBack }: { children: ReactNode; onBa
               <div className="settings-section-box">
                 <InfoRow
                   title="发布结果"
-                  description="任务完成、存在失败项或结果待核验时显示系统通知。"
+                  description="任务完成或存在失败项时显示系统通知。"
                   value="已启用"
                 />
                 <InfoRow

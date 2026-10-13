@@ -1,7 +1,7 @@
 import type { Page, Locator } from "playwright-core";
 import { readFile } from "node:fs/promises";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
-import { NeedsUser, type Publisher } from "../Publisher";
+import { NeedsUser, NotSubmitted, type Publisher } from "../Publisher";
 import { labels } from "./selectors";
 
 type SessionIdentity = { owner: string | null; actor: string | null };
@@ -11,6 +11,21 @@ const normal = (text: string) =>
     .replace(/\r\n/g, "\n")
     .replace(/\u00a0/g, " ")
     .trim();
+// Photo posts move to a settings step whose preview keeps the body, while the
+// original textbox stays in the DOM off-screen and empty.
+export function composerStillHasPost(
+  editorText: string | null,
+  surfaceText: string,
+  expected: string,
+) {
+  const want = normal(expected);
+  if (!want) return false;
+  if (editorText !== null && normal(editorText) === want) return true;
+  const surface = normal(surfaceText);
+  if (surface.includes(want)) return true;
+  const compact = (value: string) => value.replace(/\s+/g, "");
+  return compact(surface).includes(compact(want));
+}
 export function postUrl(href: string): string | null {
   try {
     const u = new URL(href, "https://www.facebook.com");
@@ -111,6 +126,7 @@ export class FacebookAdapter implements Publisher {
     const escape = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return page
       .getByRole("dialog", { name: labels.account })
+      .getByRole("listitem")
       .getByRole("button", {
         name: new RegExp(`^(?:切换到|Switch to )?${escape}(?:[，,].*)?$`, "i"),
       })
@@ -126,8 +142,8 @@ export class FacebookAdapter implements Publisher {
       if ((session.actor || session.owner) !== previous) break;
       await page.waitForTimeout(200);
     }
-    // A fresh document avoids mixing old and new actor bootstrap from SPA navigation.
-    await page.goto("https://www.facebook.com/", { waitUntil: "domcontentloaded" });
+    // Reload after the actor changes to avoid stale bootstrap data from SPA navigation.
+    await this.navigate(page, "https://www.facebook.com/");
     return this.identity(page);
   }
   async discover(accountId: string): Promise<Target[]> {
@@ -143,12 +159,16 @@ export class FacebookAdapter implements Publisher {
         .getByRole("button")
         .filter({ visible: true })
         .evaluateAll((nodes) =>
-          nodes.map((node) =>
-            (node.getAttribute("aria-label") || node.textContent || "")
-              .replace(/^(?:切换到|Switch to )/, "")
-              .replace(/(?:，|,).*$/, "")
-              .trim(),
-          ),
+          nodes
+            // Profile rows have an avatar. The same list also contains actions such
+            // as Create Page, which must never be clicked during identity discovery.
+            .filter((node) => node.querySelector("img, svg image"))
+            .map((node) =>
+              (node.getAttribute("aria-label") || node.textContent || "")
+                .replace(/^(?:切换到|Switch to )/, "")
+                .replace(/(?:，|,).*$/, "")
+                .trim(),
+            ),
         );
       await page.keyboard.press("Escape");
       let current = original;
@@ -180,6 +200,17 @@ export class FacebookAdapter implements Publisher {
       kind: identity.kind,
     }));
   }
+  private async navigate(page: Page, url: string) {
+    try {
+      await page.goto(url, { waitUntil: "domcontentloaded" });
+    } catch (error) {
+      // Facebook can still be completing its own redirect. Retry only read-only
+      // navigation once; publishing clicks are never retried by this helper.
+      if (!(error instanceof Error) || !error.message.includes("net::ERR_ABORTED")) throw error;
+      await page.waitForLoadState("domcontentloaded", { timeout: 15000 });
+      await page.goto(url, { waitUntil: "domcontentloaded" });
+    }
+  }
   private async unique(locator: Locator, message: string) {
     const visible = locator.filter({ visible: true });
     await visible
@@ -199,10 +230,12 @@ export class FacebookAdapter implements Publisher {
       throw new NeedsUser("切换后的身份 ID 与目标不一致，未提交；请手动切换后继续");
   }
   private dialog(page: Page) {
-    return page
-      .getByRole("dialog")
-      .filter({ has: page.locator('[role="textbox"][contenteditable="true"]') })
-      .filter({ visible: true });
+    const withEditor = page.getByRole("dialog").filter({
+      has: page.locator('[role="textbox"][contenteditable="true"]'),
+    });
+    // Ignore wrappers containing another editor dialog, but retain composers
+    // containing auxiliary dialogs without a textbox.
+    return withEditor.filter({ hasNot: withEditor }).filter({ visible: true });
   }
   private async links(page: Page) {
     return new Set(
@@ -224,9 +257,7 @@ export class FacebookAdapter implements Publisher {
     // Validate all files before touching the composer.
     for (const path of task.images) await readFile(path);
     if ((await this.dialog(page).count()) === 0) {
-      await page.goto(`https://www.facebook.com/profile.php?id=${target.identityId}`, {
-        waitUntil: "domcontentloaded",
-      });
+      await this.navigate(page, `https://www.facebook.com/profile.php?id=${target.identityId}`);
       const identity = await this.identity(page);
       if (identity.id !== target.identityId)
         throw new NeedsUser("目标主页加载后身份不一致，未提交");
@@ -250,11 +281,10 @@ export class FacebookAdapter implements Publisher {
       await (await this.unique(opener, "未找到发帖入口，请打开当前身份主页后继续")).click();
     }
     const dialog = await this.unique(this.dialog(page), "未识别到 Facebook 发帖编辑器");
-    const editor = await this.unique(
+    await this.unique(
       dialog.locator('[role="textbox"][contenteditable="true"]'),
       "正文编辑器不唯一",
     );
-    await editor.fill(task.body);
     if (task.images.length) {
       let files = dialog.locator('input[type="file"][accept*="image"]');
       if ((await files.count()) !== 1) {
@@ -271,8 +301,12 @@ export class FacebookAdapter implements Publisher {
       // File selection is not upload completion: require rendered attachment previews and idle UI.
       await page.waitForFunction(
         ({ count }) => {
-          const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter((d) =>
-            d.querySelector('[contenteditable="true"]'),
+          const dialogs = [...document.querySelectorAll('[role="dialog"]')].filter(
+            (d) =>
+              d.querySelector('[role="textbox"][contenteditable="true"]') &&
+              ![...d.querySelectorAll('[role="dialog"]')].some((child) =>
+                child.querySelector('[role="textbox"][contenteditable="true"]'),
+              ),
           );
           if (dialogs.length !== 1) return false;
           const d = dialogs[0];
@@ -281,7 +315,20 @@ export class FacebookAdapter implements Publisher {
             (i) =>
               /^(blob:|data:)|fbcdn\.net/.test(i.src) && i.naturalWidth > 0 && i.clientWidth > 80,
           );
-          return !busy && images.length >= count;
+          // Facebook folds a gallery into five previews. The final tile's +N
+          // includes that tile, so five visible images and +7 represent 11.
+          let attachments = images.length;
+          for (const label of d.querySelectorAll("div, span")) {
+            if (label.children.length) continue;
+            const more = /^\+(\d+)$/.exec(label.textContent?.trim() ?? "");
+            if (!more) continue;
+            let tile = label.parentElement;
+            while (tile && tile !== d && !tile.querySelector("img")) tile = tile.parentElement;
+            const previews = tile ? [...tile.querySelectorAll("img")] : [];
+            if (previews.length === 1 && images.includes(previews[0]))
+              attachments = Math.max(attachments, images.length - 1 + Number(more[1]));
+          }
+          return !busy && attachments >= count;
         },
         { count: task.images.length },
         { timeout: 90000 },
@@ -289,7 +336,28 @@ export class FacebookAdapter implements Publisher {
       if (await dialog.getByText(labels.uploading).filter({ visible: true }).count())
         throw new NeedsUser("图片仍在上传，请等待完成后继续");
     }
-    if (normal(await editor.innerText()) !== normal(task.body))
+    // Uploading attachments can remount or clear Facebook's Lexical editor.
+    // Fill only after attachment previews settle, using a fresh live locator.
+    const finalEditor = await this.unique(
+      this.dialog(page).locator('[role="textbox"][contenteditable="true"]'),
+      "上传后正文编辑器不唯一",
+    );
+    // Lexical can discard bulk insertText input, including the first character
+    // of an immediate fallback. Use sequential keyboard input from the outset.
+    const lexical = await finalEditor.getAttribute("data-lexical-editor");
+    if (lexical !== "true") await finalEditor.fill(task.body);
+    if (lexical === "true" || normal(await finalEditor.innerText()) !== normal(task.body)) {
+      if (normal(await finalEditor.innerText())) {
+        await finalEditor.press("ControlOrMeta+A");
+        await finalEditor.press("Backspace");
+        await page.waitForFunction(
+          (element) => !element?.textContent?.trim(),
+          await finalEditor.elementHandle(),
+        );
+      }
+      await finalEditor.pressSequentially(task.body);
+    }
+    if (normal(await finalEditor.innerText()) !== normal(task.body))
       throw new Error("Facebook 编辑器正文与任务不一致");
     // Some Facebook versions have a separate post settings step.
     let post = dialog.getByRole("button", { name: labels.post }).filter({ visible: true });
@@ -315,32 +383,34 @@ export class FacebookAdapter implements Publisher {
     this.prepared = { taskId: task.id, targetId: target.id, before };
     this.journal?.save(target.id, { before: [...before], authorPath: this.authorPath });
   }
-  async submit(task: Task, target: TaskTarget) {
+  async submit(task: Task, target: TaskTarget, markSubmitted: () => void) {
     if (this.prepared?.taskId !== task.id || this.prepared.targetId !== target.id)
-      throw new Error("任务未完成发布准备");
+      throw new NotSubmitted("任务未完成发布准备");
     const page = await this.getPage();
     const identity = await this.identity(page);
     if (identity.id !== target.identityId || identity.kind !== target.kind)
-      throw new Error("提交前身份变化，已停止；请核验发布记录");
+      throw new NotSubmitted("提交前身份变化，已停止");
     const button = await this.unique(
       page.getByRole("dialog").getByRole("button", { name: labels.post }),
       "发布按钮不唯一，未再次点击",
     );
-    const dialog = page
-      .getByRole("dialog")
-      .filter({ has: page.getByRole("button", { name: labels.post }) })
-      .filter({ visible: true });
+    const withPost = page.getByRole("dialog").filter({
+      has: page.getByRole("button", { name: labels.post }),
+    });
+    const dialog = withPost.filter({ hasNot: withPost }).filter({ visible: true });
     const editor = dialog.locator('[role="textbox"][contenteditable="true"]');
-    const content =
-      (await editor.count()) === 1 ? await editor.innerText() : await dialog.innerText();
-    if (
-      !((await editor.count()) === 1
-        ? normal(content) === normal(task.body)
-        : normal(content).includes(normal(task.body)))
-    )
-      throw new Error("提交前编辑内容已变化，未点击发布；请人工核验");
+    const editorText = (await editor.count()) === 1 ? await editor.innerText() : null;
+    if (editorText === null || normal(editorText) !== normal(task.body)) {
+      const more = dialog
+        .getByRole("button", { name: /^(See more|展开|查看更多|查看全文)$/i })
+        .filter({ visible: true });
+      if ((await more.count()) === 1) await more.click({ timeout: 3000 }).catch(() => {});
+      if (!composerStillHasPost(editorText, await dialog.innerText(), task.body))
+        throw new NotSubmitted("提交前编辑内容已变化，未点击发布");
+    }
     if (await dialog.locator('[role="progressbar"], [aria-busy="true"]').count())
-      throw new Error("上传状态变化，未点击发布；请人工核验");
+      throw new NotSubmitted("上传状态变化，未点击发布");
+    markSubmitted();
     await button.click({ timeout: 15000 });
   }
   async verify(task: Task, target: TaskTarget): Promise<string | null> {
@@ -364,7 +434,7 @@ export class FacebookAdapter implements Publisher {
                 candidate,
                 authorPath: this.authorPath,
               });
-              await page.goto(candidate, { waitUntil: "domcontentloaded" });
+              await this.navigate(page, candidate);
               await page
                 .getByRole("article")
                 .first()
@@ -387,15 +457,29 @@ export class FacebookAdapter implements Publisher {
       .getByRole("button", { name: /^(See more|展开|查看更多)$/i })
       .filter({ visible: true });
     if ((await more.count()) === 1) await more.click({ timeout: 3000 }).catch(() => {});
-    const evidence = await article.evaluate((node) => ({
-      text: (node as HTMLElement).innerText,
-      links: [...node.querySelectorAll("h2 a[href], h3 a[href], h4 a[href], strong a[href]")].map(
-        (a) => (a as HTMLAnchorElement).href,
-      ),
-      imageCount: [...node.querySelectorAll("img")].filter(
+    const evidence = await article.evaluate((node) => {
+      const images = [...node.querySelectorAll("img")].filter(
         (i) => i.naturalWidth > 0 && i.clientWidth > 80,
-      ).length,
-    }));
+      );
+      let imageCount = images.length;
+      for (const label of node.querySelectorAll("div, span")) {
+        if (label.children.length) continue;
+        const more = /^\+(\d+)$/.exec(label.textContent?.trim() ?? "");
+        if (!more) continue;
+        let tile = label.parentElement;
+        while (tile && tile !== node && !tile.querySelector("img")) tile = tile.parentElement;
+        const previews = tile ? [...tile.querySelectorAll("img")] : [];
+        if (previews.length === 1 && images.includes(previews[0]))
+          imageCount = Math.max(imageCount, images.length - 1 + Number(more[1]));
+      }
+      return {
+        text: (node as HTMLElement).innerText,
+        links: [...node.querySelectorAll("h2 a[href], h3 a[href], h4 a[href], strong a[href]")].map(
+          (a) => (a as HTMLAnchorElement).href,
+        ),
+        imageCount,
+      };
+    });
     if (
       !normal(evidence.text).includes(normal(task.body)) ||
       evidence.imageCount < task.images.length
@@ -428,7 +512,7 @@ export class FacebookAdapter implements Publisher {
     const page = await this.getPage();
     await this.selectTarget(page, target);
     this.authorPath = saved?.authorPath ?? null;
-    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await this.navigate(page, url);
     await page
       .getByRole("article")
       .first()

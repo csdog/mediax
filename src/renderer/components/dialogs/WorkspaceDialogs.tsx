@@ -26,10 +26,6 @@ export function WorkspaceDialogs() {
     reload,
     openBrowser,
     setNotice,
-    verifyDialogTarget,
-    setVerifyDialogTarget,
-    verifyUrl,
-    setVerifyUrl,
   } = useWorkspace();
   return (
     <>
@@ -100,50 +96,6 @@ export function WorkspaceDialogs() {
               </Button>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={Boolean(verifyDialogTarget)}
-        onOpenChange={(open) => {
-          if (!open) setVerifyDialogTarget(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>核验发布结果</DialogTitle>
-            <DialogDescription>
-              此操作只检查帖子，不会重新发布。可填写你在 Facebook
-              找到的本次帖子链接，留空则检查已有提交证据。
-            </DialogDescription>
-          </DialogHeader>
-          <Label htmlFor="verify-post-url">帖子链接</Label>
-          <Input
-            id="verify-post-url"
-            value={verifyUrl}
-            onChange={(event) => setVerifyUrl(event.target.value)}
-            placeholder="https://www.facebook.com/…/posts/…"
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setVerifyDialogTarget(null)}>
-              取消
-            </Button>
-            <Button
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await window.desktop.verifyTarget(
-                    verifyDialogTarget!.id,
-                    verifyUrl.trim() || undefined,
-                  );
-                  setVerifyDialogTarget(null);
-                  await reload();
-                  setNotice("已核验帖子作者与内容");
-                })
-              }
-            >
-              核验帖子
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

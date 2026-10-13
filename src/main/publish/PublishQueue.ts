@@ -1,5 +1,5 @@
 import { Database } from "../storage/Database";
-import { NeedsUser, type Publisher } from "../platforms/Publisher";
+import { NeedsUser, NotSubmitted, type Publisher } from "../platforms/Publisher";
 import type { TaskTarget, Status } from "../../shared/models";
 export class PublishQueue {
   private active: Promise<void> | null = null;
@@ -29,26 +29,40 @@ export class PublishQueue {
         if (target.status !== "pending") continue;
         const attempt = this.db.startAttempt(target.id);
         let intent = false;
+        let adapter: Publisher | undefined;
         const finish = (status: Status, error: string | null = null, url: string | null = null) => {
           this.db.transition(target.id, status, error, url);
           this.db.finishAttempt(attempt, status, error, url);
         };
         try {
-          const adapter = this.publisher(target);
+          adapter = this.publisher(target);
           await adapter.prepare(task, target);
-          // Durable intent precedes the click. A crash here requires verification, never blind retry.
-          this.db.transition(target.id, "submitted");
-          intent = true;
-          await adapter.submit(task, target);
+          await adapter.submit(task, target, () => {
+            intent = true;
+            this.db.transition(target.id, "submitted");
+          });
           const url = await adapter.verify(task, target);
-          finish(url ? "verified" : "submitted", null, url);
+          finish("verified", null, url);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           if (error instanceof NeedsUser && !intent) {
             finish("awaiting_user", message);
             return;
           }
-          finish(intent ? "unknown" : "failed", message);
+          if (error instanceof NotSubmitted || !intent) {
+            finish("failed", message);
+            continue;
+          }
+          try {
+            const url = adapter ? await adapter.verify(task, target) : null;
+            if (url) {
+              finish("verified", null, url);
+              continue;
+            }
+          } catch {
+            // The click may already have happened; do not ask the user to decide.
+          }
+          finish("unknown", message);
         }
       }
     }

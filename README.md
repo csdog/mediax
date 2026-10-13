@@ -17,7 +17,7 @@ mise exec -- pnpm install --frozen-lockfile
 mise exec -- pnpm run dev
 ```
 
-开发界面固定使用 `http://127.0.0.1:5186`；端口被占用时直接报错，不自动切换。Electron 的 CDP 通信端口仍动态分配。
+开发界面默认使用 `http://127.0.0.1:5186`，可通过 `.env.local` 的 `MAIN_VITE_DEV_SERVER_PORT` 修改；端口被占用时直接报错，不自动切换。Electron 的 CDP 通信端口仍动态分配。
 
 安装后会为 Electron ABI 重建 SQLite 原生模块。测试用 Electron 的 Node 模式运行，避免宿主 Node ABI 不一致。
 
@@ -70,7 +70,7 @@ Git 与工具配置均位于 `media-post-desktop/`；外层 `media-post/` 仅作
 
 系统通知接入任务状态变更：成功、失败、人工处理与结果待核验分别提示，点击后跳转发布记录并标记对应任务。不包含正文内容；实际展示受 macOS 通知权限与专注模式影响。发布通知由真实任务状态驱动，待核验不会显示为发布成功。
 
-应用图标采用用户提供的章鱼图片；菜单栏使用单色发布标记，适配系统明暗背景。其余桌面能力见 [TODO](docs/TODO.md)。
+应用图标采用用户提供的章鱼图片；菜单栏使用同一张桌面图标。其余桌面能力见 [TODO](docs/TODO.md)。
 
 点击左下角头像，在弹出菜单中打开「设置」，可录制、保存或清除全局呼出快捷键，默认 `⌘M`。配置保存在 SQLite，启动时恢复；快捷键冲突时保留原有配置并显示错误。全局快捷键仅在应用运行期间有效。
 
@@ -133,3 +133,48 @@ mise exec -- pnpm run db:check
 ## 窗口外框与原生材质
 
 已依据本机 Codex 安装包静态样式与窗口代码修正分层：macOS 使用 menu 材质，失焦切换实色；外框、圆角页面底板、侧栏与白色内容区分别绘制。当前原生材质与界面统一为浅色。其他平台使用中性实色回退，尚未实机验收。详见 [窗口实现与静态依据](docs/window-chrome.md)。
+
+## 环境配置与日志
+
+使用 electron-vite 原生 `.env` 加载机制，不额外实现 dotenv 加载器。配置从项目根目录读取，渲染进程虽位于 `src/renderer`，也使用同一目录。
+
+| 文件                               | 作用                                                                |
+| ---------------------------------- | ------------------------------------------------------------------- |
+| `.env`                             | 开发、生产共用的非敏感默认值                                        |
+| `.env.development`                 | `pnpm dev` 使用，console 和 file 默认为 debug                       |
+| `.env.production`                  | `pnpm build` / `pnpm package:mac` 使用，console 和 file 默认为 info |
+| `.env.local` / `.env.[mode].local` | 本机覆盖配置，Git 已忽略                                            |
+
+优先级从高到低：启动命令已有环境变量、`.env.[mode].local`、`.env.[mode]`、`.env.local`、`.env`。修改后重启开发命令；生产配置在构建时写入应用，修改源 `.env.production` 后需重新构建／打包。已安装应用不会从当前工作目录寻找 `.env`。
+
+| 配置项                      | 默认值／用途                                                   |
+| --------------------------- | -------------------------------------------------------------- |
+| `MAIN_VITE_DEV_SERVER_PORT` | `5186`，开发服务器端口，1024–65535                             |
+| `VITE_LOG_CONSOLE_LEVEL`    | 开发 debug、生产 info；主进程 console 和渲染进程 DevTools 等级 |
+| `MAIN_VITE_LOG_FILE_LEVEL`  | 开发 debug、生产 info；文件等级                                |
+| `MAIN_VITE_LOG_MAX_SIZE`    | `5242880`（5 MiB）；单文件轮转阈值，1024–104857600 字节        |
+
+等级可用 `error`、`warn`、`info`、`verbose`、`debug`、`silly`；值为 `false` 时关闭对应输出。日志等级无效或轮转大小越界会报错。示例 `.env.development.local`：
+
+```dotenv
+MAIN_VITE_DEV_SERVER_PORT=5187
+VITE_LOG_CONSOLE_LEVEL=debug
+MAIN_VITE_LOG_FILE_LEVEL=info
+MAIN_VITE_LOG_MAX_SIZE=10485760
+```
+
+环境变量通过 `import.meta.env` 访问：`MAIN_VITE_` 仅主进程、`PRELOAD_VITE_` 仅 preload、`RENDERER_VITE_` 仅渲染进程、`VITE_` 三者共享。不要在共享或渲染变量中放凭据；桌面包内的主进程配置也可被提取，长期密钥不能依赖客户端环境文件保密。
+
+日志使用 `electron-log`，主进程和应用渲染进程的 `console.log/info/warn/error/debug` 同时接入 console 与文件，保留原生 console API 使用方式。未捕获异常、未处理 Promise rejection、应用启动／退出、主界面加载／异常、IPC 调用失败、发布目标状态变化均会记录。业务日志不主动输出发布正文、图片预览、Cookie 或密码；不要向 logger 传入敏感数据。
+
+开发模式（`pnpm dev`）写到项目目录 `logs/main.log`。生产构建和安装包写到应用数据目录 `<userData>/logs/main.log`，默认 macOS 路径：
+
+```text
+~/Library/Application Support/media-post/logs/main.log
+```
+
+达到阈值后由 electron-log 轮转为 `main.old.log`，只保留一个旧文件；阈值在写入时检查，不是每条消息的硬截断。生产模式测试传入 `MEDIA_POST_USER_DATA` 时，日志随测试数据目录隔离。日志包含带本地时区偏移的时间、大写等级、进程来源与异常堆栈。控制台里的等级按级别着色：错误红色、警告黄色、信息青色、调试灰色。文件日志保持纯文本。
+
+主进程使用 `import { log } from "./logging"`；渲染进程可使用 `import log from "electron-log/renderer"`，也可沿用 console。库的 preload 桥仅打包进应用自己的 sandbox preload，不向 Facebook 账号会话注入脚本，不收集远程网页 console。
+
+实现依据：[electron-log](https://github.com/megahertz/electron-log)、[electron-vite 环境变量与模式](https://electron-vite.org/guide/env-and-mode)。

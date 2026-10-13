@@ -10,16 +10,8 @@ import { BrowserPage } from "@/pages/BrowserPage";
 import { useWorkspace } from "@/app/WorkspaceContext";
 
 export function WorkspaceShell() {
-  const {
-    sidebarOpen,
-    setSidebarOpen,
-    setAvatarMenuOpen,
-    settingsOpen,
-    isNewTab,
-    activeBrowser,
-    browserTabs,
-    pageTitle,
-  } = useWorkspace();
+  const { sidebarOpen, setSidebarOpen, setAvatarMenuOpen, settingsOpen, isNewTab, activeBrowser } =
+    useWorkspace();
   return (
     <TooltipProvider>
       <WorkspaceDialogs />
@@ -36,17 +28,6 @@ export function WorkspaceShell() {
         {settingsOpen && <Outlet />}
         <WorkspaceNavigation />
         <SidebarInset className="min-w-0 bg-background">
-          <header className="document-toolbar">
-            <span className="text-xs text-muted-foreground">工作空间</span>
-            <span className="text-xs text-muted-foreground">/</span>
-            <span className="text-xs">
-              {isNewTab
-                ? "新标签页"
-                : activeBrowser
-                  ? browserTabs.find((tab) => tab.id === activeBrowser)?.name
-                  : pageTitle}
-            </span>
-          </header>
           {!settingsOpen &&
             (isNewTab ? <NewTabPage /> : activeBrowser ? <BrowserPage /> : <Outlet />)}
         </SidebarInset>

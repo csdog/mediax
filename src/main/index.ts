@@ -1,4 +1,5 @@
 import { app, BrowserWindow, screen } from "electron";
+import { initializeLogging, observeWindowLogging, log } from "./logging";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
@@ -29,7 +30,9 @@ async function unusedPort(): Promise<number> {
 }
 async function start(): Promise<void> {
   if (process.env.MEDIA_POST_USER_DATA) app.setPath("userData", process.env.MEDIA_POST_USER_DATA);
+  initializeLogging();
   if (!app.requestSingleInstanceLock()) {
+    log.info("Existing instance detected; handing off");
     app.quit();
     return;
   }
@@ -155,22 +158,21 @@ async function start(): Promise<void> {
       preload: join(__dirname, "../preload/index.js"),
     },
   });
+  observeWindowLogging(win);
   installWindowBackdrop(win);
   const shell = new DesktopShell(win, db);
-  registerIpc(
-    db,
-    new AccountService(db, new AccountBrowserManager(win, endpoint)),
-    win,
-    () => shell.rendererReady(),
-    shell,
-  );
+  const accounts = new AccountService(db, new AccountBrowserManager(win, endpoint));
+  accounts.startAutoRefresh();
+  app.on("will-quit", () => accounts.stopAutoRefresh());
+  registerIpc(db, accounts, win, () => shell.rendererReady(), shell);
   if (maximized) win.maximize();
   app.on("will-quit", () => db.close());
   if (process.env.ELECTRON_RENDERER_URL) await win.loadURL(process.env.ELECTRON_RENDERER_URL);
   else await win.loadFile(join(__dirname, "../renderer/index.html"));
+  log.info("Application window loaded");
 }
 start().catch(async (error) => {
-  console.error(error);
+  log.error("Application startup failed", error);
   if (process.env.MEDIA_POST_RESULT)
     await writeFile(
       process.env.MEDIA_POST_RESULT,

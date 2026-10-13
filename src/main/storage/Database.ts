@@ -62,6 +62,56 @@ export class Database {
       })
       .run();
   }
+  deleteSetting(key: string) {
+    this.orm.delete(schema.settings).where(eq(schema.settings.key, key)).run();
+  }
+  deleteAccount(id: string) {
+    this.account(id);
+    if (
+      this.targets().some(
+        (target) =>
+          target.accountId === id &&
+          ["pending", "running", "awaiting_user", "submitted"].includes(target.status),
+      )
+    )
+      throw new Error("该账号仍有未完成的发布，完成后再删除");
+    const targetIds = this.targets()
+      .filter((target) => target.accountId === id)
+      .map((target) => target.id);
+    this.orm.transaction((tx) => {
+      for (const targetId of targetIds)
+        tx.delete(schema.attempts).where(eq(schema.attempts.targetId, targetId)).run();
+      tx.delete(schema.targets).where(eq(schema.targets.accountId, id)).run();
+      const referenced = new Set(
+        tx
+          .select()
+          .from(schema.targets)
+          .all()
+          .map((target) => target.taskId),
+      );
+      for (const task of tx.select().from(schema.tasks).all()) {
+        if (!referenced.has(task.id))
+          tx.delete(schema.tasks).where(eq(schema.tasks.id, task.id)).run();
+      }
+      tx.delete(schema.accounts).where(eq(schema.accounts.id, id)).run();
+    });
+    this.deleteSetting(`avatar:${id}`);
+    this.deleteSetting(`identities:${id}`);
+    this.deleteSetting(`account-status:${id}`);
+    for (const targetId of targetIds) this.deleteSetting(`publish-evidence:${targetId}`);
+    const session = this.setting("workspaceSession") as {
+      tabs?: { id: string; kind?: string }[];
+      activeId?: string | null;
+      page?: string;
+    } | null;
+    if (session && Array.isArray(session.tabs)) {
+      this.setSetting("workspaceSession", {
+        ...session,
+        tabs: session.tabs.filter((tab) => tab.id !== id),
+        activeId: session.activeId === id ? null : (session.activeId ?? null),
+      });
+    }
+  }
   onTargetChange(listener: (target: TaskTarget) => void) {
     this.targetListeners.add(listener);
     return () => {
@@ -189,13 +239,22 @@ export class Database {
   recover() {
     this.orm.transaction((tx) => {
       tx.update(schema.targets)
-        .set({ status: "unknown", error: "应用中断，请先人工核验是否已发布" })
+        .set({ status: "unknown", error: "应用中断，发布未完成" })
         .where(eq(schema.targets.status, "running"))
         .run();
       tx.update(schema.attempts)
         .set({ status: "unknown" })
         .where(eq(schema.attempts.status, "running"))
         .run();
+      for (const target of tx.select().from(schema.targets).all()) {
+        if (!target.error || (target.status !== "unknown" && target.status !== "submitted"))
+          continue;
+        if (!/未点击发布|未再次点击/.test(target.error)) continue;
+        tx.update(schema.targets)
+          .set({ status: "failed", error: target.error.replace(/；?请人工核验/g, "") })
+          .where(eq(schema.targets.id, target.id))
+          .run();
+      }
     });
   }
   retry(id: string) {

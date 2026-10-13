@@ -18,13 +18,15 @@ ${blocked ? '<input name="email"><input name="pass">' : '<button id="compose">Wh
 <script>
 let clicks=0;
 const posts=JSON.parse(localStorage.getItem('posts:${actor}')||'[]');
-function renderPost(body, images, id) {const a=document.createElement('article');a.role='article';a.innerHTML='<h4><a href="https://www.facebook.com/profile.php?id=${actor}">Author</a></h4>';const p=document.createElement('p');p.textContent=body;a.append(p);for(const src of images){const i=new Image();i.src=src;i.style.width='120px';a.append(i)}const l=document.createElement('a');l.href='https://www.facebook.com/${actor}/posts/'+id;l.textContent='Just now';a.append(l);document.querySelector('#feed').prepend(a);}
+function gallery(parent,images){for(const [index,src] of images.slice(0,5).entries()){const tile=document.createElement('div');const i=new Image();i.src=src;i.style.width='120px';tile.append(i);if(index===4&&images.length>5){const more=document.createElement('span');more.textContent='+'+(images.length-4);tile.append(more)}parent.append(tile)}}
+function renderPost(body, images, id) {const a=document.createElement('article');a.role='article';a.innerHTML='<h4><a href="https://www.facebook.com/profile.php?id=${actor}">Author</a></h4>';const p=document.createElement('p');p.textContent=body;a.append(p);gallery(a,images);const l=document.createElement('a');l.href='https://www.facebook.com/${actor}/posts/'+id;l.textContent='Just now';a.append(l);document.querySelector('#feed').prepend(a);}
 for(const post of posts)renderPost(post.body,post.images,post.id);
 document.querySelector('#compose')?.addEventListener('click', () => {
- const d=document.createElement('div'); d.role='dialog';d.innerHTML='<div role="textbox" contenteditable="true"></div><input type="file" accept="image/*" multiple><div id="attachments"></div><button id="post">Post</button>';document.body.append(d);
- const post=d.querySelector('#post');
- d.querySelector('input').onchange=async e=>{post.disabled=true;d.setAttribute('aria-busy','true');for(const file of e.target.files){const i=new Image();i.src=await new Promise(r=>{const reader=new FileReader();reader.onload=()=>r(reader.result);reader.readAsDataURL(file)});i.style.width='120px';i.style.height='120px';await new Promise(r=>{i.onload=r});d.querySelector('#attachments').append(i);}d.removeAttribute('aria-busy');post.disabled=false};
- post.onclick=()=>{clicks++;const body=d.querySelector('[contenteditable]').innerText;const images=[...d.querySelectorAll('img')].map(i=>i.src);const id=posts.length+1;posts.push({body,images,id});localStorage.setItem('posts:${actor}',JSON.stringify(posts));renderPost(body,images,id);d.remove();};
+ const d=document.createElement('div'); d.role='dialog';d.innerHTML='<div role="textbox" contenteditable="true"></div><div role="dialog" aria-label="Auxiliary"></div><input type="file" accept="image/*" multiple><div id="attachments"></div><button id="post">Post</button>';const wrapper=document.createElement('div');wrapper.role='dialog';wrapper.append(d);document.body.append(wrapper);
+ const attached=[];const post=d.querySelector('#post');
+ const editor=d.querySelector('[contenteditable]');editor.addEventListener('input',e=>{if(e.data?.length>1)editor.innerText=''});
+ d.querySelector('input').onchange=async e=>{d.querySelector('[contenteditable]').innerText='';post.disabled=true;d.setAttribute('aria-busy','true');for(const file of e.target.files){const i=new Image();i.src=await new Promise(r=>{const reader=new FileReader();reader.onload=()=>r(reader.result);reader.readAsDataURL(file)});i.style.width='120px';i.style.height='120px';await new Promise(r=>{i.onload=r});attached.push(i.src);d.querySelector('#attachments').append(i);}d.querySelector('#attachments').replaceChildren();gallery(d.querySelector('#attachments'),attached);d.removeAttribute('aria-busy');post.disabled=false};
+ post.onclick=()=>{clicks++;const body=d.querySelector('[contenteditable]').innerText;const images=attached;const id=posts.length+1;posts.push({body,images,id});localStorage.setItem('posts:${actor}',JSON.stringify(posts));renderPost(body,images,id);wrapper.remove();};
 });
 window.fixtureClicks=()=>posts.length;
 </script></body></html>`;
@@ -137,7 +139,8 @@ test(
       // Closing a tab must not make an otherwise authorized queued target unusable.
       await ui.evaluate((id) => window.desktop.closeAccountBrowser(id), b.id);
       const taskId = await ui.evaluate(
-        ({ path, targets }) => window.desktop.publish("Fixture publication body", [path], targets),
+        ({ path, targets }) =>
+          window.desktop.publish("Fixture publication body", Array(11).fill(path), targets),
         { path: image, targets: [pageTarget, second.targets[0]] },
       );
       await rm(image);
@@ -159,6 +162,7 @@ test(
       );
       assert(done.ts.every((t) => t.url?.includes("/posts/1")));
       const task = done.h.tasks.find((t) => t.id === taskId);
+      assert.equal(task.images.length, 11);
       assert(task.images.every((p) => p.includes("task-assets")));
       assert((await readFile(task.images[0])).length > 0);
       await assert.rejects(
@@ -269,6 +273,82 @@ test(
             .executeJavaScript("window.fixtureClicks()");
         }, a.id)
         .then((clicks) => assert.equal(clicks, 2));
+    } finally {
+      if (app) await app.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "identity discovery ignores Create Page and restores the original profile",
+  { timeout: 45000 },
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), "media-post-identities-"));
+    let app;
+    try {
+      const env = { ...process.env, MEDIA_POST_USER_DATA: dir };
+      delete env.ELECTRON_RUN_AS_NODE;
+      delete env.ELECTRON_RENDERER_URL;
+      app = await electron.launch({
+        executablePath: process.env.MEDIA_POST_PACKAGED
+          ? resolve("dist/mac-arm64/media-post.app/Contents/MacOS/media-post")
+          : require("electron"),
+        args: process.env.MEDIA_POST_PACKAGED ? [] : [resolve("out/main/index.js")],
+        env,
+      });
+      const ui = await app.firstWindow();
+      await ui.getByRole("heading", { name: "账号管理", exact: true }).waitFor();
+      const account = await ui.evaluate(() => window.desktop.addAccount("Identity discovery"));
+      await app.evaluate(async ({ session }, id) => {
+        const s = session.fromPartition(`persist:facebook-${id}`);
+        await s.cookies.set({
+          url: "https://www.facebook.com",
+          name: "c_user",
+          value: "1001",
+          secure: true,
+        });
+        s.protocol.handle("https", async () => {
+          const cookies = await s.cookies.get({ url: "https://www.facebook.com" });
+          const actor = cookies.find((c) => c.name === "i_user")?.value || "1001";
+          const name = actor === "1001" ? "Fixture Person" : "Fixture Page";
+          return new Response(
+            `<!doctype html><html><head><script type="application/json">{"actorID":"${actor}","USER_ID":"${actor}","NAME":"${name}"}</script></head><body>
+          <button aria-label="Your profile" aria-expanded="false" id="account">Account</button>
+          <div role="dialog" aria-label="Your profile" id="menu" hidden>
+            <button id="all">See all profiles</button>
+          </div>
+          <script>
+          const menu=document.querySelector('#menu'), account=document.querySelector('#account');
+          account.onclick=()=>{menu.hidden=false;account.setAttribute('aria-expanded','true')};
+          document.querySelector('#all').onclick=()=>{menu.innerHTML='<h2>Choose profile</h2><ul><li><button data-id="1001" aria-label="Fixture Person, 3 notifications"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">Fixture Person</button></li><li><button data-id="2002" aria-label="Fixture Page, 1 notification"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">Fixture Page</button></li><li><button id="create">Create Page</button></li></ul>';document.querySelector('#create').onclick=()=>{localStorage.setItem('created','yes')};for(const b of document.querySelectorAll('[data-id]'))b.onclick=()=>{document.cookie='i_user='+b.dataset.id+';Path=/;Secure';menu.hidden=true;account.setAttribute('aria-expanded','false')};};
+          document.onkeydown=e=>{if(e.key==='Escape'){menu.hidden=true;account.setAttribute('aria-expanded','false')}};
+          </script></body></html>`,
+            { headers: { "content-type": "text/html" } },
+          );
+        });
+      }, account.id);
+      await ui.evaluate((id) => window.desktop.openAccount(id), account.id);
+      const result = await ui.evaluate((id) => window.desktop.refreshAccount(id), account.id);
+      assert.equal(result.targets.length, 2, result.message);
+      assert.deepEqual(
+        result.targets.map((t) => [t.identityId, t.kind]),
+        [
+          ["1001", "profile"],
+          ["2002", "page"],
+        ],
+      );
+      const state = await app.evaluate(async ({ session, webContents }, id) => {
+        const s = session.fromPartition(`persist:facebook-${id}`);
+        const cookies = await s.cookies.get({ url: "https://www.facebook.com" });
+        const view = webContents.getAllWebContents().find((w) => w.session === s);
+        return {
+          actor: cookies.find((c) => c.name === "i_user")?.value,
+          created: await view.executeJavaScript("localStorage.getItem('created')"),
+        };
+      }, account.id);
+      assert.equal(state.actor, "1001");
+      assert.equal(state.created, null);
     } finally {
       if (app) await app.close();
       await rm(dir, { recursive: true, force: true });

@@ -31,8 +31,8 @@ export class TaskNotifications {
         .join("|");
       const verified = targets.filter((t) => t.status === "verified").length;
       if (targets.some((t) => ["unknown", "submitted"].includes(t.status))) {
-        title = "发布结果待核验";
-        body = "部分目标尚未确认结果，请检查发布记录，避免重复发布。";
+        title = "发布失败";
+        body = "有目标未能确认已经发布，系统不会自动重发。";
       } else if (targets.some((t) => t.status === "failed")) {
         title = "发布任务有失败项";
         body = `${verified}/${targets.length} 个目标已确认成功，请查看失败项。`;
