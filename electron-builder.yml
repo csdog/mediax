@@ -1,5 +1,6 @@
 appId: local.media-post.desktop
 productName: media-post
+publish: null
 directories:
   output: dist
   buildResources: build
