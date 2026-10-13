@@ -329,7 +329,9 @@ export function ComposePage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>确认发布</DialogTitle>
-              <DialogDescription>同一份内容会按账号依次发布，确认后开始。</DialogDescription>
+              <DialogDescription>
+                同一份内容会按设置的并行数同时发布，确认后开始。
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
               {selectedTargets.map((target) => {
@@ -369,7 +371,7 @@ export function ComposePage() {
                     if (silentPublish) setActiveBrowser(null);
                     await reload();
                     setPage("history");
-                    setNotice("任务已创建，将依次发布。需要人工处理时请打开对应账号标签页。");
+                    setNotice("任务已创建，将按并行设置发布。需要人工处理时请打开对应账号标签页。");
                   })
                 }
               >

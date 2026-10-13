@@ -25,7 +25,7 @@ pnpm run fmt
 - `src/main/platforms/catalog.ts`：登录页和会话判断。每个平台都要有 `sessions` 条目。
 - `src/main/platforms/registry.ts`：按平台创建发布器。没有发布流程的平台保持 `LoginAdapter`。
 - `src/main/platforms/web/`：文章、动态和音频的浏览器编辑流程。已有视频平台的成功路径留在各自适配器里。
-- `src/main/publish/`：发布前校验、复制素材、串行队列。
+- `src/main/publish/`：发布前校验、复制素材、可配置并行队列。
 - `src/main/storage/`：Drizzle schema 与 SQLite。
 - `src/renderer/pages/ComposePage.tsx`：文章、动态、视频、音频创作页。
 

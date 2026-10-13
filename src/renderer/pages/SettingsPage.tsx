@@ -9,7 +9,14 @@ import { useWorkspace } from "@/app/WorkspaceContext";
 import { useProfileSettings } from "@/hooks/useProfileSettings";
 
 export function SettingsPage() {
-  const { setSettingsOpen, silentPublish, setSilentPublish } = useWorkspace();
+  const {
+    setSettingsOpen,
+    publishSettings,
+    silentPublish,
+    setSilentPublish,
+    setPublishConcurrency,
+    setPublishBandwidthLimitKbps,
+  } = useWorkspace();
   const { profile, setProfileName, chooseAvatar, clearAvatar, profileError } = useProfileSettings();
   const { shortcut, setShortcut, shortcutMessage, setShortcutMessage, shortcutBusy, saveShortcut } =
     useShortcutSettings();
@@ -30,6 +37,10 @@ export function SettingsPage() {
         onBack={() => setSettingsOpen(false)}
         silentPublish={silentPublish}
         onSilentPublish={setSilentPublish}
+        publishConcurrency={publishSettings.concurrency}
+        onPublishConcurrency={setPublishConcurrency}
+        publishBandwidthLimitKbps={publishSettings.bandwidthLimitKbps}
+        onPublishBandwidthLimitKbps={setPublishBandwidthLimitKbps}
         profileName={profile.name}
         profileAvatar={profile.avatar}
         profileError={profileError}

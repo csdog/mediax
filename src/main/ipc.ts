@@ -16,8 +16,30 @@ import {
   type TabPreviewOverlay,
 } from "../shared/models";
 import { parseProfile, readProfile } from "../shared/profile";
+import {
+  mergePublishSettings,
+  readPublishSettings,
+  type PublishSettings,
+} from "../shared/publishSettings";
 import type { DesktopShell } from "./desktop/DesktopShell";
 import { TabPreviewWindow } from "./desktop/TabPreviewWindow";
+
+function savePublishSettings(
+  db: Database,
+  accounts: AccountService,
+  patch: Partial<PublishSettings>,
+) {
+  const next = mergePublishSettings(
+    readPublishSettings((key) => db.setting(key)),
+    patch,
+  );
+  db.setSetting("silentPublish", next.silent);
+  db.setSetting("publishConcurrency", next.concurrency);
+  db.setSetting("publishBandwidthLimitKbps", next.bandwidthLimitKbps);
+  accounts.applyBandwidthLimit(next.bandwidthLimitKbps);
+  return next;
+}
+
 export function registerIpc(
   db: Database,
   accounts: AccountService,
@@ -94,11 +116,14 @@ export function registerIpc(
   });
   on("shortcutSettings", () => shell.shortcutSettings());
   on("setGlobalShortcut", (accelerator) => shell.setGlobalShortcut(text(accelerator)));
-  on("publishSettings", () => ({ silent: db.setting("silentPublish") === true }));
+  on("publishSettings", () => readPublishSettings((key) => db.setting(key)));
   on("setSilentPublish", (silent) => {
     if (typeof silent !== "boolean") throw new Error("无效设置");
-    db.setSetting("silentPublish", silent);
-    return { silent };
+    return savePublishSettings(db, accounts, { silent });
+  });
+  on("setPublishSettings", (value) => {
+    if (!value || typeof value !== "object") throw new Error("无效设置");
+    return savePublishSettings(db, accounts, value as Partial<PublishSettings>);
   });
   on("profileSettings", () => readProfile(db.setting("profile")));
   on("setProfile", (value) => {

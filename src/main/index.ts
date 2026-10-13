@@ -163,6 +163,7 @@ async function start(): Promise<void> {
   const shell = new DesktopShell(win, db);
   const accounts = new AccountService(db, new AccountBrowserManager(win, endpoint));
   accounts.startAutoRefresh();
+  accounts.applyBandwidthLimit();
   app.on("will-quit", () => accounts.stopAutoRefresh());
   registerIpc(db, accounts, win, () => shell.rendererReady(), shell);
   if (maximized) win.maximize();

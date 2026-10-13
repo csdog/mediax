@@ -3,6 +3,13 @@ import { Search, Settings, Keyboard, Bell, Database, ArrowLeft } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import {
+  NumberField,
+  NumberFieldDecrement,
+  NumberFieldGroup,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from "@/components/ui/number-field";
 import { ProfileMark } from "@/components/ProfileMark";
 
 const categories = [
@@ -10,7 +17,7 @@ const categories = [
     id: "general",
     title: "常规",
     icon: Settings,
-    keywords: "菜单栏 窗口 快捷键 静默 发布 名称 头像 个人资料",
+    keywords: "菜单栏 窗口 快捷键 静默 发布 并行 网速 限速 名称 头像 个人资料",
   },
   { id: "notifications", title: "通知", icon: Bell, keywords: "发布 任务" },
   { id: "shortcuts", title: "键盘快捷键", icon: Keyboard, keywords: "全局 呼出" },
@@ -111,6 +118,10 @@ export function SettingsLayout({
   onBack,
   silentPublish,
   onSilentPublish,
+  publishConcurrency,
+  onPublishConcurrency,
+  publishBandwidthLimitKbps,
+  onPublishBandwidthLimitKbps,
   profileName,
   profileAvatar,
   profileError,
@@ -122,6 +133,10 @@ export function SettingsLayout({
   onBack(): void;
   silentPublish: boolean;
   onSilentPublish(silent: boolean): void;
+  publishConcurrency: number;
+  onPublishConcurrency(value: number): void;
+  publishBandwidthLimitKbps: number;
+  onPublishBandwidthLimitKbps(value: number): void;
   profileName: string;
   profileAvatar: string | null;
   profileError: string;
@@ -222,6 +237,53 @@ export function SettingsLayout({
                     onCheckedChange={(checked) => onSilentPublish(checked === true)}
                     aria-label="静默发布"
                   />
+                </div>
+                <div className="settings-row">
+                  <div>
+                    <h3>并行数</h3>
+                    <p>同时发布的账号数量，同一账号仍按顺序执行。最小为 1。</p>
+                  </div>
+                  <NumberField
+                    min={1}
+                    step={1}
+                    value={publishConcurrency}
+                    onValueChange={(value) => {
+                      if (value == null || !Number.isFinite(value)) return;
+                      onPublishConcurrency(value);
+                    }}
+                    className="w-28"
+                  >
+                    <NumberFieldGroup>
+                      <NumberFieldDecrement />
+                      <NumberFieldInput aria-label="发布并行数" />
+                      <NumberFieldIncrement />
+                    </NumberFieldGroup>
+                  </NumberField>
+                </div>
+                <div className="settings-row">
+                  <div>
+                    <h3>网速限制</h3>
+                    <p>限制账号浏览器的上下行速率（Kbps），可自定义输入。0 为不限制。</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <NumberField
+                      min={0}
+                      step={128}
+                      value={publishBandwidthLimitKbps}
+                      onValueChange={(value) => {
+                        if (value == null || !Number.isFinite(value)) return;
+                        onPublishBandwidthLimitKbps(value);
+                      }}
+                      className="w-36"
+                    >
+                      <NumberFieldGroup>
+                        <NumberFieldDecrement />
+                        <NumberFieldInput aria-label="发布网速限制" />
+                        <NumberFieldIncrement />
+                      </NumberFieldGroup>
+                    </NumberField>
+                    <span className="settings-row-value">Kbps</span>
+                  </div>
                 </div>
               </div>
             </section>

@@ -129,8 +129,21 @@ export interface DesktopApi {
   closeAccountBrowser(id: string): Promise<void>;
   shortcutSettings(): Promise<ShortcutSettings>;
   setGlobalShortcut(accelerator: string): Promise<ShortcutSettings>;
-  publishSettings(): Promise<{ silent: boolean }>;
-  setSilentPublish(silent: boolean): Promise<{ silent: boolean }>;
+  publishSettings(): Promise<{
+    silent: boolean;
+    concurrency: number;
+    bandwidthLimitKbps: number;
+  }>;
+  setSilentPublish(silent: boolean): Promise<{
+    silent: boolean;
+    concurrency: number;
+    bandwidthLimitKbps: number;
+  }>;
+  setPublishSettings(settings: {
+    silent?: boolean;
+    concurrency?: number;
+    bandwidthLimitKbps?: number;
+  }): Promise<{ silent: boolean; concurrency: number; bandwidthLimitKbps: number }>;
   profileSettings(): Promise<{ name: string; avatar: string | null }>;
   setProfile(profile: { name: string; avatar: string | null }): Promise<{
     name: string;

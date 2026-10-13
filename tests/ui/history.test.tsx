@@ -12,8 +12,18 @@ it("lists publish records with filters from the reference layout", async () => {
     shortcutSettings: vi
       .fn()
       .mockResolvedValue({ accelerator: "CommandOrControl+M", registered: true }),
-    publishSettings: vi.fn().mockResolvedValue({ silent: false }),
-    setSilentPublish: vi.fn().mockResolvedValue({ silent: false }),
+    publishSettings: vi
+      .fn()
+      .mockResolvedValue({ silent: false, concurrency: 3, bandwidthLimitKbps: 0 }),
+    setSilentPublish: vi
+      .fn()
+      .mockResolvedValue({ silent: false, concurrency: 3, bandwidthLimitKbps: 0 }),
+    setPublishSettings: vi.fn().mockImplementation(async (patch) => ({
+      silent: false,
+      concurrency: 3,
+      bandwidthLimitKbps: 0,
+      ...patch,
+    })),
     profileSettings: vi.fn().mockResolvedValue({ name: "media-post", avatar: null }),
     setProfile: vi.fn().mockImplementation(async (profile) => profile),
     chooseAvatar: vi.fn().mockResolvedValue(null),

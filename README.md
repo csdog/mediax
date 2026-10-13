@@ -1,16 +1,140 @@
-# media-post
+<p align="center">
+  <img src="build/icon.png" width="128" height="128" alt="media-post">
+</p>
 
-本地多平台内容发布工具，支持 macOS、Windows 与 Linux。Electron + TypeScript + React + TanStack Router / Query + Tailwind CSS + shadcn/ui 官方组件；Drizzle ORM + better-sqlite3 保存 SQLite 业务数据，Drizzle Kit 生成迁移。
+<h1 align="center">media-post</h1>
 
-创作页分为文章、动态、视频和音频。正文是纯文本，可以导入 Markdown。各账号使用应用内独立浏览器登录，发布时由 Playwright 操作这个浏览器里的平台编辑器。定时发布不在范围内。
+<p align="center">
+  <strong>本地多平台内容发布桌面端</strong><br>
+  一次创作，分发到国内外主流媒体平台<br>
+  账号会话隔离 · 本机并行发布 · 不经过第三方云端
+</p>
 
-## 当前状态
+<p align="center">
+  <a href="https://github.com/csdog/media-post/releases"><img src="https://img.shields.io/github/v/release/csdog/media-post?style=flat-square&label=release" alt="release"></a>
+  <a href="https://github.com/csdog/media-post/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/csdog/media-post/build.yml?style=flat-square&label=build" alt="build"></a>
+  <img src="https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-111827?style=flat-square" alt="desktop platforms">
+  <img src="https://img.shields.io/badge/publish-32%20platforms-2563eb?style=flat-square" alt="publish platforms">
+  <img src="https://img.shields.io/badge/login-56%20platforms-0f766e?style=flat-square" alt="login platforms">
+  <img src="https://img.shields.io/badge/Electron-44-47848f?style=flat-square&logo=electron&logoColor=white" alt="Electron">
+  <img src="https://img.shields.io/badge/TypeScript-7-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=black" alt="React">
+</p>
 
-已实现多账号独立会话、按内容类型筛选可发布账号、SQLite 草稿、确认后串行发布、暂停恢复、失败重试和链接核验。关闭账号标签页后，任务会自动重开同一账号的本地会话。设置里可以改本机显示名称和头像。
+<p align="center">
+  <a href="#支持的平台">支持的平台</a> ·
+  <a href="#特性">特性</a> ·
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#打包">打包</a> ·
+  <a href="#开发">开发</a> ·
+  <a href="AGENTS.md">Agent 约定</a>
+</p>
 
-开发版和 arm64 未签名 macOS 打包版通过离线 Electron 端到端测试，覆盖会话隔离、持久化和 Facebook 图文发布。其余平台的编辑器流程已接入，线上页面改版后需要在对应账号里再核对。给代理的工作约定见 [AGENTS.md](AGENTS.md)。
+---
 
-## 开发
+## 为什么用 media-post
+
+多数分发工具把账号和正文交给云端；media-post 把浏览器会话、草稿和任务都留在本机。
+
+- **一次创作，多端发布** — 文章 / 动态 / 视频 / 音频，按平台能力自动筛选可发账号
+- **会话隔离** — 每个账号独立 Electron 分区，登录态互不串扰
+- **人工可介入** — 登录、验证码或页面改版时暂停，处理完继续，失败可重试
+- **跨桌面系统** — 支持 macOS、Windows、Linux 安装包
+
+## 特性
+
+|                 |                                                             |
+| --------------- | ----------------------------------------------------------- |
+| ✍️ **四种体裁** | 文章、动态（图文）、视频、音频；正文可导入 Markdown         |
+| 🔐 **本机登录** | 应用内浏览器登录各平台，Cookie 保存在本地 partition         |
+| 🧵 **并行队列** | 可配置并行数与网速限制，素材快照到任务目录，单文件上限 20MB |
+| 🔔 **状态通知** | 成功 / 失败 / 等待处理 / 待核验；点击跳转发布记录           |
+| 🗂️ **工作区**   | 账号管理、内容发布、发布记录、设置；标签页与草稿可恢复      |
+| 🧪 **可测**     | 单元、UI、集成与打包后的 Electron 端到端测试                |
+
+## 支持的平台
+
+### 桌面系统
+
+| 系统        | 架构        | 产物                       |
+| ----------- | ----------- | -------------------------- |
+| **macOS**   | arm64 · x64 | `dmg` / `zip`              |
+| **Windows** | x64         | `nsis` 安装包 · `portable` |
+| **Linux**   | x64         | `AppImage` · `deb`         |
+
+从 [Releases](https://github.com/csdog/media-post/releases) 下载，或打 `v*` 标签触发 GitHub Actions 构建。
+
+### 内容平台
+
+授权网格共 **56** 个平台；其中 **32** 个已接入发布流程，其余可登录、发布适配后续补齐。
+
+<p align="center">
+  <img src="src/renderer/assets/platforms/douyin.png" width="40" height="40" alt="抖音" title="抖音">
+  <img src="src/renderer/assets/platforms/kuaishou.png" width="40" height="40" alt="快手" title="快手">
+  <img src="src/renderer/assets/platforms/channels.png" width="40" height="40" alt="视频号" title="视频号">
+  <img src="src/renderer/assets/platforms/xiaohongshu.png" width="40" height="40" alt="小红书" title="小红书">
+  <img src="src/renderer/assets/platforms/bilibili.png" width="40" height="40" alt="哔哩哔哩" title="哔哩哔哩">
+  <img src="src/renderer/assets/platforms/weibo.png" width="40" height="40" alt="微博" title="微博">
+  <img src="src/renderer/assets/platforms/zhihu.png" width="40" height="40" alt="知乎" title="知乎">
+  <img src="src/renderer/assets/platforms/toutiao.png" width="40" height="40" alt="头条号" title="头条号">
+  <img src="src/renderer/assets/platforms/baijiahao.png" width="40" height="40" alt="百家号" title="百家号">
+  <img src="src/renderer/assets/platforms/wechat.png" width="40" height="40" alt="微信公众号" title="微信公众号">
+  <img src="src/renderer/assets/platforms/youtube.png" width="40" height="40" alt="YouTube" title="YouTube">
+  <img src="src/renderer/assets/platforms/tiktok.png" width="40" height="40" alt="TikTok" title="TikTok">
+  <img src="src/renderer/assets/platforms/facebook.png" width="40" height="40" alt="Facebook" title="Facebook">
+  <img src="src/renderer/assets/platforms/instagram.png" width="40" height="40" alt="Instagram" title="Instagram">
+  <img src="src/renderer/assets/platforms/twitter.png" width="40" height="40" alt="X" title="X">
+  <img src="src/renderer/assets/platforms/threads.png" width="40" height="40" alt="Threads" title="Threads">
+</p>
+
+#### 已支持发布
+
+| 平台            | 文章 | 动态 | 视频 |
+| --------------- | :--: | :--: | :--: |
+| 头条号          |  ✅  |  ✅  |  ✅  |
+| 知乎            |  ✅  |  ✅  |  ✅  |
+| 抖音            |  ✅  |  ✅  |  ✅  |
+| 小红书          |  ✅  |  ✅  |  ✅  |
+| 微博            |  ✅  |  ✅  |  ✅  |
+| 百家号          |  ✅  |  ✅  |  ✅  |
+| Facebook        |  ✅  |  ✅  |  ✅  |
+| 微信公众号      |  ✅  |  ✅  |      |
+| 豆瓣            |  ✅  |  ✅  |      |
+| 知识星球        |  ✅  |  ✅  |      |
+| 哔哩哔哩        |  ✅  |      |  ✅  |
+| 企鹅号          |  ✅  |      |  ✅  |
+| 简书            |  ✅  |      |      |
+| Reddit          |  ✅  |      |      |
+| 快手            |      |  ✅  |  ✅  |
+| 视频号          |      |  ✅  |  ✅  |
+| Instagram       |      |  ✅  |  ✅  |
+| X               |      |  ✅  |  ✅  |
+| Threads         |      |  ✅  |      |
+| Pinterest       |      |  ✅  |      |
+| LinkedIn        |      |  ✅  |      |
+| Google Business |      |  ✅  |      |
+| YouTube         |      |      |  ✅  |
+| TikTok          |      |      |  ✅  |
+| 虎扑            |      |      |  ✅  |
+| 支付宝生活号    |      |      |  ✅  |
+
+音频（仅音频）：喜马拉雅、小宇宙、网易云音乐、QQ音乐、蜻蜓FM、荔枝FM。
+
+#### 可登录（发布适配中）
+
+搜狐号、一点号、大鱼号、网易号、爱奇艺、腾讯微视、搜狐视频、皮皮虾、腾讯视频、多多视频、美拍、AcFun、快传号、雪球号、蜂网、得物、京东、CSDN、车家号、小红书商家号、易车号、懂车号、淘宝光合、小红书私信版 等。
+
+完整能力表见 `src/shared/content.ts`，平台元数据见 `src/shared/platforms.ts`。
+
+## 快速开始
+
+### 下载使用
+
+1. 打开 [Releases](https://github.com/csdog/media-post/releases)
+2. 按系统下载安装包并打开
+3. 在「账号管理」登录平台 → 「内容发布」创作 → 「发布记录」跟进状态
+
+### 本地开发
 
 ```sh
 mise trust
@@ -19,9 +143,7 @@ mise exec -- pnpm install --frozen-lockfile
 mise exec -- pnpm run dev
 ```
 
-开发界面默认使用 `http://127.0.0.1:5186`，可通过 `.env.local` 的 `MAIN_VITE_DEV_SERVER_PORT` 修改；端口被占用时直接报错，不自动切换。Electron 的 CDP 通信端口仍动态分配。
-
-安装后会为 Electron ABI 重建 SQLite 原生模块。测试用 Electron 的 Node 模式运行，避免宿主 Node ABI 不一致。
+开发界面默认 `http://127.0.0.1:5186`，可用 `.env.local` 的 `MAIN_VITE_DEV_SERVER_PORT` 修改。
 
 ```sh
 mise exec -- pnpm run typecheck
@@ -32,177 +154,105 @@ mise exec -- pnpm run package:mac
 mise exec -- pnpm run test:packaged
 ```
 
-### 多平台打包
+## 打包
 
 | 命令                        | 产物                               |
 | --------------------------- | ---------------------------------- |
-| `pnpm run package:mac`      | macOS 未打包目录（本地测试用）     |
+| `pnpm run package:mac`      | macOS 未打包目录（本地测试）       |
 | `pnpm run package:mac:dist` | macOS `dmg` / `zip`（arm64 + x64） |
 | `pnpm run package:win`      | Windows `nsis` / `portable`（x64） |
 | `pnpm run package:linux`    | Linux `AppImage` / `deb`（x64）    |
-| `pnpm run package`          | 在当前机器上尽量打出三端产物       |
+| `pnpm run package`          | 当前机器尽量打出三端               |
 
-跨平台产物优先用 GitHub Actions（`.github/workflows/build.yml`）：打 `v*` 标签或手动触发 workflow。本机交叉打包可能受签名工具与原生模块限制。
+跨平台产物优先用 GitHub Actions（`.github/workflows/build.yml`）：打 `v*` 标签或手动触发。本机交叉打包可能受签名工具与原生模块限制。
 
-应用数据位于 Electron userData；`media-post.sqlite` 保存业务数据，账号会话由 Electron persistent partition 保存。测试使用临时目录，不读取日常浏览器 Cookie。
+## 使用流程
 
-## 本地工具链
+1. **授权账号** — 账号管理点选平台，在独立浏览器标签页登录并检查状态
+2. **选择体裁** — 文章需标题与正文；动态仅图片；视频 / 音频各一个主文件
+3. **勾选目标** — 右侧只显示支持当前体裁的账号
+4. **确认发布** — 本机按设置并行执行；遇验证或控件缺失会暂停该账号，其他账号可继续
+5. **查看记录** — 成功、失败、排队、重试与打开结果页都在发布记录里
 
-`mise.toml` 固定 Node 26.9.0 和 pnpm 12.4.2，package.json 声明 Node >=26.9.0 和带校验值的 pnpm 版本。依赖由 pnpm-lock.yaml 锁定；不再使用 npm 锁文件或 Prettier。
+定时发布不在当前范围内。关闭账号标签页后，任务会重开同一账号会话。
 
-`pnpm run fmt` / `pnpm run fmt:check` 使用 oxfmt；`pnpm run lint` / `pnpm run lint:fix` 使用 oxlint。Husky 的 pre-commit 调用 lint-staged，仅检查及格式化暂存文件，不自动暂存整个项目。使用前确保终端 Node/pnpm 版本与 mise 配置一致。
+## 技术栈
 
-## UI 组件
+| 层     | 选型                                                                     |
+| ------ | ------------------------------------------------------------------------ |
+| 桌面   | Electron 44 · electron-vite · electron-builder                           |
+| 界面   | React 19 · TanStack Router / Query · Tailwind CSS · shadcn/ui（Base UI） |
+| 数据   | Drizzle ORM · better-sqlite3 · WAL                                       |
+| 自动化 | Playwright（操作各平台网页编辑器）                                       |
+| 工具链 | mise（Node 26.9 · pnpm 12.4）· TypeScript 7 · oxlint · oxfmt · Vitest    |
 
-所有官方注册表组件已导入 `src/renderer/components/ui`（63 个组件条目，共 64 个源码文件，另含 hooks）。默认采用 shadcn New York / Neutral 主题和语义 CSS 变量；页面优先组合 Sidebar、Card、Input、Textarea、Badge、Avatar、Alert、Empty、Table 等现成组件。
+给代理的工作约定见 [AGENTS.md](AGENTS.md)。UI 与窗口说明见 [docs/ui-style.md](docs/ui-style.md)、[docs/window-chrome.md](docs/window-chrome.md)。
 
-安装工具为官方 shadcn CLI 4.21.4。`--all` 的上游清单包含缺失的 New York v4 条目，已分别从官方 Radix Nova 来源补入 Questionnaire、旧 New York 来源补入 Toast。Questionnaire 的站点内部图标占位符已替换为 Lucide CheckIcon；Combobox 未使用的 children 参数已标记为 `_children`。Toast 为兼容保留，新通知优先使用 Sonner。未引入演示页面或业务 Blocks。
+## 开发说明
 
-## 桌面布局
+### 仓库位置
 
-主窗口隐藏原生标题栏，保留 macOS 红黄绿控制按钮，顶部提供可拖动区。视觉参考 Codex：窄侧栏、ChatGPT 风格中性灰白背景、紧凑导航与无阴影内容卡片；继续使用 shadcn 组件。侧栏收起后保留展开入口，并为窗口控制按钮预留空间。
+Git 与工具配置在本目录（GitHub 仓库根）。若本地还有外层 `media-post/` 容器目录，请进入本目录执行开发与打包命令。
 
-## 截图参考布局更新
+### 工具链
 
-按用户提供的 Codex 截图调整：44px 贯通顶部工具栏、44px 活动图标栏、224px 列表侧栏、白色主工作区和细分隔线。编辑与预览采用分栏布局，去除后台式大标题和卡片装饰；保留 shadcn 组件和现有业务行为。原生标题栏仍隐藏，macOS 控制按钮及拖动区域保留。
+`mise.toml` 固定 Node / pnpm；`pnpm run fmt` / `lint` 使用 oxfmt / oxlint。Husky pre-commit 仅检查暂存文件。
 
-## 仓库位置
+### UI
 
-Git 与工具配置均位于 `media-post-desktop/`；外层 `media-post/` 仅作为项目容器。开发、测试及打包命令均在本目录执行。
+shadcn 使用官方 `base-nova`（Base UI），配置在 `components.json`。组件组合用 Base UI `render` API；Toast 优先 Sonner。
 
-## macOS 桌面能力
-
-关闭主窗口会隐藏到菜单栏，不退出应用。通过菜单栏的「打开主窗口」、Dock 或再次启动应用可以恢复窗口；真正退出使用应用菜单或菜单栏中的「退出 media-post」。
-
-窗口位置、大小和最大化状态保存在 SQLite，外接显示器移除后会调整到可见区域。应用采用单实例，同一用户数据目录不启动第二份任务进程。
-
-应用菜单支持 `⌘N` 编辑内容、`⌘O` 导入 Markdown、`⌘S` 保存草稿、`⌘1/2/3` 切换账号／内容／记录、`⌘W` / `Control+W` 关闭当前标签页、`⌘⇧W` 隐藏窗口、`⌘Q` 退出；标准编辑快捷键也可用。编辑内容不会清空已有草稿。
-
-系统通知接入任务状态变更：成功、失败、人工处理与结果待核验分别提示，点击后跳转发布记录并标记对应任务。不包含正文内容；实际展示受 macOS 通知权限与专注模式影响。发布通知由真实任务状态驱动，待核验不会显示为发布成功。
-
-应用图标采用用户提供的章鱼图片；菜单栏使用同一张桌面图标。其余桌面能力见 [TODO](docs/TODO.md)。
-
-点击左下角头像，在弹出菜单中打开「设置」，可录制、保存或清除全局呼出快捷键，默认 `⌘M`。配置保存在 SQLite，启动时恢复；快捷键冲突时保留原有配置并显示错误。全局快捷键仅在应用运行期间有效。
-
-账号浏览器在主窗口顶部以标签页打开；每个账号保持独立会话，重复打开复用标签页，关闭标签页保留登录数据。最小化快捷键调整为 `⌘⌥M`，避免与全局呼出冲突。
-
-标签页顺序、当前选中的标签页与工作区页面保存在 SQLite，下次启动自动恢复。账号标签页重新打开该平台首页并沿用原登录会话；不恢复未提交的网页编辑器内容。工作区标签页固定保留。
-
-常用标签页快捷键（账号浏览器获得焦点时也有效）：`⌘/Control+T` 新建、`⌘/Control+W` 关闭、`⌘/Control+Shift+T` 重新打开最近关闭的标签页、`Control+Tab` / `Control+Shift+Tab` 前后切换，`⌘/Control+,` 打开设置。重新打开关闭标签页的历史仅在本次运行中保留。完整清单见设置中的「键盘快捷键」。
-
-## 本地发布
-
-在账号管理点选平台，在账号浏览器里登录，再检查状态。内容发布先选择类型：
-
-| 类型 | 要求                     |
-| ---- | ------------------------ |
-| 文章 | 标题和正文，最多一张封面 |
-| 动态 | 正文；附件只能是图片     |
-| 视频 | 一个视频文件，正文可空   |
-| 音频 | 一个音频文件，正文可空   |
-
-右侧只列出支持该类型的账号。任务在本机依次执行，素材复制到任务目录，单文件 20MB。登录、验证或找不到控件时暂停，等人处理后继续。失败可重试；已提交或结果未知只核验，不自动重发。
-
-| 类型             | 平台                                                 |
-| ---------------- | ---------------------------------------------------- |
-| 文章、动态、视频 | 头条号、知乎、抖音、小红书、微博、百家号、Facebook   |
-| 文章、动态       | 微信公众号、豆瓣、知识星球                           |
-| 文章、视频       | 哔哩哔哩、企鹅号                                     |
-| 文章             | 简书、Reddit                                         |
-| 动态、视频       | 快手、视频号、Instagram、X                           |
-| 动态             | Threads、Pinterest、LinkedIn、Google Business        |
-| 音频             | 喜马拉雅、小宇宙、网易云音乐、QQ音乐、蜻蜓FM、荔枝FM |
-| 视频             | YouTube、TikTok、虎扑、支付宝生活号                  |
-
-抖音、快手、小红书已有的图文按动态发布。授权网格里的其他平台可以登录，发布流程尚未接入。能力表在 `src/shared/content.ts`。
-
-## UI 组件基础
-
-shadcn 使用官方 `base-nova`（Base UI）组件，配置位于 `components.json`；应用继续使用已有中性灰白语义 Token 与 Lucide 图标。组件组合采用 Base UI 的 `render` API。弹窗、Popover、Tooltip、HoverCard、Select、Checkbox、Drawer 等交互组件均使用 Base UI；表单组合使用 `useRender`，Toast 使用 Base UI toast manager。已移除直接 Radix 与 Vaul 依赖。
-
-## 渲染进程结构与依赖原则
-
-`src/renderer/src.tsx` 只负责挂载应用与加载样式；页面通过 TanStack Router 的代码路由注册，使用内存 history，兼容开发服务器和打包后的 `file://`。账号浏览器标签页继续由 Electron 管理，会话与标签恢复仍使用 SQLite。
+### 渲染结构
 
 ```text
 src/renderer/
-  src.tsx                     # 应用入口
-  app/                        # Router、QueryClient、查询定义、工作区 Context
-  pages/                      # 账号、内容发布、发布记录、设置、新标签页、账号浏览器
-  components/workspace/       # 工具栏、导航、外壳与页面公共容器
-  components/dialogs/         # 工作区公共弹窗
-  components/ui/              # 官方 shadcn / Base UI 组件
-  hooks/                      # 桌面协调、原生视图布局、预览和快捷键设置
+  src.tsx                 # 入口
+  app/                    # Router、Query、工作区 Context
+  pages/                  # 账号、发布、记录、设置、浏览器
+  components/workspace/   # 工具栏、导航、页面容器
+  components/dialogs/     # 公共弹窗
+  components/ui/          # shadcn / Base UI
+  hooks/                  # 桌面协调、布局、快捷键
 ```
 
-TanStack Query 管理账号、发布记录、快捷键设置与标签预览；发布记录每 1.5 秒刷新，由 Query 管理请求生命周期，替代手写定时器。写操作使用 Mutation；发布等副作用关闭自动重试。预览截图仅保存在内存，关闭预览后立即清理对应查询缓存。草稿编辑状态由工作区持有，页面切换和打开设置不会清空正文、图片或目标选择。
-
-通用能力优先使用已有依赖和成熟、维护活跃的 npm 包：路由与数据状态用 TanStack，界面优先组合 shadcn / Base UI，表单与校验可复用已安装的 React Hook Form / Zod，日期处理可复用 date-fns。新增依赖前检查现有依赖是否已满足需要；业务规则、Electron 原生视图协调与各平台适配保留在项目代码中。避免为简单局部逻辑引入不必要依赖，也避免重复实现成熟库已有的能力。
-
-## SQLite 与数据库迁移
-
-表定义集中在 `src/main/storage/schema.ts`；`Database.ts` 使用 Drizzle 的类型安全查询、JSON 字段映射与事务，底层继续使用 better-sqlite3，并保留外键约束和 WAL。草稿仅保存图片路径及名称，预览仍在加载时生成。
+### SQLite 迁移
 
 ```sh
-# 修改 schema.ts 后生成 SQL 迁移及快照
 mise exec -- pnpm run db:generate --name=describe_change
-# 检查迁移历史是否存在冲突
 mise exec -- pnpm run db:check
 ```
 
-`drizzle.config.ts` 配置 SQLite、schema 路径与 `drizzle/` 输出目录，不绑定用户数据库。提交时同时包含生成的 SQL、`meta/_journal.json` 和 schema 快照。`db:check` 只检查迁移历史一致性，实际执行由自动化测试验证。
+表定义在 `src/main/storage/schema.ts`；迁移输出在 `drizzle/`。不要对真实用户库执行 `drizzle-kit push`。
 
-应用在打开数据库时调用官方 better-sqlite3 migrator，按 `__drizzle_migrations` 执行尚未应用的迁移；迁移失败会回滚并停止打开数据库。迁移文件随桌面包进入 `app.asar/drizzle`，主进程通过自身模块位置定位，不依赖启动时的工作目录。Drizzle Kit 只作为开发依赖，应用运行时不调用 CLI。
+### 环境与日志
 
-初始迁移 `0000_legacy_baseline.sql` 由 Kit 生成，针对已有 v1/v2 数据库将建表语句调整为 `IF NOT EXISTS`，保留原表和记录，并补齐 v1 缺少的 settings 表。此基线只完成既有数据库接管，不重建表；旧库主键原有的可空属性保持不变，新库按 Drizzle 定义建立非空主键。`user_version=3` 标记接管完成，阻止旧应用误读；后续结构版本以 Drizzle 迁移历史为准。启动时拒绝高于本应用的旧版本号或 Drizzle 迁移记录。已有迁移发布后不可修改；后续改表应生成新的迁移。不要对真实用户数据库运行 `drizzle-kit push`。
+| 文件                                   | 作用                     |
+| -------------------------------------- | ------------------------ |
+| `.env`                                 | 共用非敏感默认值         |
+| `.env.development` / `.env.production` | 开发 / 生产日志等级      |
+| `.env.local` / `.env.*.local`          | 本机覆盖（已 gitignore） |
 
-迁移测试使用独立的原版 v1 SQL fixture，覆盖 v1/v2 账号、图片草稿、任务、目标、尝试记录与设置保留，重复启动不重复迁移、失败回滚、防降级以及中断任务恢复。
+| 变量                        | 用途                        |
+| --------------------------- | --------------------------- |
+| `MAIN_VITE_DEV_SERVER_PORT` | 开发服务器端口，默认 `5186` |
+| `VITE_LOG_CONSOLE_LEVEL`    | console 等级                |
+| `MAIN_VITE_LOG_FILE_LEVEL`  | 文件日志等级                |
+| `MAIN_VITE_LOG_MAX_SIZE`    | 单文件轮转阈值，默认 5 MiB  |
 
-## 窗口外框与原生材质
+开发日志：`logs/main.log`。安装包日志：`<userData>/logs/main.log`（macOS 一般为 `~/Library/Application Support/media-post/logs/main.log`）。不记录正文、Cookie、密码。
 
-已依据本机 Codex 安装包静态样式与窗口代码修正分层：macOS 使用 menu 材质，失焦切换实色；外框、圆角页面底板、侧栏与白色内容区分别绘制。当前原生材质与界面统一为浅色。其他平台使用中性实色回退，尚未实机验收。详见 [窗口实现与静态依据](docs/window-chrome.md)。
+### 桌面行为（macOS 等）
 
-## 环境配置与日志
+关闭主窗口默认隐藏到托盘；菜单栏 / Dock 可恢复。窗口几何、标签与草稿保存在 SQLite。单实例运行。全局呼出快捷键默认 `⌘M`，可在设置中修改。
 
-使用 electron-vite 原生 `.env` 加载机制，不额外实现 dotenv 加载器。配置从项目根目录读取，渲染进程虽位于 `src/renderer`，也使用同一目录。
+## 当前状态
 
-| 文件                               | 作用                                                                |
-| ---------------------------------- | ------------------------------------------------------------------- |
-| `.env`                             | 开发、生产共用的非敏感默认值                                        |
-| `.env.development`                 | `pnpm dev` 使用，console 和 file 默认为 debug                       |
-| `.env.production`                  | `pnpm build` / `pnpm package:mac` 使用，console 和 file 默认为 info |
-| `.env.local` / `.env.[mode].local` | 本机覆盖配置，Git 已忽略                                            |
+多账号独立会话、按内容类型筛选、SQLite 草稿、确认后并行发布（可配并行数与网速限制）、暂停恢复、失败重试与链接核验已可用。开发版与 arm64 未签名 macOS 包通过离线 Electron 端到端测试（会话隔离、持久化、Facebook 图文）。其余平台编辑器已接入，站点改版后需在对应账号再核对。待办见 [docs/TODO.md](docs/TODO.md)。
 
-优先级从高到低：启动命令已有环境变量、`.env.[mode].local`、`.env.[mode]`、`.env.local`、`.env`。修改后重启开发命令；生产配置在构建时写入应用，修改源 `.env.production` 后需重新构建／打包。已安装应用不会从当前工作目录寻找 `.env`。
+## Star History
 
-| 配置项                      | 默认值／用途                                                   |
-| --------------------------- | -------------------------------------------------------------- |
-| `MAIN_VITE_DEV_SERVER_PORT` | `5186`，开发服务器端口，1024–65535                             |
-| `VITE_LOG_CONSOLE_LEVEL`    | 开发 debug、生产 info；主进程 console 和渲染进程 DevTools 等级 |
-| `MAIN_VITE_LOG_FILE_LEVEL`  | 开发 debug、生产 info；文件等级                                |
-| `MAIN_VITE_LOG_MAX_SIZE`    | `5242880`（5 MiB）；单文件轮转阈值，1024–104857600 字节        |
+[![Star History Chart](https://api.star-history.com/svg?repos=csdog/media-post&type=Date)](https://star-history.com/#csdog/media-post&Date)
 
-等级可用 `error`、`warn`、`info`、`verbose`、`debug`、`silly`；值为 `false` 时关闭对应输出。日志等级无效或轮转大小越界会报错。示例 `.env.development.local`：
+## License
 
-```dotenv
-MAIN_VITE_DEV_SERVER_PORT=5187
-VITE_LOG_CONSOLE_LEVEL=debug
-MAIN_VITE_LOG_FILE_LEVEL=info
-MAIN_VITE_LOG_MAX_SIZE=10485760
-```
-
-环境变量通过 `import.meta.env` 访问：`MAIN_VITE_` 仅主进程、`PRELOAD_VITE_` 仅 preload、`RENDERER_VITE_` 仅渲染进程、`VITE_` 三者共享。不要在共享或渲染变量中放凭据；桌面包内的主进程配置也可被提取，长期密钥不能依赖客户端环境文件保密。
-
-日志使用 `electron-log`，主进程和应用渲染进程的 `console.log/info/warn/error/debug` 同时接入 console 与文件，保留原生 console API 使用方式。未捕获异常、未处理 Promise rejection、应用启动／退出、主界面加载／异常、IPC 调用失败、发布目标状态变化均会记录。业务日志不主动输出发布正文、图片预览、Cookie 或密码；不要向 logger 传入敏感数据。
-
-开发模式（`pnpm dev`）写到项目目录 `logs/main.log`。生产构建和安装包写到应用数据目录 `<userData>/logs/main.log`，默认 macOS 路径：
-
-```text
-~/Library/Application Support/media-post/logs/main.log
-```
-
-达到阈值后由 electron-log 轮转为 `main.old.log`，只保留一个旧文件；阈值在写入时检查，不是每条消息的硬截断。生产模式测试传入 `MEDIA_POST_USER_DATA` 时，日志随测试数据目录隔离。日志包含带本地时区偏移的时间、大写等级、进程来源与异常堆栈。控制台里的等级按级别着色：错误红色、警告黄色、信息青色、调试灰色。文件日志保持纯文本。
-
-主进程使用 `import { log } from "./logging"`；渲染进程可使用 `import log from "electron-log/renderer"`，也可沿用 console。库的 preload 桥仅打包进应用自己的 sandbox preload，不向账号会话注入脚本，不收集远程网页 console。
-
-实现依据：[electron-log](https://github.com/megahertz/electron-log)、[electron-vite 环境变量与模式](https://electron-vite.org/guide/env-and-mode)。
+Private / unpublished npm package（`"private": true`）。仓库用途以 GitHub 仓库设置为准。

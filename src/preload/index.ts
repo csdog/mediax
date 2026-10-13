@@ -15,6 +15,7 @@ const api: DesktopApi = {
   setGlobalShortcut: (accelerator) => call("setGlobalShortcut", accelerator),
   publishSettings: () => call("publishSettings"),
   setSilentPublish: (silent) => call("setSilentPublish", silent),
+  setPublishSettings: (settings) => call("setPublishSettings", settings),
   profileSettings: () => call("profileSettings"),
   setProfile: (profile) => call("setProfile", profile),
   chooseAvatar: () => call("chooseAvatar"),

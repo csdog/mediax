@@ -13,6 +13,7 @@ import {
   urlLooksLoggedIn,
 } from "../platforms/catalog";
 import { platformInfo } from "../../shared/platforms";
+import { bandwidthLimitBytesPerSecond, readPublishSettings } from "../../shared/publishSettings";
 import { NeedsUser, type Publisher } from "../platforms/Publisher";
 import { discoveredAccountName, shouldAdoptAccountName, usableAccountName } from "./accountName";
 import { Database } from "../storage/Database";
@@ -178,17 +179,35 @@ export class AccountService {
     await partition.clearStorageData();
     await partition.clearCache();
   }
+  applyBandwidthLimit(
+    kbps = readPublishSettings((key) => this.db.setting(key)).bandwidthLimitKbps,
+  ) {
+    if (!app?.isReady()) return;
+    const bytes = bandwidthLimitBytesPerSecond(kbps);
+    for (const account of this.db.accounts()) {
+      const partition = session.fromPartition(partitionName(account.platform, account.id));
+      if (bytes <= 0) partition.disableNetworkEmulation();
+      else
+        partition.enableNetworkEmulation({
+          offline: false,
+          latency: 0,
+          downloadThroughput: bytes,
+          uploadThroughput: bytes,
+        });
+    }
+  }
   private async sessionPage(id: string) {
     const account = this.db.account(id);
-    const silent = this.db.setting("silentPublish") === true;
+    const settings = readPublishSettings((key) => this.db.setting(key));
     if (!this.browsers.get(id))
       await this.browsers.open(id, platformHome[account.platform], {
-        focus: !silent,
+        focus: !settings.silent,
         platform: account.platform,
       });
     const view = this.browsers.get(id);
-    if (silent && view && !view.webContents.isDestroyed())
+    if (settings.silent && view && !view.webContents.isDestroyed())
       view.webContents.setBackgroundThrottling(false);
+    this.applyBandwidthLimit(settings.bandwidthLimitKbps);
     return this.browsers.page(id);
   }
   adapter(id: string): Publisher & { discover(accountId: string): Promise<Target[]> } {

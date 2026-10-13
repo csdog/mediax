@@ -120,7 +120,13 @@ export function useWorkspaceController() {
     await window.desktop.openAccount(account.id);
     await queryClient.fetchQuery({ ...accountsOptions, staleTime: 0 });
   };
-  const { silentPublish, setSilentPublish } = usePublishSettings();
+  const {
+    publishSettings,
+    silentPublish,
+    setSilentPublish,
+    setPublishConcurrency,
+    setPublishBandwidthLimitKbps,
+  } = usePublishSettings();
   const concealBrowser =
     silentPublish &&
     records.targets.some((target) => ["pending", "running", "submitted"].includes(target.status));
@@ -316,8 +322,11 @@ export function useWorkspaceController() {
     browserTabs,
     activeBrowser,
     setActiveBrowser,
+    publishSettings,
     silentPublish,
     setSilentPublish,
+    setPublishConcurrency,
+    setPublishBandwidthLimitKbps,
     concealBrowser,
     isNewTab,
     hoveredTab,

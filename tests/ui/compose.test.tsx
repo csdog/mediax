@@ -22,8 +22,20 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       accelerator,
       registered: Boolean(accelerator),
     })),
-    publishSettings: vi.fn().mockResolvedValue({ silent: false }),
-    setSilentPublish: vi.fn().mockImplementation(async (silent: boolean) => ({ silent })),
+    publishSettings: vi
+      .fn()
+      .mockResolvedValue({ silent: false, concurrency: 3, bandwidthLimitKbps: 0 }),
+    setSilentPublish: vi.fn().mockImplementation(async (silent: boolean) => ({
+      silent,
+      concurrency: 3,
+      bandwidthLimitKbps: 0,
+    })),
+    setPublishSettings: vi.fn().mockImplementation(async (patch) => ({
+      silent: false,
+      concurrency: 3,
+      bandwidthLimitKbps: 0,
+      ...patch,
+    })),
     profileSettings: vi.fn(async () => profile),
     setProfile: vi.fn(async (next: { name: string; avatar: string | null }) => {
       profile = next;

@@ -2,6 +2,7 @@ import { mkdir, copyFile, rm, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { validatePublish } from "../../shared/content";
+import { readPublishSettings } from "../../shared/publishSettings";
 import type { ContentKind, Target } from "../../shared/models";
 import { Database } from "../storage/Database";
 import { AccountService } from "../accounts/AccountService";
@@ -16,7 +17,11 @@ export class PublishService {
     private accounts: AccountService,
     private assetsDirectory: string,
   ) {
-    this.queue = new PublishQueue(db, (target) => accounts.adapter(target.accountId));
+    this.queue = new PublishQueue(
+      db,
+      (target) => accounts.adapter(target.accountId),
+      () => readPublishSettings((key) => db.setting(key)).concurrency,
+    );
   }
   private async execute(work: () => Promise<void>) {
     if (this.running) throw new Error("已有发布任务正在执行");
