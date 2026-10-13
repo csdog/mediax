@@ -1,11 +1,11 @@
 {
-  "name": "media-post-desktop",
+  "name": "mediax-desktop",
   "version": "0.1.0",
   "private": true,
   "description": "Local multi-platform publishing workspace for macOS, Windows, and Linux",
   "repository": {
     "type": "git",
-    "url": "https://github.com/csdog/media-post.git"
+    "url": "https://github.com/csdog/mediax.git"
   },
   "main": "out/main/index.js",
   "scripts": {
@@ -18,10 +18,11 @@
     "package:win": "pnpm run build && electron-builder --win --publish never",
     "package:linux": "pnpm run build && electron-builder --linux --publish never",
     "package": "pnpm run build && electron-builder --mac --win --linux --publish never",
-    "test:packaged": "MEDIA_POST_PACKAGED=1 node --test --test-concurrency=1 tests/integration/*.test.mjs",
+    "test:packaged": "MEDIAX_PACKAGED=1 node --test --test-concurrency=1 tests/integration/*.test.mjs",
     "test:unit": "ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run tests/unit",
     "test:ui": "ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run tests/ui",
-    "postinstall": "electron-builder install-app-deps",
+    "postinstall": "electron-builder install-app-deps && node scripts/patch-electron-dock-name.mjs",
+    "patch:dock-name": "node scripts/patch-electron-dock-name.mjs",
     "prepare": "husky",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",

@@ -14,6 +14,7 @@ it("reads and merges notification preferences", () => {
     publishResult: true,
     awaitingUser: true,
     privacy: true,
+    sound: true,
   });
   expect(
     mergeNotificationSettings(
@@ -21,6 +22,7 @@ it("reads and merges notification preferences", () => {
       {
         enabled: false,
         publishResult: false,
+        sound: false,
       },
     ),
   ).toEqual({
@@ -28,6 +30,7 @@ it("reads and merges notification preferences", () => {
     publishResult: false,
     awaitingUser: true,
     privacy: false,
+    sound: false,
   });
 });
 
@@ -53,6 +56,7 @@ it("respects notification switches and privacy when composing notices", () => {
     publishResult: true,
     awaitingUser: true,
     privacy: true,
+    sound: true,
   };
   const notifier = new TaskNotifications(
     db,
@@ -74,7 +78,7 @@ it("respects notification switches and privacy when composing notices", () => {
 it("formats diagnostics without embedding draft bodies", () => {
   const report: DiagnosticReport = {
     generatedAt: "2026-10-13T00:00:00.000Z",
-    app: { name: "media-post", version: "0.1.0", packaged: false },
+    app: { name: "MediaX", version: "0.1.0", packaged: false },
     runtime: {
       electron: "44.0.0",
       chrome: "1",
@@ -88,10 +92,21 @@ it("formats diagnostics without embedding draft bodies", () => {
       logFile: "/tmp/user/logs/main.log",
     },
     counts: { accounts: 1, tasks: 2, targets: { verified: 1 } },
+    storage: {
+      totalBytes: 700,
+      categories: [
+        { id: "database", label: "数据库", bytes: 100 },
+        { id: "sessions", label: "浏览器会话", bytes: 200 },
+        { id: "assets", label: "发布素材", bytes: 50 },
+        { id: "logs", label: "日志", bytes: 25 },
+        { id: "cache", label: "缓存", bytes: 300 },
+        { id: "other", label: "其他", bytes: 25 },
+      ],
+    },
     logTail: "Application starting",
   };
   const text = formatDiagnosticReport(report);
-  expect(text).toContain("media-post diagnostic report");
+  expect(text).toContain("MediaX diagnostic report");
   expect(text).toContain("accounts: 1");
   expect(text).toContain("Application starting");
 });

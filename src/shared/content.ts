@@ -32,6 +32,12 @@ export function inferContentKind(paths: string[]): ContentKind {
   return "article";
 }
 
+/** Prefer the video workspace when dropped / opened files include A/V media. */
+export function preferredPageForFiles(paths: string[]): "compose" | "video" {
+  if (paths.some((path) => isVideo(path) || isAudio(path))) return "video";
+  return "compose";
+}
+
 const capabilities: Partial<Record<PlatformId, readonly ContentKind[]>> = {
   toutiao: ["article", "moment", "video"],
   zhihu: ["article", "moment", "video"],

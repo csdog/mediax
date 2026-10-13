@@ -140,7 +140,13 @@ export interface DesktopApi {
   updateStatus(): Promise<UpdateStatus>;
   checkForUpdates(): Promise<UpdateStatus>;
   installUpdate(): Promise<UpdateStatus>;
+  autoUpdateEnabled(): Promise<boolean>;
+  setAutoUpdateEnabled(enabled: boolean): Promise<boolean>;
   onUpdateStatus(listener: (status: UpdateStatus) => void): () => void;
+  desktopBehavior(): Promise<{ keepAwakeWhilePublishing: boolean }>;
+  setDesktopBehavior(settings: {
+    keepAwakeWhilePublishing?: boolean;
+  }): Promise<{ keepAwakeWhilePublishing: boolean }>;
   publishSettings(): Promise<{
     silent: boolean;
     concurrency: number;
@@ -167,20 +173,26 @@ export interface DesktopApi {
     publishResult: boolean;
     awaitingUser: boolean;
     privacy: boolean;
+    sound: boolean;
   }>;
   setNotificationSettings(settings: {
     enabled?: boolean;
     publishResult?: boolean;
     awaitingUser?: boolean;
     privacy?: boolean;
+    sound?: boolean;
   }): Promise<{
     enabled: boolean;
     publishResult: boolean;
     awaitingUser: boolean;
     privacy: boolean;
+    sound: boolean;
   }>;
   notificationPermission(): Promise<{ supported: boolean; label: string; detail: string }>;
   openNotificationSettings(): Promise<void>;
+  testNotification(): Promise<{ ok: boolean; message: string }>;
+  themePreference(): Promise<"system" | "light" | "dark">;
+  setThemePreference(preference: "system" | "light" | "dark"): Promise<"system" | "light" | "dark">;
   diagnostics(): Promise<{
     generatedAt: string;
     app: { name: string; version: string; packaged: boolean };
@@ -193,8 +205,19 @@ export interface DesktopApi {
     };
     paths: { userData: string; logsDir: string; logFile: string };
     counts: { accounts: number; tasks: number; targets: Record<string, number> };
+    storage: {
+      totalBytes: number;
+      categories: Array<{ id: string; label: string; bytes: number }>;
+    };
     logTail: string;
   }>;
+  storageUsage(force?: boolean): Promise<{
+    totalBytes: number;
+    categories: Array<{ id: string; label: string; bytes: number }>;
+  }>;
+  clearStorage(
+    id: "cache" | "logs" | "assets" | "sessions",
+  ): Promise<{ freedBytes: number } | null>;
   exportDiagnostics(): Promise<string | null>;
   revealLogFile(): Promise<void>;
   openAtLogin(): Promise<{ openAtLogin: boolean; detail: string | null }>;
@@ -207,6 +230,12 @@ export interface DesktopApi {
   deleteAccount(id: string): Promise<void>;
   importMarkdown(): Promise<string | null>;
   chooseImages(kind?: ContentKind): Promise<ImageAsset[]>;
+  importLocalFiles(
+    paths: string[],
+    kind: ContentKind,
+  ): Promise<{ markdown: string | null; assets: ImageAsset[]; warnings: string[] }>;
+  revealInFolder(path: string): Promise<void>;
+  pathForFile?(file: File): string;
   saveDraft(body: string, images: ImageAsset[], kind: ContentKind, title: string): Promise<void>;
   loadDraft(): Promise<{
     body: string;
@@ -251,4 +280,6 @@ export type DesktopCommand =
   | { action: "settings" }
   | { action: "navigate"; page: DesktopPage; taskId?: string }
   | { action: "save-draft" }
-  | { action: "import-markdown" };
+  | { action: "import-markdown" }
+  | { action: "toast"; title: string; body: string }
+  | { action: "open-files"; paths: string[] };

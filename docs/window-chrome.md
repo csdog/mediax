@@ -1,6 +1,6 @@
 # 窗口外壳、材质与颜色
 
-参考本机 `/Applications/ChatGPT.app`（Bundle ID `com.openai.codex`，产品名 Codex，版本 `26.1007.30912`）。以下是安装包静态观察及 media-post 的实现选择；未读取运行中 Codex 的 DOM，也未验证其当前主题设置。
+参考本机 `/Applications/ChatGPT.app`（Bundle ID `com.openai.codex`，产品名 Codex，版本 `26.1007.30912`）。以下是安装包静态观察及 mediax 的实现选择；未读取运行中 Codex 的 DOM，也未验证其当前主题设置。
 
 ## 安装包中观察到的行为
 
@@ -10,7 +10,7 @@
 - 浅色 editor-opaque 在支持 color-mix 时使用 `#ededed` 的 40% 混色，frame 进一步取该颜色的 70%；对应同色透明合成约为 28%。page-surface 使用 surface-secondary 的 85%；页面侧栏导航再覆盖 surface 的 65%。这些是代码中的样式规则，当前运行界面是否启用相应布局和主题尚未验证。
 - `app-initial-99e8b4b455fa.css` 区分 PageSurface、MainContentSurface 与 Sidebar；基础面板圆角 `--radius-xl-base` 为 `.75rem`，有侧栏时内容区内侧接缝取消圆角。内容面板使用不透明 surface，圆角处露出底层外壳。
 
-## media-post 实现
+## mediax 实现
 
 `src/main/desktop/windowBackdrop.ts` 管理原生背景：macOS 获得焦点时启用 menu 材质，失焦时移除材质并使用 `#f9f9f9`。系统要求减少透明度时使用实色。以 BrowserWindow 焦点为准，避免账号 WebContentsView 获取输入焦点时误判。显示、隐藏和原生主题更新也会同步背景，关闭窗口后移除原生主题监听。
 

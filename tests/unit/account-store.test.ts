@@ -78,4 +78,48 @@ describe("SQLite storage", () => {
     accounts.stopAutoRefresh();
     db.close();
   });
+
+  it("persists logged_out for every account after clearing browser sessions", async () => {
+    const db = new Database(":memory:");
+    const accounts = new AccountService(db, new AccountBrowserManager());
+    const loaded = db.addAccount("Loaded");
+    const unloaded = db.addAccount("Unloaded", "zhihu");
+    const target = {
+      accountId: loaded.id,
+      identityId: "1001",
+      name: "Loaded",
+      kind: "profile" as const,
+    };
+    db.setSetting(`account-status:${loaded.id}`, {
+      login: "logged_in",
+      message: "已识别 1 个发布身份。",
+      targets: [target],
+    });
+    db.setSetting(`account-status:${unloaded.id}`, {
+      login: "logged_in",
+      message: "已登录",
+      targets: [],
+    });
+    expect(accounts.list().find((item) => item.id === loaded.id)?.login).toBe("logged_in");
+    await accounts.clearAllBrowserSessions();
+    expect(accounts.list()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: loaded.id,
+          login: "logged_out",
+          message: "已清理浏览器会话，请重新登录",
+        }),
+        expect.objectContaining({
+          id: unloaded.id,
+          login: "logged_out",
+          message: "已清理浏览器会话，请重新登录",
+        }),
+      ]),
+    );
+    accounts.stopAutoRefresh();
+    const restored = new AccountService(db, new AccountBrowserManager());
+    expect(restored.list().every((item) => item.login === "logged_out")).toBe(true);
+    restored.stopAutoRefresh();
+    db.close();
+  });
 });

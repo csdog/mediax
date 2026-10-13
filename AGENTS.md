@@ -1,6 +1,6 @@
 # AGENTS.md
 
-macOS 本地多平台发布应用。Git 仓库是 `media-post-desktop/`；外层 `media-post/` 只是容器。开发、测试和打包都在本目录执行。
+macOS 本地多平台发布应用。Git 仓库是 `mediax-desktop/`；外层 `mediax/` 只是容器。开发、测试和打包都在本目录执行。
 
 ## 命令
 
@@ -16,6 +16,8 @@ pnpm run fmt
 ```
 
 `pnpm dev --watch` 在保存主进程文件时会重建，并可能断开正在使用的 CDP。集成测试会启动真实 Electron，且包含 Facebook 发布夹具；只有用户明确要求时才运行 `test:integration` 或 `test:packaged`。不要为了验证而向真实账号再发一条帖。
+
+macOS 开发态 Dock / ⌘-Tab 名称优先看 `.app` **文件夹名**（不是 `app.setName`）。`pnpm dev` 前与 `postinstall` 会把 `Electron.app` 重命名为 `MediaX.app` 并同步 `path.txt`；仅改 Info.plist 不够。改完后需完全退出旧进程再开；若 Dock 仍钉着旧的 Electron，右键从 Dock 移除后再启动。
 
 ## 代码位置
 
@@ -47,7 +49,59 @@ pnpm run fmt
 
 当前 schema 拒绝高于 5 的 `user_version`。下一张迁移是 `drizzle/0003_*.sql`，并把 `Database` 的版本上限改到 6，同时把“版本过高”测试再加一档。已发布的 SQL 不要改。改表用 `pnpm run db:generate`，并提交 SQL、`drizzle/meta/_journal.json` 和快照。不要对用户库执行 `drizzle-kit push`。
 
-业务库在 `~/Library/Application Support/media-post/media-post.sqlite`。`MEDIA_POST_USER_DATA` 可改测试目录。开发日志在仓库 `logs/main.log`。日志里不要写正文、Cookie、密码或图片预览。
+业务库在 `~/Library/Application Support/mediax/mediax.sqlite`。`MEDIAX_USER_DATA` 可改测试目录。开发日志在仓库 `logs/main.log`。日志里不要写正文、Cookie、密码或图片预览。
+
+## 性能优化
+
+对标 [Electron Performance](https://www.electronjs.org/docs/latest/tutorial/performance)、VS Code（code cache / UtilityProcess / 生命周期分阶段）和 Codex Desktop（重活出主进程）。改启动路径或主进程重活时遵守本节，不要为了省事把同步 I/O 或大模块重新塞回冷启动。
+
+### 已落地
+
+| 措施                                                                       | 位置 / 约定                                                                            |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| ready 前 `Menu.setApplicationMenu(null)`                                   | `src/main/index.ts`                                                                    |
+| 单实例冲突用 `app.exit(0)`，不用 `app.quit()`                              | 避免启动期 Chrome_IOThread SIGTRAP                                                     |
+| 主窗口 / 账号视图 `spellcheck: false`、`v8CacheOptions: 'bypassHeatCheck'` | `index.ts`、`AccountBrowserManager`                                                    |
+| 版本升级清 Chromium code cache                                             | `src/main/desktop/codeCache.ts`                                                        |
+| CDP 就绪与窗口 `loadURL`/`loadFile` 并行                                   | `index.ts`                                                                             |
+| 生命周期 `Starting → Restored → Eventually`                                | `src/main/desktop/appLifecycle.ts`；账号同步、自动更新只进 Eventually                  |
+| 启动埋点 `mediax/will*` / `did*`                                           | `src/main/desktop/perfMarks.ts`；Eventually 打摘要日志                                 |
+| 懒加载 `playwright-core`、`electron-updater`                               | `CdpBridge.connect`、`AppUpdater` 首次使用时再 `import`                                |
+| 素材 / Markdown 导入进 UtilityProcess                                      | `src/main/content/mediaImportHost.ts` + `workers/mediaImportWorker.ts`；失败回退主进程 |
+
+### Agent 约束
+
+- **主进程**：禁止新增同步 `fs` / `child_process`（`*Sync`）挡在 UI 线程上；长 CPU 或大文件编解码放 UtilityProcess / Worker，或延到 Eventually。
+- **启动**：不要在 `markRestored` 之前拉起账号全量同步、更新检查、或其它可延后的网络 / 磁盘扫描。
+- **模块**：冷启动路径不要静态 `import` 重依赖（Playwright、updater、大解析库）；需要时再动态加载。
+- **窗口**：新 `BrowserWindow` / `WebContentsView` 默认带上 `sandbox`、`contextIsolation`、`spellcheck: false`；打包向 UI 用 `v8CacheOptions: 'bypassHeatCheck'`。账号内嵌页若必须后台保持活跃可关 `backgroundThrottling`，主窗口不要默认关。
+- **发布 CDP**：仍须留在主进程（要碰 `webContents`）；不要为了「性能」另开用户浏览器或把 Playwright 塞进渲染进程。
+- **验证**：改启动或导入路径后跑 `pnpm run typecheck` 与 `pnpm run test:unit`；关注日志里的 `[perf]` 与 `Startup performance marks`。
+
+参考清单与排期备注见 `docs/TODO.md`。
+
+## TypeScript 类型
+
+目标：改完后尽量不出现 `tsc` 错误；`pnpm run typecheck` 必须通过。不要用大面积 `as any` / `@ts-ignore` 糊弄过去。
+
+### 约定
+
+- 保持 `strict`；新增 API、IPC、共享模型先写清类型（优先改 `src/shared/models.ts` 等共享定义）。
+- DOM 集合可迭代：`tsconfig` 已含 `DOM` + `DOM.Iterable`。对 `NodeListOf` / `HTMLCollection` 用 `for...of`、展开或 `Array.from(...)` 均可；不要为绕过类型去关 lib。
+- 常见坑示例：
+  - `TS2488`：`NodeListOf<Element>` 不可迭代 → 确认 lib 含 `DOM.Iterable`，或写成 `Array.from(document.querySelectorAll(...))`。
+  - Playwright `Locator` / `Page` 与 DOM 类型不要混用；`page.evaluate` 回调内只使用可序列化进浏览器的类型。
+  - Electron 主进程不要引用仅渲染层存在的 DOM 全局；预加载与沙箱边界上的值用显式类型收窄。
+- 联合类型与 `PlatformId` / `ContentKind` 用穷尽检查（`switch` + `never`），避免漏平台。
+- 禁止无必要的 `any`；确需放宽时用更窄的断言或类型守卫，并注明原因。
+
+### 验证
+
+涉及类型、共享模型、IPC、平台适配器或 DOM/Playwright 脚本时，提交前跑：
+
+```sh
+pnpm run typecheck
+```
 
 ## 改动习惯
 

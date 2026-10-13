@@ -24,7 +24,7 @@ it("rejects an unsupported content type before opening the account browser", asy
     adapter,
     exclusive: (work: () => Promise<void>) => work(),
   } as unknown as AccountService;
-  const publishing = new PublishService(db, accounts, "/tmp/media-post-assets");
+  const publishing = new PublishService(db, accounts, "/tmp/mediax-assets");
   await expect(publishing.publish("article", "标题", "正文", [], [target])).rejects.toThrow(
     "虎扑不支持文章",
   );

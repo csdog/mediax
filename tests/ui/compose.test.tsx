@@ -7,7 +7,7 @@ import { App } from "../../src/renderer/src";
 vi.mock("../../src/renderer/lib/logging", () => ({ initializeRendererLogging: vi.fn() }));
 it("imports and saves content, manages desktop tabs/settings, and requires target selection plus publish confirmation", async () => {
   let commandListener: ((command: any) => void) | undefined;
-  let profile = { name: "media-post", avatar: null as string | null };
+  let profile = { name: "MediaX", avatar: null as string | null };
   window.desktop = {
     onCommand: vi.fn((listener) => {
       commandListener = listener;
@@ -109,12 +109,14 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       publishResult: true,
       awaitingUser: true,
       privacy: false,
+      sound: true,
     }),
     setNotificationSettings: vi.fn().mockImplementation(async (patch) => ({
       enabled: true,
       publishResult: true,
       awaitingUser: true,
       privacy: false,
+      sound: true,
       ...patch,
     })),
     notificationPermission: vi.fn().mockResolvedValue({
@@ -123,9 +125,19 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       detail: "测试环境",
     }),
     openNotificationSettings: vi.fn(),
+    testNotification: vi.fn().mockResolvedValue({ ok: true, message: "已发送测试通知" }),
+    themePreference: vi.fn().mockResolvedValue("system"),
+    setThemePreference: vi.fn().mockImplementation(async (preference) => preference),
+    autoUpdateEnabled: vi.fn().mockResolvedValue(true),
+    setAutoUpdateEnabled: vi.fn().mockImplementation(async (enabled: boolean) => enabled),
+    desktopBehavior: vi.fn().mockResolvedValue({ keepAwakeWhilePublishing: true }),
+    setDesktopBehavior: vi.fn().mockImplementation(async (patch) => ({
+      keepAwakeWhilePublishing: true,
+      ...patch,
+    })),
     diagnostics: vi.fn().mockResolvedValue({
       generatedAt: "2026-10-13T00:00:00.000Z",
-      app: { name: "media-post", version: "0.1.0", packaged: false },
+      app: { name: "MediaX", version: "0.1.0", packaged: false },
       runtime: {
         electron: "44",
         chrome: "1",
@@ -135,8 +147,31 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       },
       paths: { userData: "/tmp", logsDir: "/tmp/logs", logFile: "/tmp/logs/main.log" },
       counts: { accounts: 0, tasks: 0, targets: {} },
+      storage: {
+        totalBytes: 1024,
+        categories: [
+          { id: "database", label: "数据库", bytes: 512 },
+          { id: "sessions", label: "浏览器会话", bytes: 256 },
+          { id: "assets", label: "发布素材", bytes: 128 },
+          { id: "logs", label: "日志", bytes: 64 },
+          { id: "cache", label: "缓存", bytes: 32 },
+          { id: "other", label: "其他", bytes: 32 },
+        ],
+      },
       logTail: "log line",
     }),
+    storageUsage: vi.fn().mockResolvedValue({
+      totalBytes: 1024,
+      categories: [
+        { id: "database", label: "数据库", bytes: 512 },
+        { id: "sessions", label: "浏览器会话", bytes: 256 },
+        { id: "assets", label: "发布素材", bytes: 128 },
+        { id: "logs", label: "日志", bytes: 64 },
+        { id: "cache", label: "缓存", bytes: 32 },
+        { id: "other", label: "其他", bytes: 32 },
+      ],
+    }),
+    clearStorage: vi.fn().mockResolvedValue({ freedBytes: 32 }),
     exportDiagnostics: vi.fn().mockResolvedValue(null),
     revealLogFile: vi.fn(),
     openAtLogin: vi.fn().mockResolvedValue({ openAtLogin: false, detail: null }),
@@ -157,6 +192,9 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     history: vi.fn().mockResolvedValue({ tasks: [], targets: [] }),
     loadDraft: vi.fn().mockResolvedValue({ body: "", images: [] }),
     importMarkdown: vi.fn().mockResolvedValue("Imported article"),
+    importLocalFiles: vi.fn().mockResolvedValue({ markdown: null, assets: [], warnings: [] }),
+    revealInFolder: vi.fn(),
+    pathForFile: vi.fn((file: File) => (file as File & { path?: string }).path ?? ""),
     saveDraft: vi.fn().mockResolvedValue(undefined),
   } as any;
   Object.defineProperty(window, "matchMedia", {
@@ -236,11 +274,11 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   await waitFor(() => expect(screen.queryByRole("tab", { name: "Facebook 账号 1" })).toBeNull());
   expect(screen.queryByRole("button", { name: "设置", exact: true })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "打开头像菜单" }));
-  expect(screen.getByRole("dialog", { name: "用户菜单" }).textContent).toContain("media-post");
+  expect(screen.getByRole("dialog", { name: "用户菜单" }).textContent).toContain("MediaX");
   fireEvent.click(screen.getByRole("button", { name: "设置", exact: true }));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "用户菜单" })).toBeNull());
   await waitFor(() =>
-    expect((screen.getByLabelText("个人名称") as HTMLInputElement).value).toBe("media-post"),
+    expect((screen.getByLabelText("个人名称") as HTMLInputElement).value).toBe("MediaX"),
   );
   expect(screen.getByRole("button", { name: "更换头像" })).toBeTruthy();
   fireEvent.change(screen.getByLabelText("个人名称"), { target: { value: "张三" } });

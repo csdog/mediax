@@ -99,7 +99,7 @@ export function WorkspaceToolbar() {
             >
               <div className="space-y-1 px-3 py-2.5">
                 <p className="text-sm font-medium">{pageTitle}</p>
-                <p className="text-xs text-muted-foreground">media-post · 本地工作空间</p>
+                <p className="text-xs text-muted-foreground">MediaX · 本地工作空间</p>
               </div>
               <div className="border-t bg-background p-3 text-xs text-muted-foreground">
                 {page === "accounts" ? (

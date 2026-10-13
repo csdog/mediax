@@ -184,7 +184,7 @@ export function WorkspaceNavigation() {
       <Sidebar className="border-0" variant="sidebar">
         <SidebarHeader className="px-2 py-2">
           <div className="flex h-8 items-center gap-1.5 px-2">
-            <span className="text-sm font-semibold">media-post</span>
+            <span className="text-sm font-semibold">MediaX</span>
             <ChevronDown className="size-3 text-muted-foreground" />
           </div>
           <Button

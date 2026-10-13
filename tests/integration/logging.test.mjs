@@ -21,17 +21,17 @@ test(
   "logging: console/file, renderer errors, rotation and no bridge in remote account sessions",
   { timeout: 60000 },
   async () => {
-    const dir = await mkdtemp(join(tmpdir(), "media-post-logging-"));
-    const env = { ...process.env, MEDIA_POST_USER_DATA: dir };
+    const dir = await mkdtemp(join(tmpdir(), "mediax-logging-"));
+    const env = { ...process.env, MEDIAX_USER_DATA: dir };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.ELECTRON_RENDERER_URL;
     let application;
     try {
       application = await electron.launch({
-        executablePath: process.env.MEDIA_POST_PACKAGED
-          ? resolve("dist/mac-arm64/media-post.app/Contents/MacOS/media-post")
+        executablePath: process.env.MEDIAX_PACKAGED
+          ? resolve("dist/mac-arm64/MediaX.app/Contents/MacOS/MediaX")
           : require("electron"),
-        args: process.env.MEDIA_POST_PACKAGED ? [] : [resolve("out/main/index.js")],
+        args: process.env.MEDIAX_PACKAGED ? [] : [resolve("out/main/index.js")],
         env,
       });
       let output = "";

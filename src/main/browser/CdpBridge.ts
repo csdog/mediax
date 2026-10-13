@@ -1,9 +1,12 @@
-import { chromium, type Browser, type Page } from "playwright-core";
+import type { Browser, Page } from "playwright-core";
+
 export class CdpBridge {
   private browser?: Browser;
   async connect(endpoint: string): Promise<void> {
     const u = new URL(endpoint);
     if (u.hostname !== "127.0.0.1") throw new Error("CDP must use loopback");
+    // playwright-core is large; load only when an account page is actually needed.
+    const { chromium } = await import("playwright-core");
     this.browser = await chromium.connectOverCDP(endpoint, { timeout: 15000 });
   }
   async findPage(bootstrapUrl: string): Promise<Page> {

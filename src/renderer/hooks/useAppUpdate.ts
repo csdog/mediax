@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UpdateStatus } from "../../shared/models";
 
 const idle: UpdateStatus = {
@@ -11,9 +12,23 @@ const idle: UpdateStatus = {
   canInstall: false,
 };
 
+const autoKey = ["desktop", "auto-update"] as const;
+
 export function useAppUpdate() {
+  const client = useQueryClient();
   const [status, setStatus] = useState<UpdateStatus>(idle);
   const [busy, setBusy] = useState(false);
+  const autoUpdate = useQuery({
+    queryKey: autoKey,
+    queryFn: () => window.desktop.autoUpdateEnabled(),
+  });
+  const saveAuto = useMutation({
+    mutationFn: (enabled: boolean) => window.desktop.setAutoUpdateEnabled(enabled),
+    onSuccess: (enabled) => {
+      client.setQueryData(autoKey, enabled);
+      void window.desktop.updateStatus().then(setStatus);
+    },
+  });
   useEffect(() => {
     let active = true;
     void window.desktop.updateStatus().then((next) => {
@@ -31,11 +46,13 @@ export function useAppUpdate() {
       const detail = (event as CustomEvent<UpdateStatus>).detail;
       if (detail) apply(detail);
     };
-    window.addEventListener("media-post:update-status", receive);
-    return () => window.removeEventListener("media-post:update-status", receive);
+    window.addEventListener("mediax:update-status", receive);
+    return () => window.removeEventListener("mediax:update-status", receive);
   }, []);
   return {
     status,
+    autoUpdateEnabled: autoUpdate.data ?? true,
+    setAutoUpdateEnabled: (enabled: boolean) => saveAuto.mutate(enabled),
     checkForUpdates: async () => {
       setBusy(true);
       try {

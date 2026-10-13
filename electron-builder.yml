@@ -1,9 +1,9 @@
-appId: local.media-post.desktop
-productName: media-post
+appId: local.mediax.desktop
+productName: MediaX
 publish:
   provider: github
   owner: csdog
-  repo: media-post
+  repo: mediax
 directories:
   output: dist
   buildResources: build
@@ -13,9 +13,39 @@ files:
   - drizzle/meta/_journal.json
   - package.json
 protocols:
-  - name: media-post
+  - name: mediax
     schemes:
-      - media-post
+      - mediax
+fileAssociations:
+  - ext: md
+    name: Markdown
+    description: Markdown document
+    role: Editor
+  - ext: markdown
+    name: Markdown
+    description: Markdown document
+    role: Editor
+  - ext: png
+    name: PNG Image
+    role: Viewer
+  - ext: jpg
+    name: JPEG Image
+    role: Viewer
+  - ext: jpeg
+    name: JPEG Image
+    role: Viewer
+  - ext: webp
+    name: WebP Image
+    role: Viewer
+  - ext: gif
+    name: GIF Image
+    role: Viewer
+  - ext: mp4
+    name: MP4 Video
+    role: Viewer
+  - ext: mov
+    name: QuickTime Video
+    role: Viewer
 mac:
   icon: build/icon.png
   category: public.app-category.productivity
@@ -41,7 +71,7 @@ win:
 linux:
   icon: build/icon.png
   category: Office
-  maintainer: media-post
+  maintainer: MediaX
   target:
     - target: AppImage
       arch:

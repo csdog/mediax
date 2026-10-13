@@ -22,6 +22,9 @@ export function useNotificationSettings() {
       window.desktop.setNotificationSettings(patch),
     onSuccess: (result) => client.setQueryData(key, result),
   });
+  const test = useMutation({
+    mutationFn: () => window.desktop.testNotification(),
+  });
   return {
     settings: settings.data ?? defaultNotificationSettings,
     permission: permission.data ?? {
@@ -31,6 +34,9 @@ export function useNotificationSettings() {
     },
     setSettings: (patch: Partial<NotificationSettings>) => save.mutate(patch),
     openSystemSettings: () => void window.desktop.openNotificationSettings(),
+    testNotification: () => test.mutateAsync(),
+    testBusy: test.isPending,
+    testMessage: test.data?.message ?? test.error?.message ?? "",
     refreshPermission: () => client.invalidateQueries({ queryKey: permissionKey }),
   };
 }

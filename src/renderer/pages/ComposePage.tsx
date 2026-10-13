@@ -1,5 +1,16 @@
 import { useState } from "react";
-import { Monitor, X, ImagePlus, FileText, Save, Send, Plus, RefreshCw } from "lucide-react";
+import {
+  Monitor,
+  X,
+  ImagePlus,
+  FileText,
+  Save,
+  Send,
+  Plus,
+  RefreshCw,
+  FolderOpen,
+} from "lucide-react";
+import { applyLocalFiles, pathsFromDataTransfer } from "@/lib/importLocalFiles";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -53,6 +64,16 @@ export function ComposePage() {
   const [platformQuery, setPlatformQuery] = useState("");
   const [accountQuery, setAccountQuery] = useState("");
   const [syncedSignature, setSyncedSignature] = useState("");
+  const [dragging, setDragging] = useState(false);
+  const importPaths = (paths: string[]) => {
+    if (!paths.length) return;
+    void run(async () => {
+      const result = await applyLocalFiles(paths, contentKind, images);
+      if (result.markdown != null) setBody(result.markdown);
+      setImages(result.images);
+      setNotice(result.notice);
+    });
+  };
   const paths = images.map((image) => image.path);
   const ready = canPublish(contentKind, title, body, paths);
   const signature = [
@@ -171,7 +192,34 @@ export function ComposePage() {
             先勾选账号，填写内容，同步到账号，再一键发布
           </div>
           <div className="composer-dock">
-            <Card className="composer">
+            <Card
+              className={`composer ${dragging ? "composer-drop-active" : ""}`}
+              onDragEnter={(event) => {
+                if (![...event.dataTransfer.types].includes("Files")) return;
+                event.preventDefault();
+                setDragging(true);
+              }}
+              onDragOver={(event) => {
+                if (![...event.dataTransfer.types].includes("Files")) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "copy";
+                setDragging(true);
+              }}
+              onDragLeave={(event) => {
+                if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+                setDragging(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragging(false);
+                importPaths(pathsFromDataTransfer(event.dataTransfer));
+              }}
+            >
+              {dragging ? (
+                <div className="composer-drop-hint" aria-live="polite">
+                  松开以导入 Markdown 或素材
+                </div>
+              ) : null}
               {page === "video" ? null : (
                 <div
                   className="flex flex-wrap gap-2 px-3 pt-3"
@@ -227,11 +275,20 @@ export function ComposePage() {
                 <div className="composer-images">
                   {images.map((image) => (
                     <div className="relative" key={image.path}>
-                      <img
-                        className="size-14 rounded-lg border object-cover"
-                        src={image.preview}
-                        alt={image.name}
-                      />
+                      {image.preview ? (
+                        <img
+                          className="size-14 rounded-lg border object-cover"
+                          src={image.preview}
+                          alt={image.name}
+                        />
+                      ) : (
+                        <div
+                          className="flex size-14 items-center justify-center rounded-lg border text-[10px] text-muted-foreground"
+                          title={image.name}
+                        >
+                          媒体
+                        </div>
+                      )}
                       <Button
                         variant="secondary"
                         size="icon-xs"
@@ -240,6 +297,19 @@ export function ComposePage() {
                         className="absolute -top-1 -right-1 rounded-full"
                       >
                         <X />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="icon-xs"
+                        aria-label={`在 Finder 中显示 ${image.name}`}
+                        onClick={() =>
+                          void run(async () => {
+                            await window.desktop.revealInFolder(image.path);
+                          })
+                        }
+                        className="absolute -bottom-1 -left-1 rounded-full"
+                      >
+                        <FolderOpen />
                       </Button>
                     </div>
                   ))}
@@ -270,7 +340,7 @@ export function ComposePage() {
                       </Button>
                     }
                   />
-                  <TooltipContent>{mediaLabel(contentKind)}</TooltipContent>
+                  <TooltipContent>{mediaLabel(contentKind)}（也可拖入）</TooltipContent>
                 </Tooltip>
                 <Button
                   variant="ghost"

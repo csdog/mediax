@@ -41,11 +41,15 @@ export class AccountService {
   }
   startAutoRefresh() {
     if (this.timer) return;
-    void this.syncAll();
-    this.timer = setInterval(() => void this.syncAll(), 20_000);
+    // First sync is deferred slightly so cold start stays responsive.
+    this.timer = setTimeout(() => {
+      void this.syncAll();
+      this.timer = setInterval(() => void this.syncAll(), 20_000);
+    }, 2_000);
   }
   stopAutoRefresh() {
     if (!this.timer) return;
+    clearTimeout(this.timer);
     clearInterval(this.timer);
     this.timer = null;
   }
@@ -178,6 +182,24 @@ export class AccountService {
     const partition = session.fromPartition(partitionName(account.platform, id));
     await partition.clearStorageData();
     await partition.clearCache();
+  }
+  /** Close account browsers and wipe persist partition storage (login state). */
+  async clearAllBrowserSessions() {
+    if (this.operating) throw new Error("账号正在执行身份检查或发布任务，请稍后再试");
+    for (const account of this.db.accounts()) {
+      this.browsers.close(account.id);
+      if (app?.isReady()) {
+        const partition = session.fromPartition(partitionName(account.platform, account.id));
+        await partition.clearStorageData();
+        await partition.clearCache();
+      }
+      const previous = this.states.get(account.id) ?? this.stored(account.id);
+      this.remember({
+        ...previous,
+        login: "logged_out",
+        message: "已清理浏览器会话，请重新登录",
+      });
+    }
   }
   applyBandwidthLimit(
     kbps = readPublishSettings((key) => this.db.setting(key)).bandwidthLimitKbps,

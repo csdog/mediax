@@ -1,6 +1,8 @@
+import { productName } from "./product";
+
 export type ProfileSettings = { name: string; avatar: string | null };
 
-export const defaultProfile: ProfileSettings = { name: "media-post", avatar: null };
+export const defaultProfile: ProfileSettings = { name: productName, avatar: null };
 
 const avatarPattern = /^data:image\/(?:png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/;
 
@@ -12,7 +14,7 @@ export function profileInitials(name: string) {
     const second = [...parts[1]][0] ?? "";
     return `${first}${second}`.toUpperCase();
   }
-  return [...trimmed].slice(0, 2).join("").toUpperCase() || "MP";
+  return [...trimmed].slice(0, 2).join("").toUpperCase() || "MX";
 }
 
 export function readProfile(value: unknown): ProfileSettings {

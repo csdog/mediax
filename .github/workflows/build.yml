@@ -45,7 +45,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: media-post-${{ matrix.os }}
+          name: mediax-${{ matrix.os }}
           path: |
             dist/*.dmg
             dist/*.zip

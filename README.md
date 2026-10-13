@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="build/icon.png" width="128" height="128" alt="media-post">
+  <img src="build/icon.png" width="128" height="128" alt="MediaX">
 </p>
 
-<h1 align="center">media-post</h1>
+<h1 align="center">MediaX</h1>
 
 <p align="center">
   <strong>本地多平台内容发布桌面端</strong><br>
@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/csdog/media-post/releases"><img src="https://img.shields.io/github/v/release/csdog/media-post?style=flat-square&label=release" alt="release"></a>
-  <a href="https://github.com/csdog/media-post/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/csdog/media-post/build.yml?style=flat-square&label=build" alt="build"></a>
+  <a href="https://github.com/csdog/mediax/releases"><img src="https://img.shields.io/github/v/release/csdog/mediax?style=flat-square&label=release" alt="release"></a>
+  <a href="https://github.com/csdog/mediax/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/csdog/mediax/build.yml?style=flat-square&label=build" alt="build"></a>
   <img src="https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-111827?style=flat-square" alt="desktop platforms">
   <img src="https://img.shields.io/badge/publish-32%20platforms-2563eb?style=flat-square" alt="publish platforms">
   <img src="https://img.shields.io/badge/login-56%20platforms-0f766e?style=flat-square" alt="login platforms">
@@ -34,9 +34,9 @@
 
 ---
 
-## 为什么用 media-post
+## 为什么用 MediaX
 
-多数分发工具把账号和正文交给云端；media-post 把浏览器会话、草稿和任务都留在本机。
+多数分发工具把账号和正文交给云端；MediaX 把浏览器会话、草稿和任务都留在本机。
 
 - **一次创作，多端发布** — 文章 / 动态 / 视频 / 音频，按平台能力自动筛选可发账号
 - **会话隔离** — 每个账号独立 Electron 分区，登录态互不串扰
@@ -64,7 +64,7 @@
 | **Windows** | x64         | `nsis` 安装包 · `portable` |
 | **Linux**   | x64         | `AppImage` · `deb`         |
 
-从 [Releases](https://github.com/csdog/media-post/releases) 下载，或打 `v*` 标签触发 GitHub Actions 构建。
+从 [Releases](https://github.com/csdog/mediax/releases) 下载，或打 `v*` 标签触发 GitHub Actions 构建。
 
 ### 内容平台
 
@@ -132,7 +132,7 @@
 
 ### 下载使用
 
-1. 打开 [Releases](https://github.com/csdog/media-post/releases)
+1. 打开 [Releases](https://github.com/csdog/mediax/releases)
 2. 按系统下载安装包并打开
 3. 在「账号管理」登录平台 → 「内容发布」创作 → 「发布记录」跟进状态
 
@@ -168,7 +168,7 @@ mise exec -- pnpm run test:packaged
 
 跨平台产物优先用 GitHub Actions（`.github/workflows/build.yml`）：打 `v*` 标签或手动触发。本机交叉打包可能受签名工具与原生模块限制。
 
-打包版通过 `electron-updater` 从 GitHub Releases（`csdog/media-post`）检查更新：启动约 15 秒后后台检查，设置 → 常规 → 更新可手动检查；下载完成后可「重启安装」。开发模式不检查。正式签名与公证仍待补齐。
+打包版通过 `electron-updater` 从 GitHub Releases（`csdog/mediax`）检查更新：启动约 15 秒后后台检查，设置 → 常规 → 更新可手动检查；下载完成后可「重启安装」。开发模式不检查。正式签名与公证仍待补齐。
 
 ## 使用流程
 
@@ -196,7 +196,7 @@ mise exec -- pnpm run test:packaged
 
 ### 仓库位置
 
-Git 与工具配置在本目录（GitHub 仓库根）。若本地还有外层 `media-post/` 容器目录，请进入本目录执行开发与打包命令。
+Git 与工具配置在本目录（GitHub 仓库根）。若本地还有外层 `mediax/` 容器目录，请进入本目录执行开发与打包命令。
 
 ### 工具链
 
@@ -243,7 +243,7 @@ mise exec -- pnpm run db:check
 | `MAIN_VITE_LOG_FILE_LEVEL`  | 文件日志等级                |
 | `MAIN_VITE_LOG_MAX_SIZE`    | 单文件轮转阈值，默认 5 MiB  |
 
-开发日志：`logs/main.log`。安装包日志：`<userData>/logs/main.log`（macOS 一般为 `~/Library/Application Support/media-post/logs/main.log`）。超过大小限制后滚动为 `main.YYYY-MM-DD.log`（同日多次滚动为 `main.YYYY-MM-DD.1.log`…）。不记录正文、Cookie、密码。
+开发日志：`logs/main.log`。安装包日志：`<userData>/logs/main.log`（macOS 一般为 `~/Library/Application Support/mediax/logs/main.log`）。超过大小限制后滚动为 `main.YYYY-MM-DD.log`（同日多次滚动为 `main.YYYY-MM-DD.1.log`…）。不记录正文、Cookie、密码。
 
 ### 桌面行为（macOS 等）
 
@@ -262,7 +262,7 @@ mise exec -- pnpm run db:check
 | 自动更新           | GitHub Releases 检查、设置页手动检查、头像上方更新入口 | ✅   |
 | 主题               | 跟随系统浅色 / 深色                                    | ✅   |
 | 登录时启动         | 系统登录后自动启动，可隐藏到菜单栏                     | ✅   |
-| 深度链接           | `media-post://compose` 等协议打开对应页面              | ✅   |
+| 深度链接           | `mediax://compose` 等协议打开对应页面                  | ✅   |
 | Dock / 任务栏      | 快捷菜单、发布进度、待处理角标与提醒                   | ✅   |
 | 通知与权限         | 开关、隐私、系统通知权限状态                           | ✅   |
 | 日志与诊断         | 查看 / 打开日志，导出本机诊断报告                      | ✅   |
@@ -274,7 +274,7 @@ mise exec -- pnpm run db:check
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=csdog/media-post&type=Date)](https://star-history.com/#csdog/media-post&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=csdog/mediax&type=Date)](https://star-history.com/#csdog/mediax&Date)
 
 ## License
 

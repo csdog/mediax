@@ -11,7 +11,7 @@ test(
   "Electron Chromium: target mapping, isolated persistent sessions, upload, reconnect",
   { timeout: 90000 },
   async () => {
-    const dir = await mkdtemp(join(tmpdir(), "media-post-cdp-"));
+    const dir = await mkdtemp(join(tmpdir(), "mediax-cdp-"));
     const server = createServer((req, res) => {
       res.setHeader("Content-Type", "text/html");
       res.end('<textarea></textarea><input type="file">');
@@ -21,16 +21,16 @@ test(
     try {
       for (const phase of ["first", "restart"]) {
         const result = join(dir, `${phase}.json`);
-        const binary = process.env.MEDIA_POST_PACKAGED
-          ? resolve("dist/mac-arm64/media-post.app/Contents/MacOS/media-post")
+        const binary = process.env.MEDIAX_PACKAGED
+          ? resolve("dist/mac-arm64/MediaX.app/Contents/MacOS/MediaX")
           : require("electron");
-        const args = process.env.MEDIA_POST_PACKAGED ? [] : [resolve("out/main/index.js")];
+        const args = process.env.MEDIAX_PACKAGED ? [] : [resolve("out/main/index.js")];
         const env = {
           ...process.env,
-          MEDIA_POST_USER_DATA: join(dir, "profile"),
-          MEDIA_POST_FIXTURE: base,
-          MEDIA_POST_RESULT: result,
-          MEDIA_POST_PHASE: phase,
+          MEDIAX_USER_DATA: join(dir, "profile"),
+          MEDIAX_FIXTURE: base,
+          MEDIAX_RESULT: result,
+          MEDIAX_PHASE: phase,
         };
         delete env.ELECTRON_RUN_AS_NODE;
         const child = spawn(binary, args, {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type {
   AccountInfo,
   ContentKind,
@@ -15,7 +16,8 @@ import type {
 import { useTabPreview } from "./useTabPreview";
 import { useAccountBrowserLayout } from "./useAccountBrowserLayout";
 import { usePublishSettings } from "./usePublishSettings";
-import { supportedKinds } from "../../shared/content";
+import { preferredPageForFiles, supportedKinds } from "../../shared/content";
+import { applyLocalFiles } from "@/lib/importLocalFiles";
 import { navigation } from "@/app/navigation";
 import { accountsOptions, historyOptions } from "@/app/queries";
 const emptyAccounts: AccountInfo[] = [];
@@ -217,6 +219,11 @@ export function useWorkspaceController() {
   useEffect(() => {
     if (!initialized) return;
     return window.desktop.onCommand?.((command) => {
+      if (command.action === "toast") {
+        toast(command.title, { description: command.body, duration: 7000 });
+        setNotice(`${command.title}：${command.body}`);
+        return;
+      }
       if (busy && command.action !== "navigate") return;
       if (command.action === "tab") {
         if (!settingsOpen && !accountDialogOpen && !publishDialogOpen)
@@ -241,6 +248,20 @@ export function useWorkspaceController() {
         void run(async () => {
           const text = await window.desktop.importMarkdown();
           if (text !== null) setBody(text);
+        });
+      } else if (command.action === "open-files") {
+        setSettingsOpen(false);
+        setActiveBrowser(null);
+        const nextPage = preferredPageForFiles(command.paths);
+        const nextKind = nextPage === "video" && contentKind !== "audio" ? "video" : contentKind;
+        setPage(nextPage);
+        if (nextKind !== contentKind) setContentKind(nextKind);
+        void run(async () => {
+          const result = await applyLocalFiles(command.paths, nextKind, images);
+          if (result.markdown != null) setBody(result.markdown);
+          setImages(result.images);
+          setNotice(result.notice);
+          requestAnimationFrame(() => document.getElementById("post-body")?.focus());
         });
       }
     });

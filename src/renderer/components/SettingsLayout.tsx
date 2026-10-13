@@ -1,5 +1,16 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Search, Settings, Keyboard, Bell, Database, ArrowLeft } from "lucide-react";
+import {
+  Search,
+  Settings,
+  Keyboard,
+  Bell,
+  Database,
+  ArrowLeft,
+  Palette,
+  Sun,
+  Moon,
+  Monitor,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -14,6 +25,13 @@ import { ProfileMark } from "@/components/ProfileMark";
 import { PanelErrorBoundary } from "@/components/PanelErrorBoundary";
 import type { UpdateStatus } from "../../shared/models";
 import type { NotificationSettings } from "../../shared/notificationSettings";
+import type { ThemePreference } from "../../shared/themePreference";
+import {
+  formatBytes,
+  storageCategoryMeta,
+  storageCleanupActions,
+  type StorageCleanupId,
+} from "../../shared/storageUsage";
 
 const categories = [
   {
@@ -21,7 +39,13 @@ const categories = [
     title: "常规",
     icon: Settings,
     keywords:
-      "菜单栏 窗口 主题 浅色 深色 深度链接 协议 Dock 角标 登录时启动 开机 快捷键 静默 发布 并行 网速 限速 名称 头像 个人资料 更新 版本",
+      "菜单栏 窗口 深度链接 协议 Dock 角标 登录时启动 开机 快捷键 静默 发布 并行 网速 限速 名称 头像 个人资料 更新 版本",
+  },
+  {
+    id: "appearance",
+    title: "外观",
+    icon: Palette,
+    keywords: "主题 模式 浅色 深色 跟随系统 外观",
   },
   {
     id: "notifications",
@@ -30,7 +54,18 @@ const categories = [
     keywords: "发布 任务 开关 隐私 权限 系统",
   },
   { id: "shortcuts", title: "键盘快捷键", icon: Keyboard, keywords: "全局 呼出 标签 编辑 重置" },
-  { id: "storage", title: "存储", icon: Database, keywords: "本地 数据 会话 日志 诊断 导出 故障" },
+  {
+    id: "storage",
+    title: "存储",
+    icon: Database,
+    keywords: "本地 数据 会话 日志 诊断 导出 故障 占用 容量 缓存 素材",
+  },
+];
+
+const themeModes: { id: ThemePreference; title: string; icon: typeof Sun }[] = [
+  { id: "light", title: "浅色", icon: Sun },
+  { id: "dark", title: "深色", icon: Moon },
+  { id: "system", title: "系统", icon: Monitor },
 ];
 function InfoRow({
   title,
@@ -139,22 +174,40 @@ export function SettingsLayout({
   onClearAvatar,
   updateStatus,
   updateBusy,
+  autoUpdateEnabled,
+  onAutoUpdateEnabled,
   onCheckForUpdates,
   onInstallUpdate,
+  keepAwakeWhilePublishing,
+  onKeepAwakeWhilePublishing,
   notificationSettings,
   onNotificationSettings,
   notificationPermission,
   onOpenNotificationSettings,
+  onTestNotification,
+  testNotificationBusy,
+  testNotificationMessage,
   diagnostics,
   diagnosticsLoading,
   diagnosticsMessage,
+  diagnosticsAutoRefresh,
+  onDiagnosticsAutoRefresh,
   onRefreshDiagnostics,
   onExportDiagnostics,
   diagnosticsExporting,
   onRevealLogFile,
+  storageUsage,
+  storageLoading,
+  storageClearingId,
+  storageMessage,
+  storageMessageError,
+  onRefreshStorage,
+  onClearStorage,
   openAtLogin,
   openAtLoginDetail,
   onOpenAtLogin,
+  themePreference,
+  onThemePreference,
 }: {
   children: ReactNode;
   onBack(): void;
@@ -172,29 +225,50 @@ export function SettingsLayout({
   onClearAvatar(): void;
   updateStatus: UpdateStatus;
   updateBusy: boolean;
+  autoUpdateEnabled: boolean;
+  onAutoUpdateEnabled(enabled: boolean): void;
   onCheckForUpdates(): void;
   onInstallUpdate(): void;
+  keepAwakeWhilePublishing: boolean;
+  onKeepAwakeWhilePublishing(enabled: boolean): void;
   notificationSettings: NotificationSettings;
   onNotificationSettings(patch: Partial<NotificationSettings>): void;
   notificationPermission: { supported: boolean; label: string; detail: string };
   onOpenNotificationSettings(): void;
+  onTestNotification(): void;
+  testNotificationBusy: boolean;
+  testNotificationMessage: string;
   diagnostics: {
     generatedAt: string;
     app: { version: string; packaged: boolean };
     runtime: { electron: string; platform: string; arch: string };
-    paths: { logFile: string };
+    paths: { logFile: string; userData?: string };
     counts: { accounts: number; tasks: number };
     logTail: string;
   } | null;
   diagnosticsLoading: boolean;
   diagnosticsMessage: string;
+  diagnosticsAutoRefresh: boolean;
+  onDiagnosticsAutoRefresh(enabled: boolean): void;
   onRefreshDiagnostics(): void;
   onExportDiagnostics(): void;
   diagnosticsExporting: boolean;
   onRevealLogFile(): void;
+  storageUsage: {
+    totalBytes: number;
+    categories: Array<{ id: string; label: string; bytes: number }>;
+  } | null;
+  storageLoading: boolean;
+  storageClearingId: StorageCleanupId | null;
+  storageMessage: string;
+  storageMessageError: boolean;
+  onRefreshStorage(): void;
+  onClearStorage(id: StorageCleanupId): void;
   openAtLogin: boolean;
   openAtLoginDetail: string | null;
   onOpenAtLogin(openAtLogin: boolean): void;
+  themePreference: ThemePreference;
+  onThemePreference(preference: ThemePreference): void;
 }) {
   const [category, setCategory] = useState("general");
   const [query, setQuery] = useState("");
@@ -265,20 +339,26 @@ export function SettingsLayout({
                 <div className="settings-section-box">
                   <InfoRow
                     title="在菜单栏中显示"
-                    description="关闭主窗口后，可通过菜单栏图标重新打开应用。"
+                    description="关闭主窗口后，仍在菜单栏保留图标；应用继续运行，发布任务不会中断。"
                     value="已启用"
                   />
-                  <InfoRow
-                    title="关闭窗口后隐藏"
-                    description="应用继续运行，正在执行的发布任务会继续处理。"
-                    value="已启用"
-                  />
+                  <div className="settings-row">
+                    <div>
+                      <h3>发布时保持唤醒</h3>
+                      <p>有发布任务进行中时，阻止系统休眠，避免上传中断。</p>
+                    </div>
+                    <Switch
+                      checked={keepAwakeWhilePublishing}
+                      onCheckedChange={(checked) => onKeepAwakeWhilePublishing(checked === true)}
+                      aria-label="发布时保持唤醒"
+                    />
+                  </div>
                   <div className="settings-row">
                     <div>
                       <h3>登录时启动</h3>
                       <p>
                         {openAtLoginDetail ??
-                          "系统登录后自动启动 media-post；从登录项启动时默认留在菜单栏。"}
+                          "系统登录后自动启动 MediaX；从登录项启动时默认留在菜单栏。"}
                       </p>
                     </div>
                     <Switch
@@ -288,15 +368,40 @@ export function SettingsLayout({
                     />
                   </div>
                   <InfoRow
-                    title="主题"
-                    description="跟随系统外观自动切换浅色 / 深色。"
-                    value="跟随系统"
-                  />
-                  <InfoRow
                     title="深度链接"
-                    description="可用 media-post://compose、history、settings 等打开对应页面。"
-                    value="media-post://"
+                    description="可用 mediax://compose、history、settings 等打开对应页面。"
+                    value="mediax://"
                   />
+                </div>
+              </section>
+            )}
+            {category === "appearance" && (
+              <section className="settings-section">
+                <h3>视觉风格</h3>
+                <div className="settings-section-box">
+                  <div className="settings-row">
+                    <div>
+                      <h3>模式</h3>
+                      <p>选择浅色、深色，或跟随系统外观自动切换。</p>
+                    </div>
+                    <div className="theme-mode-picker" role="radiogroup" aria-label="外观模式">
+                      {themeModes.map((mode) => (
+                        <button
+                          key={mode.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={themePreference === mode.id}
+                          aria-label={mode.title}
+                          className="theme-mode-option"
+                          data-active={themePreference === mode.id || undefined}
+                          onClick={() => onThemePreference(mode.id)}
+                        >
+                          <mode.icon className="size-4" aria-hidden />
+                          <span>{mode.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </section>
             )}
@@ -307,21 +412,10 @@ export function SettingsLayout({
                   <div className="settings-row">
                     <div>
                       <h3>当前版本</h3>
-                      <p>{updateStatus.message ?? "打包版会在启动后自动检查 GitHub Releases。"}</p>
-                    </div>
-                    <span className="settings-row-value">v{updateStatus.currentVersion}</span>
-                  </div>
-                  <div className="settings-row">
-                    <div>
-                      <h3>自动更新</h3>
-                      <p>
-                        {updateStatus.availableVersion
-                          ? `可用版本 v${updateStatus.availableVersion}`
-                          : "从 GitHub Releases 检查并下载更新。"}
-                        {updateStatus.progress != null ? ` · ${updateStatus.progress}%` : ""}
-                      </p>
+                      <p>{updateStatus.message ?? "打包版可从 GitHub Releases 检查更新。"}</p>
                     </div>
                     <div className="flex items-center gap-2">
+                      <span className="settings-row-value">v{updateStatus.currentVersion}</span>
                       {updateStatus.canInstall ? (
                         <Button
                           type="button"
@@ -342,6 +436,24 @@ export function SettingsLayout({
                         {updateBusy || updateStatus.state === "checking" ? "检查中…" : "检查更新"}
                       </Button>
                     </div>
+                  </div>
+                  <div className="settings-row">
+                    <div>
+                      <h3>自动更新</h3>
+                      <p>
+                        {updateStatus.availableVersion
+                          ? `可用版本 v${updateStatus.availableVersion}`
+                          : autoUpdateEnabled
+                            ? "启动后自动检查；发现新版本后自动下载。"
+                            : "已关闭：不会在启动时检查或自动下载，仍可手动检查更新。"}
+                        {updateStatus.progress != null ? ` · ${updateStatus.progress}%` : ""}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={autoUpdateEnabled}
+                      onCheckedChange={(checked) => onAutoUpdateEnabled(checked === true)}
+                      aria-label="自动更新"
+                    />
                   </div>
                 </div>
               </section>
@@ -414,12 +526,16 @@ export function SettingsLayout({
             {category === "notifications" && (
               <>
                 <section className="settings-section">
-                  <h3>任务通知</h3>
+                  <h3>通知</h3>
                   <div className="settings-section-box">
                     <div className="settings-row">
                       <div>
                         <h3>启用通知</h3>
-                        <p>关闭后不再发送发布相关系统通知。</p>
+                        <p>
+                          {notificationSettings.enabled
+                            ? "关闭后不再发送发布相关通知。"
+                            : "通知已关闭。开启后可使用下列选项；系统权限请在「系统设置」中确认。"}
+                        </p>
                       </div>
                       <Switch
                         checked={notificationSettings.enabled}
@@ -431,8 +547,8 @@ export function SettingsLayout({
                     </div>
                     <div className="settings-row">
                       <div>
-                        <h3>发布结果</h3>
-                        <p>任务完成或存在失败项时显示系统通知。</p>
+                        <h3>发布完成通知</h3>
+                        <p>任务完成、部分失败或无法确认结果时提醒你。</p>
                       </div>
                       <Switch
                         checked={notificationSettings.publishResult}
@@ -440,13 +556,13 @@ export function SettingsLayout({
                         onCheckedChange={(checked) =>
                           onNotificationSettings({ publishResult: checked === true })
                         }
-                        aria-label="发布结果通知"
+                        aria-label="发布完成通知"
                       />
                     </div>
                     <div className="settings-row">
                       <div>
-                        <h3>需要人工处理</h3>
-                        <p>需要登录或验证时通知你，点击通知可打开发布记录。</p>
+                        <h3>需要人工处理通知</h3>
+                        <p>需要登录或验证才能继续时显示提醒；点击可打开发布记录。</p>
                       </div>
                       <Switch
                         checked={notificationSettings.awaitingUser}
@@ -455,6 +571,20 @@ export function SettingsLayout({
                           onNotificationSettings({ awaitingUser: checked === true })
                         }
                         aria-label="需要人工处理通知"
+                      />
+                    </div>
+                    <div className="settings-row">
+                      <div>
+                        <h3>通知提示音</h3>
+                        <p>任务完成、需要人工处理时播放提示音。</p>
+                      </div>
+                      <Switch
+                        checked={notificationSettings.sound}
+                        disabled={!notificationSettings.enabled}
+                        onCheckedChange={(checked) =>
+                          onNotificationSettings({ sound: checked === true })
+                        }
+                        aria-label="通知提示音"
                       />
                     </div>
                     <div className="settings-row">
@@ -486,6 +616,15 @@ export function SettingsLayout({
                         <Button
                           type="button"
                           variant="outline"
+                          disabled={!notificationSettings.enabled || testNotificationBusy}
+                          onClick={onTestNotification}
+                          aria-label="发送测试通知"
+                        >
+                          {testNotificationBusy ? "发送中…" : "发送测试通知"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
                           onClick={onOpenNotificationSettings}
                           aria-label="打开系统通知设置"
                         >
@@ -494,56 +633,167 @@ export function SettingsLayout({
                       </div>
                     </div>
                   </div>
+                  {testNotificationMessage ? (
+                    <p className="settings-section-note" role="status">
+                      {testNotificationMessage}
+                    </p>
+                  ) : null}
                 </section>
               </>
             )}
             {category === "storage" && (
               <>
-                <section className="settings-section">
-                  <h3>本地数据</h3>
-                  <div className="settings-section-box">
-                    <InfoRow
-                      title="账号与发布记录"
-                      description="账号信息、草稿、设置和任务记录保存在本机。"
-                      value="SQLite"
-                    />
-                    <InfoRow
-                      title="浏览器会话"
-                      description="每个账号使用独立的持久化浏览器会话。"
-                      value="本地存储"
-                    />
-                    <InfoRow
-                      title="发布素材"
-                      description="创建任务时保存图片副本，供任务继续执行与结果核验。"
-                      value="本地存储"
-                    />
+                <section className="settings-section storage-panel">
+                  <h3 className="storage-panel-title">本机设备</h3>
+                  <p className="storage-panel-desc">
+                    管理保存在这台电脑上的账号数据、浏览器会话、发布素材与日志
+                  </p>
+                  <div className="storage-usage">
+                    <div className="storage-usage-summary">
+                      <p className="storage-usage-total">
+                        {storageUsage
+                          ? `${formatBytes(storageUsage.totalBytes)} 已被 MediaX 使用`
+                          : storageLoading
+                            ? "正在统计占用…"
+                            : "尚未统计占用"}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={storageLoading}
+                        onClick={onRefreshStorage}
+                        aria-label="刷新存储占用"
+                      >
+                        {storageLoading ? "统计中…" : "刷新"}
+                      </Button>
+                    </div>
+                    {storageUsage ? (
+                      <>
+                        <div
+                          className="storage-usage-bar"
+                          role="img"
+                          aria-label={`存储占用 ${formatBytes(storageUsage.totalBytes)}`}
+                        >
+                          {storageUsage.categories
+                            .filter((item) => item.bytes > 0)
+                            .map((item) => {
+                              const meta =
+                                storageCategoryMeta[item.id as keyof typeof storageCategoryMeta];
+                              const widthPercent =
+                                storageUsage.totalBytes > 0
+                                  ? (item.bytes / storageUsage.totalBytes) * 100
+                                  : 0;
+                              return (
+                                <span
+                                  key={item.id}
+                                  className="storage-usage-segment"
+                                  style={{
+                                    width: `${widthPercent}%`,
+                                    background: meta?.color ?? "#9aa3af",
+                                  }}
+                                  title={`${item.label} ${formatBytes(item.bytes)}`}
+                                />
+                              );
+                            })}
+                        </div>
+                        <ul className="storage-usage-legend">
+                          {storageUsage.categories.map((item) => {
+                            const meta =
+                              storageCategoryMeta[item.id as keyof typeof storageCategoryMeta];
+                            return (
+                              <li key={item.id}>
+                                <span className="storage-usage-legend-head">
+                                  <span
+                                    className="storage-usage-dot"
+                                    style={{ background: meta?.color ?? "#9aa3af" }}
+                                    aria-hidden
+                                  />
+                                  <span className="storage-usage-legend-label">{item.label}</span>
+                                </span>
+                                <span className="storage-usage-legend-size">
+                                  {formatBytes(item.bytes)}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </>
+                    ) : null}
+                    {storageMessage ? (
+                      <p
+                        className={
+                          storageMessageError
+                            ? "settings-section-note text-destructive"
+                            : "settings-section-note"
+                        }
+                        role={storageMessageError ? "alert" : "status"}
+                      >
+                        {storageMessage}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="settings-section-box storage-actions">
+                    {storageCleanupActions.map((action) => {
+                      const busy = storageClearingId === action.id;
+                      return (
+                        <div key={action.id} className="settings-row">
+                          <div>
+                            <h3 className={action.dangerous ? "text-destructive" : undefined}>
+                              {action.title}
+                            </h3>
+                            <p>{action.description}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant={action.dangerous ? "destructive" : "secondary"}
+                            size="sm"
+                            disabled={storageClearingId !== null || storageLoading}
+                            onClick={() => onClearStorage(action.id)}
+                            aria-label={action.button}
+                          >
+                            {busy ? "清理中…" : action.button}
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </section>
                 <section className="settings-section">
                   <h3>故障日志与诊断</h3>
                   <div className="settings-section-box">
-                    <InfoRow
-                      title="日志文件"
-                      description={diagnostics?.paths.logFile ?? "正在读取…"}
-                      value={diagnostics?.app.packaged ? "安装版" : "开发版"}
-                    />
+                    <div className="settings-row">
+                      <div>
+                        <h3>日志文件</h3>
+                        <p>{diagnostics?.paths.logFile ?? "正在读取…"}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="settings-row-value">
+                          {diagnostics?.app.packaged ? "安装版" : "开发版"}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={onRevealLogFile}
+                          aria-label="显示日志文件"
+                        >
+                          打开日志
+                        </Button>
+                      </div>
+                    </div>
                     <InfoRow
                       title="运行环境"
                       description={
                         diagnostics
-                          ? `v${diagnostics.app.version} · Electron ${diagnostics.runtime.electron} · ${diagnostics.runtime.platform}/${diagnostics.runtime.arch}`
+                          ? `Electron ${diagnostics.runtime.electron} · ${diagnostics.runtime.platform}/${diagnostics.runtime.arch}`
                           : "正在读取…"
                       }
-                      value={
-                        diagnostics
-                          ? `${diagnostics.counts.accounts} 账号 / ${diagnostics.counts.tasks} 任务`
-                          : "—"
-                      }
+                      value={diagnostics ? `v${diagnostics.app.version}` : "—"}
                     />
                     <div className="settings-row">
                       <div>
                         <h3>诊断操作</h3>
-                        <p>导出不含正文与 Cookie 的诊断报告，或在文件管理器中打开日志。</p>
+                        <p>刷新诊断摘要，或导出不含正文与 Cookie 的诊断报告。</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
@@ -557,14 +807,6 @@ export function SettingsLayout({
                         </Button>
                         <Button
                           type="button"
-                          variant="outline"
-                          onClick={onRevealLogFile}
-                          aria-label="显示日志文件"
-                        >
-                          打开日志
-                        </Button>
-                        <Button
-                          type="button"
                           disabled={diagnosticsExporting}
                           onClick={onExportDiagnostics}
                           aria-label="导出诊断信息"
@@ -572,6 +814,17 @@ export function SettingsLayout({
                           {diagnosticsExporting ? "导出中…" : "导出诊断"}
                         </Button>
                       </div>
+                    </div>
+                    <div className="settings-row">
+                      <div>
+                        <h3>自动刷新</h3>
+                        <p>开启后约每 3 秒刷新日志末尾与诊断摘要；离开本页或关闭开关即停止。</p>
+                      </div>
+                      <Switch
+                        checked={diagnosticsAutoRefresh}
+                        onCheckedChange={(checked) => onDiagnosticsAutoRefresh(checked === true)}
+                        aria-label="自动刷新诊断信息"
+                      />
                     </div>
                   </div>
                   {diagnosticsMessage ? (

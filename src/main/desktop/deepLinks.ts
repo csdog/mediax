@@ -8,22 +8,22 @@ const pages = new Set<DesktopPage>(["accounts", "compose", "video", "history"]);
 export function registerDeepLinkProtocol() {
   if (process.defaultApp) {
     if (process.argv.length >= 2)
-      app.setAsDefaultProtocolClient("media-post", process.execPath, [resolve(process.argv[1])]);
+      app.setAsDefaultProtocolClient("mediax", process.execPath, [resolve(process.argv[1])]);
     return;
   }
-  app.setAsDefaultProtocolClient("media-post");
+  app.setAsDefaultProtocolClient("mediax");
 }
 
 export function findDeepLinkArg(argv: readonly string[]) {
-  return argv.find((arg) => /^media-post:\/\//i.test(arg));
+  return argv.find((arg) => /^mediax:\/\//i.test(arg));
 }
 
 /**
  * Accepted forms:
- * - media-post://compose
- * - media-post://history/<taskId>
- * - media-post://history?taskId=<id>
- * - media-post://settings
+ * - mediax://compose
+ * - mediax://history/<taskId>
+ * - mediax://history?taskId=<id>
+ * - mediax://settings
  */
 export function parseDeepLink(raw: string): DesktopCommand | null {
   let url: URL;
@@ -32,7 +32,7 @@ export function parseDeepLink(raw: string): DesktopCommand | null {
   } catch {
     return null;
   }
-  if (url.protocol !== "media-post:") return null;
+  if (url.protocol !== "mediax:") return null;
   const parts = [url.hostname, ...url.pathname.split("/")]
     .map((part) => part.trim())
     .filter(Boolean);

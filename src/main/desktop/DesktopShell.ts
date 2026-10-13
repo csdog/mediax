@@ -1,12 +1,4 @@
-import {
-  app,
-  BrowserWindow,
-  globalShortcut,
-  Menu,
-  nativeImage,
-  Notification,
-  Tray,
-} from "electron";
+import { app, BrowserWindow, globalShortcut, Menu, nativeImage, Tray } from "electron";
 import { join } from "node:path";
 import type { Database } from "../storage/Database";
 import type { DesktopCommand, DesktopPage, ShortcutSettings } from "../../shared/models";
@@ -18,9 +10,14 @@ import {
   shortcutEntry,
 } from "../../shared/shortcutCatalog";
 import { findDeepLinkArg, parseDeepLink } from "./deepLinks";
+import { findOpenFileArgs, openFilesCommand } from "./openFiles";
 import { tabShortcut } from "./tabShortcuts";
 import { TaskDockStatus } from "./TaskDockStatus";
 import { TaskNotifications } from "./TaskNotifications";
+import { TaskPowerSave } from "./TaskPowerSave";
+import { presentNotification } from "./presentNotification";
+import { readNotificationSettings } from "../../shared/notificationSettings";
+import { readDesktopBehavior } from "../../shared/desktopBehavior";
 
 export class DesktopShell {
   private tray: Tray;
@@ -31,9 +28,9 @@ export class DesktopShell {
   private rendererIsReady = false;
   private pending: DesktopCommand[] = [];
   private stateTimer?: ReturnType<typeof setTimeout>;
-  private notifications = new Set<Notification>();
   private taskNotifications: TaskNotifications;
   private taskDockStatus: TaskDockStatus;
+  private taskPowerSave: TaskPowerSave;
   constructor(
     private window: BrowserWindow,
     private db: Database,
@@ -43,7 +40,7 @@ export class DesktopShell {
     const source = nativeImage.createFromPath(iconPath);
     if (source.isEmpty()) throw new Error("菜单栏图标加载失败");
     this.tray = new Tray(menuBarIcon(source));
-    this.tray.setToolTip("media-post · 本地发布工具");
+    this.tray.setToolTip("MediaX · 本地发布工具");
     this.tray.setContextMenu(Menu.buildFromTemplate(this.quickActions(true)));
     this.tray.on("double-click", () => this.show());
     if (process.platform === "darwin") {
@@ -92,7 +89,12 @@ export class DesktopShell {
     app.on("activate", () => this.show());
     app.on("second-instance", (_event, argv) => {
       const link = findDeepLinkArg(argv);
-      if (link) this.handleDeepLink(link);
+      if (link) {
+        this.handleDeepLink(link);
+        return;
+      }
+      const files = findOpenFileArgs(argv);
+      if (files.length) this.handleOpenFiles(files);
       else this.show();
     });
     app.on("before-quit", () => {
@@ -101,20 +103,20 @@ export class DesktopShell {
       clearTimeout(this.stateTimer);
     });
     this.taskNotifications = new TaskNotifications(db, (notice) => {
-      if (!Notification.isSupported()) return;
-      const notification = new Notification({ title: notice.title, body: notice.body });
-      this.notifications.add(notification);
-      notification.on("click", () =>
-        this.dispatch({ action: "navigate", page: "history", taskId: notice.taskId }),
-      );
-      notification.on("close", () => this.notifications.delete(notification));
-      notification.on("failed", (_event, error) => {
-        console.warn("系统通知未送达:", error);
-        this.notifications.delete(notification);
+      const prefs = readNotificationSettings((key) => this.db.setting(key));
+      void presentNotification(this.window, {
+        title: notice.title,
+        body: notice.body,
+        silent: !prefs.sound,
+        onClick: () =>
+          this.dispatch({ action: "navigate", page: "history", taskId: notice.taskId }),
       });
-      notification.show();
     });
     this.taskDockStatus = new TaskDockStatus(db, window);
+    this.taskPowerSave = new TaskPowerSave(
+      db,
+      () => readDesktopBehavior((key) => this.db.setting(key)).keepAwakeWhilePublishing,
+    );
     app.once("will-quit", () => {
       if (this.globalRegistered) {
         const current = normalizeAccelerator(this.shortcuts["global-show"] ?? "");
@@ -122,12 +124,20 @@ export class DesktopShell {
       }
       this.taskNotifications.dispose();
       this.taskDockStatus.dispose();
-      for (const n of this.notifications) n.close();
+      this.taskPowerSave.dispose();
       this.tray.destroy();
     });
   }
+  syncPowerSave() {
+    this.taskPowerSave.sync();
+  }
   handleDeepLink(raw: string) {
     const command = parseDeepLink(raw);
+    if (command) this.dispatch(command);
+    else this.show();
+  }
+  handleOpenFiles(paths: string[]) {
+    const command = openFilesCommand(paths);
     if (command) this.dispatch(command);
     else this.show();
   }
@@ -245,11 +255,11 @@ export class DesktopShell {
   rendererReady() {
     this.rendererIsReady = true;
     for (const command of this.pending.splice(0))
-      this.window.webContents.send("media-post:command", command);
+      this.window.webContents.send("mediax:command", command);
   }
   private dispatch(command: DesktopCommand) {
     this.show();
-    if (this.rendererIsReady) this.window.webContents.send("media-post:command", command);
+    if (this.rendererIsReady) this.window.webContents.send("mediax:command", command);
     else this.pending.push(command);
   }
   private navigate(page: DesktopPage) {
@@ -265,7 +275,7 @@ export class DesktopShell {
       { type: "separator" },
       { label: "设置…", click: () => this.dispatch({ action: "settings" }) },
       ...(includeQuit
-        ? [{ type: "separator" as const }, { label: "退出 media-post", click: () => app.quit() }]
+        ? [{ type: "separator" as const }, { label: "退出 MediaX", click: () => app.quit() }]
         : []),
     ];
   }
@@ -283,7 +293,7 @@ export class DesktopShell {
         ...(process.platform === "darwin"
           ? [
               {
-                label: "media-post",
+                label: "MediaX",
                 submenu: [
                   { role: "about" as const },
                   {
@@ -298,7 +308,7 @@ export class DesktopShell {
                   { role: "hideOthers" as const },
                   { role: "unhide" as const },
                   { type: "separator" as const },
-                  { role: "quit" as const, label: "退出 media-post" },
+                  { role: "quit" as const, label: "退出 MediaX" },
                 ],
               },
             ]

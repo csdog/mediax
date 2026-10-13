@@ -1,8 +1,7 @@
 import { nativeTheme, type BrowserWindow } from "electron";
 
-/** Follow the OS appearance so native chrome matches renderer light/dark tokens. */
+/** Keep native chrome colors in sync with the active light/dark appearance. */
 export function installWindowBackdrop(window: BrowserWindow) {
-  nativeTheme.themeSource = "system";
   const update = () => {
     if (window.isDestroyed()) return;
     const dark = nativeTheme.shouldUseDarkColors;

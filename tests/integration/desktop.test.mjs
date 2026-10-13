@@ -12,14 +12,14 @@ test(
   "desktop: hide/reopen, native menus, single instance, draft command and window restoration",
   { timeout: 90000 },
   async () => {
-    const dir = await mkdtemp(join(tmpdir(), "media-post-desktop-"));
-    const env = { ...process.env, MEDIA_POST_USER_DATA: dir };
+    const dir = await mkdtemp(join(tmpdir(), "mediax-desktop-"));
+    const env = { ...process.env, MEDIAX_USER_DATA: dir };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.ELECTRON_RENDERER_URL;
-    const executablePath = process.env.MEDIA_POST_PACKAGED
-      ? resolve("dist/mac-arm64/media-post.app/Contents/MacOS/media-post")
+    const executablePath = process.env.MEDIAX_PACKAGED
+      ? resolve("dist/mac-arm64/MediaX.app/Contents/MacOS/MediaX")
       : require("electron");
-    const args = process.env.MEDIA_POST_PACKAGED ? [] : [resolve("out/main/index.js")];
+    const args = process.env.MEDIAX_PACKAGED ? [] : [resolve("out/main/index.js")];
     let application;
     try {
       application = await electron.launch({ executablePath, args, env });
@@ -207,7 +207,7 @@ test(
         { id: account.id, box: previewBox },
       );
       await page.screenshot({
-        path: join(tmpdir(), "media-post-tab-hover.png"),
+        path: join(tmpdir(), "mediax-tab-hover.png"),
         animations: "disabled",
       });
       await page.mouse.move(20, 100);
@@ -216,12 +216,12 @@ test(
         (await BrowserWindow.getAllWindows()[0].capturePage()).toDataURL(),
       );
       await writeFile(
-        join(tmpdir(), "media-post-browser-tab.png"),
+        join(tmpdir(), "mediax-browser-tab.png"),
         Buffer.from(capture.split(",")[1], "base64"),
       );
       assert.equal(browserState.body, "Local account browser fixture");
       await writeFile(
-        join(tmpdir(), "media-post-browser-content.png"),
+        join(tmpdir(), "mediax-browser-content.png"),
         Buffer.from(browserState.capture.split(",")[1], "base64"),
       );
       assert.equal(browserState.windows, 1);

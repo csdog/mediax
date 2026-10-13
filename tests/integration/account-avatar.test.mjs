@@ -11,8 +11,8 @@ const png =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==";
 
 test("account avatar is downloaded into a local image", { timeout: 60000 }, async () => {
-  const dir = await mkdtemp(join(tmpdir(), "media-post-avatar-"));
-  const env = { ...process.env, MEDIA_POST_USER_DATA: dir };
+  const dir = await mkdtemp(join(tmpdir(), "mediax-avatar-"));
+  const env = { ...process.env, MEDIAX_USER_DATA: dir };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.ELECTRON_RENDERER_URL;
   const application = await electron.launch({

@@ -14,7 +14,18 @@ export default defineConfig(({ mode }) => {
     .default(5186)
     .parse(env.MAIN_VITE_DEV_SERVER_PORT);
   return {
-    main: { envDir, plugins: [externalizeDepsPlugin()] },
+    main: {
+      envDir,
+      plugins: [externalizeDepsPlugin()],
+      build: {
+        rollupOptions: {
+          input: {
+            index: resolve("src/main/index.ts"),
+            mediaImportWorker: resolve("src/main/workers/mediaImportWorker.ts"),
+          },
+        },
+      },
+    },
     // Sandboxed preloads cannot require npm packages; bundle the logging bridge.
     preload: { envDir, plugins: [externalizeDepsPlugin({ exclude: ["electron-log"] })] },
     renderer: {

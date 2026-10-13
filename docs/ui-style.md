@@ -1,4 +1,4 @@
-# media-post UI 规范
+# mediax UI 规范
 
 布局、字体和圆角以用户确认的 Codex 截图规范为准；配色按 2026-10-12 实际读取的 ChatGPT 网页浅色样式调整。界面使用 shadcn/ui，图标仅使用 Lucide，样式集中在 src/renderer/style.css 的语义 Token 中。
 

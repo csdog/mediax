@@ -9,7 +9,7 @@ const directories: string[] = [];
 const draftImages = [{ path: "/tmp/中文.png", name: "中文.png" }];
 const windowState = { x: 100, y: 100, width: 1100, height: 740, maximized: false };
 function temporaryDatabase() {
-  const directory = mkdtempSync(join(tmpdir(), "media-post-drizzle-"));
+  const directory = mkdtempSync(join(tmpdir(), "mediax-drizzle-"));
   directories.push(directory);
   return { directory, file: join(directory, "app.sqlite") };
 }

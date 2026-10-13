@@ -11,18 +11,18 @@ test(
   "packaged UI + SQLite: account and draft survive restart without Facebook requests",
   { timeout: 60000 },
   async () => {
-    const dir = await mkdtemp(join(tmpdir(), "media-post-ui-"));
+    const dir = await mkdtemp(join(tmpdir(), "mediax-ui-"));
     try {
       for (const phase of ["first", "restart"]) {
-        const env = { ...process.env, MEDIA_POST_USER_DATA: dir };
+        const env = { ...process.env, MEDIAX_USER_DATA: dir };
         delete env.ELECTRON_RUN_AS_NODE;
         delete env.ELECTRON_RENDERER_URL;
-        const binary = process.env.MEDIA_POST_PACKAGED
-          ? resolve("dist/mac-arm64/media-post.app/Contents/MacOS/media-post")
+        const binary = process.env.MEDIAX_PACKAGED
+          ? resolve("dist/mac-arm64/MediaX.app/Contents/MacOS/MediaX")
           : require("electron");
         const child = spawn(
           binary,
-          process.env.MEDIA_POST_PACKAGED ? [] : [resolve("out/main/index.js")],
+          process.env.MEDIAX_PACKAGED ? [] : [resolve("out/main/index.js")],
           { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] },
         );
         let output = "",
@@ -71,7 +71,7 @@ test(
           }
           await page.getByRole("heading", { name: "UI persistence test" }).waitFor();
           await page.screenshot({
-            path: join(tmpdir(), "media-post-accounts.png"),
+            path: join(tmpdir(), "mediax-accounts.png"),
             animations: "disabled",
           });
           await page.getByRole("button", { name: "内容发布", exact: true }).click();
@@ -87,14 +87,14 @@ test(
           await page.mouse.move(700, 250);
           await page.getByRole("tooltip").waitFor({ state: "hidden" });
           await page.screenshot({
-            path: join(tmpdir(), "media-post-compose.png"),
+            path: join(tmpdir(), "mediax-compose.png"),
             animations: "disabled",
           });
           await page.getByRole("button", { name: "发布记录", exact: true }).click();
           await page.getByRole("heading", { name: "发布记录", exact: true }).waitFor();
           await page.mouse.move(700, 250);
           await page.screenshot({
-            path: join(tmpdir(), "media-post-history.png"),
+            path: join(tmpdir(), "mediax-history.png"),
             animations: "disabled",
           });
           if (phase === "first") {

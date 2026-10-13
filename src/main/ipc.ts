@@ -9,6 +9,7 @@ import { AccountService } from "./accounts/AccountService";
 import { markdownToText } from "./content/markdown";
 import { coverDataUrl } from "./content/cover";
 import { isAudio, isImage, isVideo } from "../shared/content";
+import { mediaImportHost } from "./content/mediaImportHost";
 import {
   isPlatform,
   type ContentKind,
@@ -26,6 +27,12 @@ import {
   readNotificationSettings,
   type NotificationSettings,
 } from "../shared/notificationSettings";
+import {
+  mergeDesktopBehavior,
+  readDesktopBehavior,
+  type DesktopBehavior,
+} from "../shared/desktopBehavior";
+import { readAutoUpdateEnabled } from "../shared/autoUpdateSettings";
 import type { DesktopShell } from "./desktop/DesktopShell";
 import type { AppUpdater } from "./desktop/AppUpdater";
 import { TabPreviewWindow } from "./desktop/TabPreviewWindow";
@@ -35,7 +42,12 @@ import {
   notificationPermissionStatus,
   openNotificationSettings,
   revealLogFile,
+  sendTestNotification,
 } from "./desktop/diagnostics";
+import { clearStorageCategory, collectStorageUsage } from "./desktop/storageUsage";
+import { isStorageCleanupId, storageCleanupActions } from "../shared/storageUsage";
+import { readThemePreference, saveThemePreference } from "./desktop/themePreference";
+import { parseThemePreference } from "../shared/themePreference";
 import { getOpenAtLogin, setOpenAtLogin } from "./desktop/loginItem";
 
 function savePublishSettings(
@@ -81,7 +93,7 @@ export function registerIpc(
     return value;
   };
   const on = (name: string, fn: (...args: any[]) => unknown) =>
-    ipcMain.handle(`media-post:${name}`, async (event, ...args) => {
+    ipcMain.handle(`mediax:${name}`, async (event, ...args) => {
       if (
         event.sender !== window.webContents ||
         event.senderFrame !== window.webContents.mainFrame
@@ -162,11 +174,66 @@ export function registerIpc(
     db.setSetting("notifyPublishResult", next.publishResult);
     db.setSetting("notifyAwaitingUser", next.awaitingUser);
     db.setSetting("notificationPrivacy", next.privacy);
+    db.setSetting("notificationSound", next.sound);
     return next;
   });
   on("notificationPermission", () => notificationPermissionStatus());
   on("openNotificationSettings", () => openNotificationSettings());
+  on("testNotification", () => sendTestNotification(window, (key) => db.setting(key)));
+  on("themePreference", () => readThemePreference((key) => db.setting(key)));
+  on("setThemePreference", (value) => {
+    const next = parseThemePreference(value);
+    if (value !== next) throw new Error("无效主题设置");
+    return saveThemePreference((key, stored) => db.setSetting(key, stored), next);
+  });
+  on("desktopBehavior", () => readDesktopBehavior((key) => db.setting(key)));
+  on("setDesktopBehavior", (value) => {
+    if (!value || typeof value !== "object") throw new Error("无效桌面行为设置");
+    const next = mergeDesktopBehavior(
+      readDesktopBehavior((key) => db.setting(key)),
+      value as Partial<DesktopBehavior>,
+    );
+    db.setSetting("keepAwakeWhilePublishing", next.keepAwakeWhilePublishing);
+    shell.syncPowerSave();
+    return next;
+  });
+  on("autoUpdateEnabled", () => readAutoUpdateEnabled((key) => db.setting(key)));
+  on("setAutoUpdateEnabled", (value) => {
+    if (typeof value !== "boolean") throw new Error("无效自动更新设置");
+    return updater.setAutoUpdateEnabled(value);
+  });
   on("diagnostics", () => buildDiagnosticReport(db));
+  on("storageUsage", (force?: boolean) => collectStorageUsage(force === true));
+  on("clearStorage", async (id?: unknown) => {
+    if (!isStorageCleanupId(id)) throw new Error("无效清理类型");
+    const action = storageCleanupActions.find((item) => item.id === id);
+    if (!action) throw new Error("无效清理类型");
+    const iconPath = join(
+      app.isPackaged ? process.resourcesPath : join(__dirname, "../../build"),
+      "icon.png",
+    );
+    const icon = nativeImage.createFromPath(iconPath);
+    const { response } = await dialog.showMessageBox(window, {
+      type: action.dangerous ? "warning" : "question",
+      buttons: ["取消", action.button],
+      defaultId: action.dangerous ? 0 : 1,
+      cancelId: 0,
+      title: action.title,
+      message: action.title,
+      detail: action.confirm,
+      ...(icon.isEmpty() ? {} : { icon }),
+    });
+    if (response !== 1) return null;
+    if (id === "assets") {
+      const busy = db
+        .targets()
+        .some((target) => ["pending", "running", "awaiting_user"].includes(target.status));
+      if (busy) throw new Error("有发布任务进行中，请稍后再清理素材");
+    }
+    if (id === "sessions")
+      return clearStorageCategory(id, () => accounts.clearAllBrowserSessions());
+    return clearStorageCategory(id);
+  });
   on("exportDiagnostics", () => exportDiagnosticReport(window, db));
   on("revealLogFile", () => revealLogFile());
   on("openAtLogin", () => getOpenAtLogin());
@@ -246,22 +313,18 @@ export function registerIpc(
     });
     if (result.canceled) return [];
     if (kind === "article" && result.filePaths.length > 1) throw new Error("文章只能带一张封面");
-    const assets: ImageAsset[] = [];
-    for (const path of result.filePaths) {
-      const data = await readFile(path);
-      if (data.length > 20 * 1024 * 1024) throw new Error("素材限制为 20MB，请压缩后选择");
-      if (!acceptsFile(kind, path)) throw new Error("所选文件与当前内容类型不符");
-      const media = isVideo(path) || isAudio(path);
-      const mime = imageMime(path);
-      const asset = {
-        path,
-        name: basename(path),
-        preview: media ? "" : `data:${mime};base64,${data.toString("base64")}`,
-      };
-      images.set(path, asset);
-      assets.push(asset);
-    }
-    return assets;
+    const imported = await mediaImportHost().import(result.filePaths, kind ?? "moment", images);
+    if (!imported.assets.length && imported.warnings.length) throw new Error(imported.warnings[0]);
+    return imported.assets;
+  });
+  on("importLocalFiles", async (paths, kind) => {
+    if (!isContentKind(kind)) throw new Error("无效内容类型");
+    if (!Array.isArray(paths) || !paths.every((path) => typeof path === "string"))
+      throw new Error("无效文件路径");
+    return mediaImportHost().import(paths, kind, images);
+  });
+  on("revealInFolder", (path) => {
+    electronShell.showItemInFolder(text(path));
   });
   on("saveDraft", (body, assets, kind, title) => {
     if (!isContentKind(kind)) throw new Error("无效内容类型");
@@ -396,11 +459,4 @@ function fileFilters(kind?: ContentKind) {
       extensions: ["png", "jpg", "jpeg", "webp", "mp4", "mov", "m4v", "webm"],
     },
   ];
-}
-
-function acceptsFile(kind: ContentKind | undefined, path: string) {
-  if (kind === "video") return isVideo(path);
-  if (kind === "audio") return isAudio(path);
-  if (kind === "article" || kind === "moment") return isImage(path);
-  return isImage(path) || isVideo(path);
 }

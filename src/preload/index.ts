@@ -1,8 +1,8 @@
 import "electron-log/preload";
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { DesktopApi, DesktopCommand } from "../shared/models";
 const call = (method: string, ...args: unknown[]) =>
-  ipcRenderer.invoke(`media-post:${method}`, ...args);
+  ipcRenderer.invoke(`mediax:${method}`, ...args);
 const api: DesktopApi = {
   workspaceSession: () => call("workspaceSession"),
   saveWorkspaceSession: (session) => call("saveWorkspaceSession", session),
@@ -18,12 +18,16 @@ const api: DesktopApi = {
   updateStatus: () => call("updateStatus"),
   checkForUpdates: () => call("checkForUpdates"),
   installUpdate: () => call("installUpdate"),
+  autoUpdateEnabled: () => call("autoUpdateEnabled"),
+  setAutoUpdateEnabled: (enabled) => call("setAutoUpdateEnabled", enabled),
+  desktopBehavior: () => call("desktopBehavior"),
+  setDesktopBehavior: (settings) => call("setDesktopBehavior", settings),
   onUpdateStatus: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, status: Parameters<typeof listener>[0]) =>
       listener(status);
-    ipcRenderer.on("media-post:update-status", receive);
+    ipcRenderer.on("mediax:update-status", receive);
     return () => {
-      ipcRenderer.removeListener("media-post:update-status", receive);
+      ipcRenderer.removeListener("mediax:update-status", receive);
     };
   },
   publishSettings: () => call("publishSettings"),
@@ -36,7 +40,12 @@ const api: DesktopApi = {
   setNotificationSettings: (settings) => call("setNotificationSettings", settings),
   notificationPermission: () => call("notificationPermission"),
   openNotificationSettings: () => call("openNotificationSettings"),
+  testNotification: () => call("testNotification"),
+  themePreference: () => call("themePreference"),
+  setThemePreference: (preference) => call("setThemePreference", preference),
   diagnostics: () => call("diagnostics"),
+  storageUsage: (force) => call("storageUsage", force),
+  clearStorage: (id) => call("clearStorage", id),
   exportDiagnostics: () => call("exportDiagnostics"),
   revealLogFile: () => call("revealLogFile"),
   openAtLogin: () => call("openAtLogin"),
@@ -44,10 +53,10 @@ const api: DesktopApi = {
   onCommand: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, command: DesktopCommand) =>
       listener(command);
-    ipcRenderer.on("media-post:command", receive);
+    ipcRenderer.on("mediax:command", receive);
     void call("rendererReady");
     return () => {
-      ipcRenderer.removeListener("media-post:command", receive);
+      ipcRenderer.removeListener("mediax:command", receive);
     };
   },
   accounts: () => call("accounts"),
@@ -57,6 +66,9 @@ const api: DesktopApi = {
   deleteAccount: (id) => call("deleteAccount", id),
   importMarkdown: () => call("importMarkdown"),
   chooseImages: (kind) => call("chooseImages", kind),
+  importLocalFiles: (paths, kind) => call("importLocalFiles", paths, kind),
+  revealInFolder: (path) => call("revealInFolder", path),
+  pathForFile: (file) => webUtils.getPathForFile(file),
   saveDraft: (b, i, kind, title) => call("saveDraft", b, i, kind, title),
   loadDraft: () => call("loadDraft"),
   publish: (kind, title, b, i, t) => call("publish", kind, title, b, i, t),

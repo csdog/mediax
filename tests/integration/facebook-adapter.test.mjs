@@ -35,17 +35,17 @@ test(
   "real Electron CDP publishing: profile/Page, snapshot, wrong identity, login pause, unknown verification and no duplicate",
   { timeout: 90000 },
   async () => {
-    const dir = await mkdtemp(join(tmpdir(), "media-post-publish-"));
+    const dir = await mkdtemp(join(tmpdir(), "mediax-publish-"));
     let app;
     try {
-      const env = { ...process.env, MEDIA_POST_USER_DATA: dir };
+      const env = { ...process.env, MEDIAX_USER_DATA: dir };
       delete env.ELECTRON_RUN_AS_NODE;
       delete env.ELECTRON_RENDERER_URL;
       app = await electron.launch({
-        executablePath: process.env.MEDIA_POST_PACKAGED
-          ? resolve("dist/mac-arm64/media-post.app/Contents/MacOS/media-post")
+        executablePath: process.env.MEDIAX_PACKAGED
+          ? resolve("dist/mac-arm64/MediaX.app/Contents/MacOS/MediaX")
           : require("electron"),
-        args: process.env.MEDIA_POST_PACKAGED ? [] : [resolve("out/main/index.js")],
+        args: process.env.MEDIAX_PACKAGED ? [] : [resolve("out/main/index.js")],
         env,
       });
       let ui;
@@ -179,7 +179,7 @@ test(
         async ({ app }, { targetId, packageFile }) => {
           const { createRequire } = process.getBuiltinModule("node:module");
           const DB = createRequire(packageFile)("better-sqlite3");
-          const db = new DB(app.getPath("userData") + "/media-post.sqlite");
+          const db = new DB(app.getPath("userData") + "/mediax.sqlite");
           db.prepare("UPDATE targets SET status='unknown',url=NULL WHERE id=?").run(targetId);
           db.close();
         },
@@ -292,17 +292,17 @@ test(
   "identity discovery ignores Create Page and restores the original profile",
   { timeout: 45000 },
   async () => {
-    const dir = await mkdtemp(join(tmpdir(), "media-post-identities-"));
+    const dir = await mkdtemp(join(tmpdir(), "mediax-identities-"));
     let app;
     try {
-      const env = { ...process.env, MEDIA_POST_USER_DATA: dir };
+      const env = { ...process.env, MEDIAX_USER_DATA: dir };
       delete env.ELECTRON_RUN_AS_NODE;
       delete env.ELECTRON_RENDERER_URL;
       app = await electron.launch({
-        executablePath: process.env.MEDIA_POST_PACKAGED
-          ? resolve("dist/mac-arm64/media-post.app/Contents/MacOS/media-post")
+        executablePath: process.env.MEDIAX_PACKAGED
+          ? resolve("dist/mac-arm64/MediaX.app/Contents/MacOS/MediaX")
           : require("electron"),
-        args: process.env.MEDIA_POST_PACKAGED ? [] : [resolve("out/main/index.js")],
+        args: process.env.MEDIAX_PACKAGED ? [] : [resolve("out/main/index.js")],
         env,
       });
       const ui = await app.firstWindow();

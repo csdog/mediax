@@ -108,6 +108,9 @@ export class AccountBrowserManager {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
+        spellcheck: false,
+        // Same as workbench: force V8 code cache for account web UIs.
+        v8CacheOptions: "bypassHeatCheck",
       },
     });
     // Native views draw above the renderer, so CSS overflow cannot clip their corners.

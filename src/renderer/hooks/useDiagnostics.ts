@@ -2,13 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 const key = ["desktop", "diagnostics"] as const;
+const autoRefreshMs = 3_000;
 
 export function useDiagnostics() {
   const client = useQueryClient();
   const [message, setMessage] = useState("");
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const report = useQuery({
     queryKey: key,
     queryFn: () => window.desktop.diagnostics(),
+    refetchInterval: autoRefresh ? autoRefreshMs : false,
+    refetchIntervalInBackground: false,
   });
   const exporting = useMutation({
     mutationFn: () => window.desktop.exportDiagnostics(),
@@ -21,8 +25,10 @@ export function useDiagnostics() {
   });
   return {
     report: report.data ?? null,
-    loading: report.isLoading,
+    loading: report.isFetching,
     message,
+    autoRefresh,
+    setAutoRefresh,
     refresh: () => {
       setMessage("");
       void client.invalidateQueries({ queryKey: key });
