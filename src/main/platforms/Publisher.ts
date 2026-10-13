@@ -5,4 +5,5 @@ export interface Publisher {
   prepare(task: Task, target: TaskTarget): Promise<void>;
   submit(task: Task, target: TaskTarget, markSubmitted: () => void): Promise<void>;
   verify(task: Task, target: TaskTarget): Promise<string | null>;
+  verifyExisting(task: Task, target: TaskTarget, suppliedUrl?: string): Promise<string | null>;
 }

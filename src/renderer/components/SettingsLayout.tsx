@@ -1,11 +1,17 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Search, Settings, Keyboard, Bell, Database, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { ProfileMark } from "@/components/ProfileMark";
 
 const categories = [
-  { id: "general", title: "常规", icon: Settings, keywords: "菜单栏 窗口 快捷键 静默 发布" },
+  {
+    id: "general",
+    title: "常规",
+    icon: Settings,
+    keywords: "菜单栏 窗口 快捷键 静默 发布 名称 头像 个人资料",
+  },
   { id: "notifications", title: "通知", icon: Bell, keywords: "发布 任务" },
   { id: "shortcuts", title: "键盘快捷键", icon: Keyboard, keywords: "全局 呼出" },
   { id: "storage", title: "存储", icon: Database, keywords: "本地 数据 会话" },
@@ -29,16 +35,99 @@ function InfoRow({
     </div>
   );
 }
+function ProfileSection({
+  name,
+  avatar,
+  error,
+  onName,
+  onChooseAvatar,
+  onClearAvatar,
+}: {
+  name: string;
+  avatar: string | null;
+  error: string;
+  onName(name: string): void;
+  onChooseAvatar(): void;
+  onClearAvatar(): void;
+}) {
+  const [draft, setDraft] = useState(name);
+  useEffect(() => setDraft(name), [name]);
+  const commit = () => {
+    const next = draft.trim();
+    if (!next) {
+      setDraft(name);
+      return;
+    }
+    if (next !== name) onName(next);
+  };
+  return (
+    <section className="settings-section">
+      <h3>个人资料</h3>
+      <div className="settings-section-box">
+        <div className="settings-row">
+          <div>
+            <h3>头像</h3>
+            <p>显示在头像菜单和左下角。</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <ProfileMark name={name} avatar={avatar} />
+            <Button type="button" variant="outline" onClick={onChooseAvatar}>
+              更换头像
+            </Button>
+            {avatar ? (
+              <Button type="button" variant="ghost" onClick={onClearAvatar}>
+                移除头像
+              </Button>
+            ) : null}
+          </div>
+        </div>
+        <div className="settings-row">
+          <div>
+            <h3>名称</h3>
+            <p>显示在头像菜单顶部。</p>
+          </div>
+          <Input
+            aria-label="个人名称"
+            className="w-44"
+            maxLength={40}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={commit}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+            }}
+          />
+        </div>
+      </div>
+      {error ? <p className="settings-section-note">{error}</p> : null}
+    </section>
+  );
+}
 export function SettingsLayout({
   children,
   onBack,
   silentPublish,
   onSilentPublish,
+  profileName,
+  profileAvatar,
+  profileError,
+  onProfileName,
+  onChooseAvatar,
+  onClearAvatar,
 }: {
   children: ReactNode;
   onBack(): void;
   silentPublish: boolean;
   onSilentPublish(silent: boolean): void;
+  profileName: string;
+  profileAvatar: string | null;
+  profileError: string;
+  onProfileName(name: string): void;
+  onChooseAvatar(): void;
+  onClearAvatar(): void;
 }) {
   const [category, setCategory] = useState("general");
   const [query, setQuery] = useState("");
@@ -92,6 +181,16 @@ export function SettingsLayout({
       <div className="settings-scroll-area" key={category}>
         <div className="settings-page">
           <h2>{current.title}</h2>
+          {category === "general" && (
+            <ProfileSection
+              name={profileName}
+              avatar={profileAvatar}
+              error={profileError}
+              onName={onProfileName}
+              onChooseAvatar={onChooseAvatar}
+              onClearAvatar={onClearAvatar}
+            />
+          )}
           {category === "general" && (
             <section className="settings-section">
               <h3>桌面行为</h3>

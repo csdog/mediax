@@ -46,7 +46,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { AccountInfo } from "../../shared/models";
+import { platforms, type AccountInfo, type PlatformId } from "../../shared/models";
+import { platformInfo } from "../../shared/platforms";
+function platformOf(account: AccountInfo): PlatformId {
+  return account.platform ?? "facebook";
+}
 
 const loginLabels = {
   unchecked: "待检查",
@@ -82,6 +86,7 @@ export function AccountManagement({
   const filtered = accounts.filter(
     (a) =>
       a.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) &&
+      (platform === "all" || platformOf(a) === platform) &&
       (status === "all" || a.login === status),
   );
   const chosen = selected.filter((id) => accounts.some((a) => a.id === id));
@@ -97,10 +102,18 @@ export function AccountManagement({
       <div className="min-w-0">
         <h2 className="truncate font-medium">{account.name}</h2>
         <p className="account-platform-label">
-          <span className="facebook-mark" aria-hidden="true">
-            f
+          <span
+            className={platformOf(account) === "facebook" ? "facebook-mark" : "platform-mark"}
+            style={
+              platformOf(account) === "facebook"
+                ? undefined
+                : { background: platformInfo[platformOf(account)].color }
+            }
+            aria-hidden="true"
+          >
+            {platformInfo[platformOf(account)].mark}
           </span>
-          Facebook
+          {platformInfo[platformOf(account)].label}
         </p>
       </div>
     </div>
@@ -224,19 +237,29 @@ export function AccountManagement({
               <Layers />
               全部平台<span>{accounts.length}</span>
             </Button>
-            {"facebook".includes(platformQuery.trim().toLowerCase()) && (
-              <Button
-                variant="ghost"
-                className="account-filter-item"
-                aria-pressed={platform === "facebook"}
-                onClick={() => setPlatform("facebook")}
-              >
-                <span className="facebook-mark" aria-hidden="true">
-                  f
-                </span>
-                Facebook<span>{accounts.length}</span>
-              </Button>
-            )}
+            {platforms
+              .filter((id) =>
+                platformInfo[id].label.toLowerCase().includes(platformQuery.trim().toLowerCase()),
+              )
+              .map((id) => (
+                <Button
+                  key={id}
+                  variant="ghost"
+                  className="account-filter-item"
+                  aria-pressed={platform === id}
+                  onClick={() => setPlatform(id)}
+                >
+                  <span
+                    className={id === "facebook" ? "facebook-mark" : "platform-mark"}
+                    style={id === "facebook" ? undefined : { background: platformInfo[id].color }}
+                    aria-hidden="true"
+                  >
+                    {platformInfo[id].mark}
+                  </span>
+                  {platformInfo[id].label}
+                  <span>{accounts.filter((account) => platformOf(account) === id).length}</span>
+                </Button>
+              ))}
           </div>
           <div className="account-filter-section account-groups">
             <h2>分组</h2>

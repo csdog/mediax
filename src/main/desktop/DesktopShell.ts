@@ -1,7 +1,6 @@
 import {
   app,
   BrowserWindow,
-  dialog,
   globalShortcut,
   Menu,
   nativeImage,
@@ -92,26 +91,7 @@ export class DesktopShell {
     window.on("unmaximize", scheduleStateSave);
     app.on("activate", () => this.show());
     app.on("second-instance", () => this.show());
-    app.on("before-quit", (event) => {
-      const active = db
-        .targets()
-        .filter((t) => ["pending", "running", "awaiting_user", "submitted"].includes(t.status));
-      if (!this.quitting && active.length) {
-        const answer = dialog.showMessageBoxSync(window, {
-          type: "question",
-          title: "退出 media-post",
-          message: "仍有未完成的发布任务",
-          detail:
-            "退出会停止本机任务。再次启动后，请先检查发布记录，避免重复发布。关闭窗口可以继续在后台运行。",
-          buttons: ["取消", "退出"],
-          defaultId: 0,
-          cancelId: 0,
-        });
-        if (answer === 0) {
-          event.preventDefault();
-          return;
-        }
-      }
+    app.on("before-quit", () => {
       this.quitting = true;
       this.saveWindowState();
       clearTimeout(this.stateTimer);

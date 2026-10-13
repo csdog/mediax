@@ -77,8 +77,10 @@ it.each([1, 2] as const)(
     legacyDatabase(file, version);
     const db = new Database(file);
     try {
-      expect(db.schemaVersion()).toBe(3);
-      expect(db.accounts()).toEqual([{ id: "legacy-account", name: "Existing account" }]);
+      expect(db.schemaVersion()).toBe(4);
+      expect(db.accounts()).toEqual([
+        { id: "legacy-account", name: "Existing account", platform: "facebook" },
+      ]);
       expect(db.draft()).toEqual({ body: "Existing draft 中文", images: draftImages });
       expect(db.tasks()[0]).toMatchObject({
         id: "legacy-task",
@@ -109,7 +111,7 @@ it.each([1, 2] as const)(
     const sqlite = new Sqlite(file);
     try {
       expect(sqlite.prepare("SELECT count(*) AS count FROM __drizzle_migrations").get()).toEqual({
-        count: 1,
+        count: 2,
       });
       expect(
         sqlite.prepare("SELECT status, url FROM attempts WHERE id='legacy-attempt'").get(),
@@ -127,11 +129,11 @@ it("rejects future legacy versions and future Drizzle migrations", () => {
   db.addAccount("Preserve me");
   db.close();
   const sqlite = new Sqlite(file);
-  sqlite.pragma("user_version=4");
+  sqlite.pragma("user_version=5");
   sqlite.close();
   expect(() => new Database(file)).toThrow("不能降级读取");
   const next = new Sqlite(file);
-  next.pragma("user_version=3");
+  next.pragma("user_version=4");
   next.prepare("UPDATE __drizzle_migrations SET created_at=created_at+1").run();
   next.close();
   expect(() => new Database(file)).toThrow("不能降级读取");

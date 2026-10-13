@@ -1,6 +1,6 @@
 import { BrowserWindow, WebContentsView } from "electron";
 import { CdpBridge } from "./CdpBridge";
-import type { BrowserBounds } from "../../shared/models";
+import type { BrowserBounds, PlatformId } from "../../shared/models";
 export class AccountBrowserManager {
   private windows = new Map<string, BrowserWindow>();
   private views = new Map<string, WebContentsView>();
@@ -92,7 +92,7 @@ export class AccountBrowserManager {
   async open(
     accountId: string,
     url: string,
-    options?: { focus?: boolean },
+    options?: { focus?: boolean; platform?: PlatformId },
   ): Promise<WebContentsView> {
     const existing = this.views.get(accountId);
     if (existing) {
@@ -104,7 +104,7 @@ export class AccountBrowserManager {
     const win = this.host ?? new BrowserWindow({ width: 900, height: 700, show: false });
     const view = new WebContentsView({
       webPreferences: {
-        partition: `persist:facebook-${accountId}`,
+        partition: `persist:${options?.platform ?? "facebook"}-${accountId}`,
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,

@@ -9,7 +9,7 @@ describe("SQLite storage", () => {
       b = db.addAccount("B");
     expect(a.id).not.toBe(b.id);
     expect(db.accounts()).toHaveLength(2);
-    expect(db.schemaVersion()).toBe(3);
+    expect(db.schemaVersion()).toBe(4);
     db.close();
   });
   it("rolls back a task with invalid target and enforces foreign keys", () => {

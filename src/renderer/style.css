@@ -1185,20 +1185,37 @@ body {
   color: var(--muted-foreground);
   font-size: 12px;
 }
-.facebook-mark {
+.facebook-mark,
+.platform-mark,
+.youtube-mark,
+.tiktok-mark,
+.reddit-mark {
   display: inline-flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   width: 16px;
   height: 16px;
   flex-shrink: 0;
   border-radius: 4px;
-  background: #0866ff;
   color: white;
   font:
-    bold 19px/16px Arial,
+    bold 11px/16px Arial,
     sans-serif;
   overflow: hidden;
+}
+.facebook-mark {
+  align-items: flex-end;
+  background: #0866ff;
+  font-size: 19px;
+}
+.youtube-mark {
+  background: #ff0033;
+}
+.tiktok-mark {
+  background: #111111;
+}
+.reddit-mark {
+  background: #ff4500;
 }
 .account-login {
   display: inline-flex;

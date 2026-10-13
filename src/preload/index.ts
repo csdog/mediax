@@ -15,6 +15,9 @@ const api: DesktopApi = {
   setGlobalShortcut: (accelerator) => call("setGlobalShortcut", accelerator),
   publishSettings: () => call("publishSettings"),
   setSilentPublish: (silent) => call("setSilentPublish", silent),
+  profileSettings: () => call("profileSettings"),
+  setProfile: (profile) => call("setProfile", profile),
+  chooseAvatar: () => call("chooseAvatar"),
   onCommand: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, command: DesktopCommand) =>
       listener(command);
@@ -25,7 +28,7 @@ const api: DesktopApi = {
     };
   },
   accounts: () => call("accounts"),
-  addAccount: (n) => call("addAccount", n),
+  addAccount: (n, platform) => call("addAccount", n, platform),
   openAccount: (id) => call("openAccount", id),
   refreshAccount: (id) => call("refreshAccount", id),
   deleteAccount: (id) => call("deleteAccount", id),

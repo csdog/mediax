@@ -6,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { useWorkspace } from "@/app/WorkspaceContext";
+import { useProfileSettings } from "@/hooks/useProfileSettings";
 
 export function SettingsPage() {
   const { setSettingsOpen, silentPublish, setSilentPublish } = useWorkspace();
+  const { profile, setProfileName, chooseAvatar, clearAvatar, profileError } = useProfileSettings();
   const { shortcut, setShortcut, shortcutMessage, setShortcutMessage, shortcutBusy, saveShortcut } =
     useShortcutSettings();
   useEffect(() => {
@@ -28,6 +30,12 @@ export function SettingsPage() {
         onBack={() => setSettingsOpen(false)}
         silentPublish={silentPublish}
         onSilentPublish={setSilentPublish}
+        profileName={profile.name}
+        profileAvatar={profile.avatar}
+        profileError={profileError}
+        onProfileName={setProfileName}
+        onChooseAvatar={() => void chooseAvatar()}
+        onClearAvatar={clearAvatar}
       >
         <form
           className="space-y-4"

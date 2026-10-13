@@ -1,7 +1,19 @@
 import { app, session } from "electron";
-import type { AccountInfo, BrowserBounds, Target } from "../../shared/models";
+import type { AccountInfo, BrowserBounds, PlatformId, Target } from "../../shared/models";
 import { FacebookAdapter } from "../platforms/facebook/FacebookAdapter";
-import { NeedsUser } from "../platforms/Publisher";
+import { createPublisher } from "../platforms/registry";
+import {
+  hasPlatformSession,
+  needsVerification,
+  partitionName,
+  platformCookieUrl,
+  platformHome,
+  keepsClosedSession,
+  sessionOwner,
+  urlLooksLoggedIn,
+} from "../platforms/catalog";
+import { platformInfo } from "../../shared/platforms";
+import { NeedsUser, type Publisher } from "../platforms/Publisher";
 import { Database } from "../storage/Database";
 import { AccountBrowserManager } from "../browser/AccountBrowserManager";
 
@@ -34,15 +46,15 @@ export class AccountService {
     clearInterval(this.timer);
     this.timer = null;
   }
-  add(name: string) {
-    const a = this.db.addAccount(name);
+  add(name: string, platform: PlatformId = "facebook") {
+    const a = this.db.addAccount(name, platform);
     return { ...a, login: "unchecked" as const, targets: [] };
   }
   async open(id: string) {
-    this.db.account(id);
-    await this.browsers.open(id, "https://www.facebook.com/");
+    const account = this.db.account(id);
+    await this.browsers.open(id, platformHome[account.platform], { platform: account.platform });
     this.browsers.show(id);
-    await this.updateAvatar(id);
+    if (account.platform === "facebook") await this.updateAvatar(id);
   }
   private cachedAvatar(id: string) {
     const value = this.db.setting(`avatar:${id}`) as {
@@ -57,6 +69,7 @@ export class AccountService {
       : null;
   }
   private async updateAvatar(id: string): Promise<string | undefined> {
+    if (this.db.account(id).platform !== "facebook") return this.cachedAvatar(id)?.image;
     const view = this.browsers.get(id);
     if (!view || view.webContents.isDestroyed()) return this.cachedAvatar(id)?.image;
     try {
@@ -107,15 +120,16 @@ export class AccountService {
     }
   }
   async preview(id: string) {
-    this.db.account(id);
+    const account = this.db.account(id);
     const view = this.browsers.get(id);
     if (!view || view.webContents.isDestroyed()) throw new Error("账号标签页已关闭");
     const contents = view.webContents;
     const url = contents.getURL();
+    const fallback = platformHost(account.platform);
     const screenshot = await contents.capturePage(undefined, { stayHidden: true, stayAwake: true });
     return {
       title: contents.getTitle(),
-      hostname: url ? new URL(url).hostname : "Facebook",
+      hostname: url ? new URL(url).hostname : fallback,
       image: screenshot.isEmpty()
         ? null
         : screenshot
@@ -133,26 +147,34 @@ export class AccountService {
   }
   async remove(id: string) {
     if (this.operating) throw new Error("账号正在执行身份检查或发布任务，请稍后再试");
+    const account = this.db.account(id);
     this.db.deleteAccount(id);
     this.states.delete(id);
     this.browsers.close(id);
     if (!app?.isReady()) return;
-    const partition = session.fromPartition(`persist:facebook-${id}`);
+    const partition = session.fromPartition(partitionName(account.platform, id));
     await partition.clearStorageData();
     await partition.clearCache();
   }
-  adapter(id: string) {
-    this.db.account(id);
+  private async sessionPage(id: string) {
+    const account = this.db.account(id);
+    const silent = this.db.setting("silentPublish") === true;
+    if (!this.browsers.get(id))
+      await this.browsers.open(id, platformHome[account.platform], {
+        focus: !silent,
+        platform: account.platform,
+      });
+    const view = this.browsers.get(id);
+    if (silent && view && !view.webContents.isDestroyed())
+      view.webContents.setBackgroundThrottling(false);
+    return this.browsers.page(id);
+  }
+  adapter(id: string): Publisher & { discover(accountId: string): Promise<Target[]> } {
+    const account = this.db.account(id);
+    const openPage = () => this.sessionPage(id);
+    if (account.platform !== "facebook") return createPublisher(account.platform, openPage);
     return new FacebookAdapter(
-      async () => {
-        const silent = this.db.setting("silentPublish") === true;
-        if (!this.browsers.get(id))
-          await this.browsers.open(id, "https://www.facebook.com/", { focus: !silent });
-        const view = this.browsers.get(id);
-        if (silent && view && !view.webContents.isDestroyed())
-          view.webContents.setBackgroundThrottling(false);
-        return this.browsers.page(id);
-      },
+      openPage,
       async () => {
         const view = this.browsers.get(id);
         if (!view) return { owner: null, actor: null };
@@ -199,19 +221,19 @@ export class AccountService {
     }
     const url = view.webContents.getURL();
     const cookies = await view.webContents.session.cookies.get({
-      url: "https://www.facebook.com",
+      url: platformCookieUrl[a.platform],
     });
-    const hasSession = cookies.some((c) => c.name === "c_user");
+    const hasSession = hasPlatformSession(a.platform, cookies) || urlLooksLoggedIn(a.platform, url);
     const result: AccountInfo = {
       ...a,
       avatar: await this.updateAvatar(id),
-      login: /checkpoint|two_step_verification/.test(url)
+      login: needsVerification(a.platform, url)
         ? "needs_verification"
         : hasSession
           ? "logged_in"
           : "logged_out",
       targets: (this.states.get(id) ?? this.stored(id)).targets,
-      message: "请在账号标签页中完成登录",
+      message: loginPrompt(a.platform),
     };
     if (result.login === "logged_in") {
       try {
@@ -220,19 +242,24 @@ export class AccountService {
           owner?: string;
           targets?: AccountInfo["targets"];
         } | null;
-        const owner = cookies.find((cookie) => cookie.name === "c_user")?.value;
+        const owner =
+          sessionOwner(a.platform, cookies) ??
+          (urlLooksLoggedIn(a.platform, url) ? a.platform : null);
         const retained = saved && saved.owner === owner ? (saved.targets ?? []) : [];
         const targets = new Map(retained.map((t) => [t.identityId, t]));
         for (const t of found) targets.set(t.identityId, t);
         result.targets = [...targets.values()];
         this.db.setSetting(`identities:${id}`, { owner, targets: result.targets });
-        result.message = `已识别 ${result.targets.length} 个发布身份。若需添加其他公共主页，请在 Facebook 切换到该主页后再次检查状态。`;
+        result.message = discoveredMessage(a.platform, result.targets);
       } catch (error) {
         result.message = error instanceof Error ? error.message : String(error);
         if (!(error instanceof NeedsUser)) result.message = `身份检查失败：${result.message}`;
       }
     } else if (result.login === "needs_verification")
-      result.message = "请在 Facebook 完成安全验证后重新检查";
+      result.message =
+        a.platform === "facebook"
+          ? "请在 Facebook 完成安全验证后重新检查"
+          : "请在账号浏览器中完成安全验证后重新检查";
     this.remember(result);
     return result;
   }
@@ -302,23 +329,34 @@ export class AccountService {
     }
   }
   private async syncStatus(id: string) {
+    const account = this.db.account(id);
     const view = this.browsers.get(id);
     const partition =
       view && !view.webContents.isDestroyed()
         ? view.webContents.session
-        : session.fromPartition(`persist:facebook-${id}`);
-    const cookies = await partition.cookies.get({ url: "https://www.facebook.com" });
+        : session.fromPartition(partitionName(account.platform, id));
+    const cookies = await partition.cookies.get({ url: platformCookieUrl[account.platform] });
     const url = view && !view.webContents.isDestroyed() ? view.webContents.getURL() : "";
-    const owner = cookies.find((cookie) => cookie.name === "c_user")?.value;
+    const closedLoggedIn =
+      !url &&
+      keepsClosedSession(account.platform) &&
+      (this.states.get(id) ?? this.stored(id)).login === "logged_in";
+    const owner =
+      sessionOwner(account.platform, cookies) ??
+      (urlLooksLoggedIn(account.platform, url) || closedLoggedIn ? account.platform : null);
     const previous = this.states.get(id) ?? this.stored(id);
     let login: AccountInfo["login"];
     let message = previous.message;
-    if (/checkpoint|two_step_verification/.test(url)) {
+    if (needsVerification(account.platform, url)) {
       login = "needs_verification";
-      message = "请在 Facebook 完成安全验证后重新检查";
-    } else if (owner) login = "logged_in";
+      message =
+        account.platform === "facebook"
+          ? "请在 Facebook 完成安全验证后重新检查"
+          : "请在账号浏览器中完成安全验证后重新检查";
+    } else if (owner || urlLooksLoggedIn(account.platform, url)) login = "logged_in";
+    else if (closedLoggedIn) login = "logged_in";
     else login = "logged_out";
-    if (login === "logged_out") message = "请在账号标签页中完成登录";
+    if (login === "logged_out") message = loginPrompt(account.platform);
     const identities = this.readIdentities(id);
     const discovered =
       login === "logged_in" && identities && identities.owner === owner ? identities.targets : [];
@@ -339,4 +377,34 @@ export class AccountService {
       avatar: this.cachedAvatar(id)?.image ?? previous.avatar,
     });
   }
+}
+
+function platformHost(platform: PlatformId) {
+  return platformInfo[platform].label;
+}
+
+function loginPrompt(platform: PlatformId) {
+  if (platform === "facebook") return "请在账号标签页中完成登录";
+  if (platform === "youtube") return "请在账号标签页中登录 Google / YouTube";
+  return `请在账号标签页中登录 ${platformInfo[platform].label}`;
+}
+
+function discoveredMessage(platform: PlatformId, targets: Target[]) {
+  if (platform === "youtube")
+    return targets.length
+      ? `已识别频道「${targets[0]?.name}」。发布时请附上视频。`
+      : "已登录，但没有找到频道。请打开 YouTube Studio 后再次检查。";
+  if (platform === "tiktok")
+    return targets.length
+      ? `已识别 ${targets[0]?.name}。发布时请附上视频。`
+      : "已登录，但没有读到账号。请打开 TikTok 后再次检查。";
+  if (platform === "reddit")
+    return targets.length
+      ? `已识别 ${targets[0]?.name}。文字帖会发到这个个人主页。`
+      : "已登录，但没有读到用户名。请打开 Reddit 后再次检查。";
+  if (platform === "facebook")
+    return `已识别 ${targets.length} 个发布身份。若需添加其他公共主页，请在 Facebook 切换到该主页后再次检查状态。`;
+  return targets.length
+    ? `已识别 ${targets[0]?.name}。`
+    : `已登录，但没有读到账号。请打开 ${platformInfo[platform].label} 后再次检查。`;
 }

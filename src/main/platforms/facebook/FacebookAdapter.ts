@@ -1,5 +1,6 @@
 import type { Page, Locator } from "playwright-core";
 import { readFile } from "node:fs/promises";
+import { extname } from "node:path";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
 import { NeedsUser, NotSubmitted, type Publisher } from "../Publisher";
 import { labels } from "./selectors";
@@ -26,6 +27,8 @@ export function composerStillHasPost(
   const compact = (value: string) => value.replace(/\s+/g, "");
   return compact(surface).includes(compact(want));
 }
+const isVideo = (path: string) =>
+  [".mp4", ".mov", ".m4v", ".webm"].includes(extname(path).toLowerCase());
 export function postUrl(href: string): string | null {
   try {
     const u = new URL(href, "https://www.facebook.com");
@@ -315,9 +318,17 @@ export class FacebookAdapter implements Publisher {
             (i) =>
               /^(blob:|data:)|fbcdn\.net/.test(i.src) && i.naturalWidth > 0 && i.clientWidth > 80,
           );
+          const videos = [...d.querySelectorAll("video")].filter((video) =>
+            Boolean(video.currentSrc || video.src || video.querySelector("source")),
+          );
+          const processing = [...d.querySelectorAll("span, div")].some(
+            (el) =>
+              !el.children.length &&
+              /正在上传|上传中|正在处理|Uploading|Processing/.test(el.textContent ?? ""),
+          );
           // Facebook folds a gallery into five previews. The final tile's +N
           // includes that tile, so five visible images and +7 represent 11.
-          let attachments = images.length;
+          let attachments = images.length + videos.length;
           for (const label of d.querySelectorAll("div, span")) {
             if (label.children.length) continue;
             const more = /^\+(\d+)$/.exec(label.textContent?.trim() ?? "");
@@ -328,10 +339,10 @@ export class FacebookAdapter implements Publisher {
             if (previews.length === 1 && images.includes(previews[0]))
               attachments = Math.max(attachments, images.length - 1 + Number(more[1]));
           }
-          return !busy && attachments >= count;
+          return !busy && !processing && attachments >= count;
         },
         { count: task.images.length },
-        { timeout: 90000 },
+        { timeout: task.images.some(isVideo) ? 180000 : 90000 },
       );
       if (await dialog.getByText(labels.uploading).filter({ visible: true }).count())
         throw new NeedsUser("图片仍在上传，请等待完成后继续");
@@ -359,21 +370,41 @@ export class FacebookAdapter implements Publisher {
     }
     if (normal(await finalEditor.innerText()) !== normal(task.body))
       throw new Error("Facebook 编辑器正文与任务不一致");
-    // Some Facebook versions have a separate post settings step.
-    let post = dialog.getByRole("button", { name: labels.post }).filter({ visible: true });
-    if ((await post.count()) === 0) {
-      await (
-        await this.unique(
-          dialog.getByRole("button", { name: labels.next }),
-          "未找到发布按钮或下一步",
-        )
-      ).click();
-      post = page
+    // Photo posts need one settings step. Reels adds an editor step, so keep
+    // advancing the largest visible Next until a single Post button is ready.
+    let submit: Locator | undefined;
+    for (let step = 0; step < 4; step++) {
+      const post = page
         .getByRole("dialog")
         .getByRole("button", { name: labels.post })
         .filter({ visible: true });
+      const next = page
+        .getByRole("dialog")
+        .getByRole("button", { name: labels.next })
+        .filter({ visible: true });
+      await post
+        .or(next)
+        .first()
+        .waitFor({ timeout: 20000 })
+        .catch(() => {});
+      if ((await post.count()) === 1) {
+        submit = post;
+        break;
+      }
+      const count = await next.count();
+      if (!count) throw new NeedsUser("未找到发布按钮或下一步");
+      let pick = next.first();
+      let width = -1;
+      for (let index = 0; index < count; index++) {
+        const box = await next.nth(index).boundingBox();
+        if (box && box.width > width) {
+          width = box.width;
+          pick = next.nth(index);
+        }
+      }
+      await pick.click();
     }
-    const submit = await this.unique(post, "未找到唯一的发布按钮");
+    if (!submit) throw new NeedsUser("未找到唯一的发布按钮");
     if (!(await submit.isEnabled()))
       throw new NeedsUser("发布按钮未就绪，请检查图片上传、受众或必填设置");
     const identity = await this.identity(page);
@@ -472,12 +503,13 @@ export class FacebookAdapter implements Publisher {
         if (previews.length === 1 && images.includes(previews[0]))
           imageCount = Math.max(imageCount, images.length - 1 + Number(more[1]));
       }
+      const videos = [...node.querySelectorAll("video")].filter((video) => video.clientWidth > 80);
       return {
         text: (node as HTMLElement).innerText,
         links: [...node.querySelectorAll("h2 a[href], h3 a[href], h4 a[href], strong a[href]")].map(
           (a) => (a as HTMLAnchorElement).href,
         ),
-        imageCount,
+        imageCount: imageCount + videos.length,
       };
     });
     if (

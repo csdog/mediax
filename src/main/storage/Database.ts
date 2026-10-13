@@ -5,7 +5,15 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import type { Account, Task, Target, TaskTarget, Status } from "../../shared/models";
+import {
+  isPlatform,
+  type Account,
+  type PlatformId,
+  type Task,
+  type Target,
+  type TaskTarget,
+  type Status,
+} from "../../shared/models";
 import * as schema from "./schema";
 import type { DraftImage } from "./schema";
 
@@ -21,7 +29,7 @@ export class Database {
     try {
       this.db.pragma("foreign_keys = ON");
       this.db.pragma("journal_mode = WAL");
-      if (this.schemaVersion() > 3) throw new Error("数据库版本高于当前应用，不能降级读取");
+      if (this.schemaVersion() > 4) throw new Error("数据库版本高于当前应用，不能降级读取");
       const migrations = readMigrationFiles({ migrationsFolder });
       if (!migrations.length) throw new Error("数据库迁移文件缺失");
       const journal = this.orm.get(
@@ -128,9 +136,10 @@ export class Database {
       .orderBy(sql`rowid`)
       .all();
   }
-  addAccount(name: string) {
+  addAccount(name: string, platform: PlatformId = "facebook") {
     if (!name.trim()) throw new Error("请输入账号名称");
-    const account = { id: randomUUID(), name: name.trim() };
+    if (!isPlatform(platform)) throw new Error("暂不支持该平台");
+    const account: Account = { id: randomUUID(), name: name.trim(), platform };
     this.orm.insert(schema.accounts).values(account).run();
     return account;
   }

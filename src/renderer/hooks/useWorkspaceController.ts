@@ -7,6 +7,7 @@ import type {
   Task,
   TaskTarget,
   DesktopPage,
+  PlatformId,
   Target,
   TabAction,
 } from "../../shared/models";
@@ -66,7 +67,7 @@ export function useWorkspaceController() {
   const [selectedTargets, setSelectedTargets] = useState<Target[]>([]);
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
-  const [platform, setPlatform] = useState<"facebook" | null>(null);
+  const [platform, setPlatform] = useState<PlatformId | null>(null);
   const [browserTabs, setBrowserTabs] = useState<{ id: string; name: string; kind?: "new" }[]>([]);
   const closedTabs = useRef<{ id: string; name: string; kind?: "new" }[]>([]);
   const [activeBrowser, setActiveBrowser] = useState<string | null>(null);

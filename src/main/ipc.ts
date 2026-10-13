@@ -1,6 +1,6 @@
-import { ipcMain, dialog, BrowserWindow, app, shell as electronShell } from "electron";
+import { ipcMain, dialog, BrowserWindow, app, nativeImage, shell as electronShell } from "electron";
 import { log } from "./logging";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { extname, basename, join } from "node:path";
 import { postUrl } from "./platforms/facebook/FacebookAdapter";
 import { PublishService } from "./publish/PublishService";
@@ -8,10 +8,10 @@ import { Database } from "./storage/Database";
 import { AccountService } from "./accounts/AccountService";
 import { markdownToText } from "./content/markdown";
 import { coverDataUrl } from "./content/cover";
+import { isPlatform, type ImageAsset, type TabPreviewOverlay } from "../shared/models";
+import { parseProfile, readProfile } from "../shared/profile";
 import type { DesktopShell } from "./desktop/DesktopShell";
 import { TabPreviewWindow } from "./desktop/TabPreviewWindow";
-import type { TabPreviewOverlay } from "../shared/models";
-import type { ImageAsset } from "../shared/models";
 export function registerIpc(
   db: Database,
   accounts: AccountService,
@@ -94,8 +94,40 @@ export function registerIpc(
     db.setSetting("silentPublish", silent);
     return { silent };
   });
+  on("profileSettings", () => readProfile(db.setting("profile")));
+  on("setProfile", (value) => {
+    const profile = parseProfile(value);
+    db.setSetting("profile", profile);
+    return profile;
+  });
+  on("chooseAvatar", async () => {
+    const result = await dialog.showOpenDialog(window, {
+      properties: ["openFile"],
+      filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "webp"] }],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    const file = result.filePaths[0];
+    const info = await stat(file);
+    if (info.size > 10 * 1024 * 1024) throw new Error("头像图片需要小于 10MB");
+    const image = nativeImage.createFromPath(file);
+    if (image.isEmpty()) throw new Error("无法读取这张图片");
+    const { width, height } = image.getSize();
+    const edge = Math.min(width, height);
+    const square = image.crop({
+      x: Math.round((width - edge) / 2),
+      y: Math.round((height - edge) / 2),
+      width: edge,
+      height: edge,
+    });
+    const dataUrl = square.resize({ width: 256, height: 256, quality: "best" }).toDataURL();
+    if (!dataUrl.startsWith("data:image/png;base64,")) throw new Error("无法读取这张图片");
+    return dataUrl;
+  });
   on("accounts", () => accounts.list());
-  on("addAccount", (name) => accounts.add(text(name)));
+  on("addAccount", (name, platform) => {
+    if (!isPlatform(platform)) throw new Error("暂不支持该平台");
+    return accounts.add(text(name), platform);
+  });
   on("previewAccountBrowser", (id) => accounts.preview(text(id)));
   on("openAccount", (id) => accounts.open(text(id)));
   on("layoutAccountBrowser", (id, bounds) => {
@@ -132,23 +164,26 @@ export function registerIpc(
   on("chooseImages", async () => {
     const result = await dialog.showOpenDialog(window, {
       properties: ["openFile", "multiSelections"],
-      filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "webp"] }],
+      filters: [
+        {
+          name: "图片或视频",
+          extensions: ["png", "jpg", "jpeg", "webp", "mp4", "mov", "m4v", "webm"],
+        },
+      ],
     });
     if (result.canceled) return [];
     const assets: ImageAsset[] = [];
     for (const path of result.filePaths) {
       const data = await readFile(path);
-      if (data.length > 20 * 1024 * 1024) throw new Error("图片预览限制为 20MB，请压缩后选择");
+      if (data.length > 20 * 1024 * 1024) throw new Error("素材限制为 20MB，请压缩后选择");
+      const extension = extname(path).toLowerCase();
+      const video = [".mp4", ".mov", ".m4v", ".webm"].includes(extension);
       const mime =
-        extname(path).toLowerCase() === ".png"
-          ? "image/png"
-          : extname(path).toLowerCase() === ".webp"
-            ? "image/webp"
-            : "image/jpeg";
+        extension === ".png" ? "image/png" : extension === ".webp" ? "image/webp" : "image/jpeg";
       const asset = {
         path,
         name: basename(path),
-        preview: `data:${mime};base64,${data.toString("base64")}`,
+        preview: video ? "" : `data:${mime};base64,${data.toString("base64")}`,
       };
       images.set(path, asset);
       assets.push(asset);
@@ -171,15 +206,13 @@ export function registerIpc(
       try {
         const data = await readFile(a.path);
         if (data.length > 20 * 1024 * 1024) continue;
+        const extension = extname(a.path).toLowerCase();
+        const video = [".mp4", ".mov", ".m4v", ".webm"].includes(extension);
         const mime =
-          extname(a.path) === ".png"
-            ? "image/png"
-            : extname(a.path) === ".webp"
-              ? "image/webp"
-              : "image/jpeg";
+          extension === ".png" ? "image/png" : extension === ".webp" ? "image/webp" : "image/jpeg";
         const asset = {
           ...a,
-          preview: `data:${mime};base64,${data.toString("base64")}`,
+          preview: video ? "" : `data:${mime};base64,${data.toString("base64")}`,
         };
         images.set(a.path, asset);
         assets.push(asset);
@@ -192,11 +225,15 @@ export function registerIpc(
     targets: db.targets(),
   }));
   on("publish", (body, paths, targets) => {
-    if (
-      !Array.isArray(paths) ||
-      !paths.every((path) => typeof path === "string" && images.has(path))
-    )
+    if (!Array.isArray(paths) || !paths.every((path) => typeof path === "string"))
       throw new Error("请重新选择发布图片");
+    for (const path of paths) {
+      if (images.has(path)) continue;
+      const extension = extname(path).toLowerCase();
+      if (![".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".m4v", ".webm"].includes(extension))
+        throw new Error("请重新选择发布图片");
+      images.set(path, { path, name: basename(path), preview: "" });
+    }
     if (
       !Array.isArray(targets) ||
       !targets.every(

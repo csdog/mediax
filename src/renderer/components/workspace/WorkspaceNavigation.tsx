@@ -1,7 +1,8 @@
 import { Settings, FileText, ChevronDown, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { ProfileMark } from "@/components/ProfileMark";
+import { useProfileSettings } from "@/hooks/useProfileSettings";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Sidebar,
@@ -30,6 +31,7 @@ export function WorkspaceNavigation() {
     setSidebarOpen,
     openSettings,
   } = useWorkspace();
+  const { profile } = useProfileSettings();
   return (
     <>
       <aside className="activity-rail" aria-label="快捷导航">
@@ -72,9 +74,12 @@ export function WorkspaceNavigation() {
                 size="icon-sm"
                 aria-label="打开头像菜单"
               >
-                <Avatar className="size-6">
-                  <AvatarFallback className="text-[9px]">MP</AvatarFallback>
-                </Avatar>
+                <ProfileMark
+                  name={profile.name}
+                  avatar={profile.avatar}
+                  size="sm"
+                  className="size-6"
+                />
               </Button>
             }
           />
@@ -86,9 +91,12 @@ export function WorkspaceNavigation() {
             className="w-52 p-1.5"
             aria-label="用户菜单"
           >
-            <div className="border-b px-2.5 py-2.5 mb-1">
-              <p className="text-sm font-medium">media-post</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">本地工作空间</p>
+            <div className="mb-1 flex items-center gap-2.5 border-b px-2.5 py-2.5">
+              <ProfileMark name={profile.name} avatar={profile.avatar} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{profile.name}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">本地工作空间</p>
+              </div>
             </div>
             <Button
               variant="ghost"

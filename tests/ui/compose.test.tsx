@@ -7,6 +7,7 @@ import { App } from "../../src/renderer/src";
 vi.mock("../../src/renderer/lib/logging", () => ({ initializeRendererLogging: vi.fn() }));
 it("imports and saves content, manages desktop tabs/settings, and requires target selection plus publish confirmation", async () => {
   let commandListener: ((command: any) => void) | undefined;
+  let profile = { name: "media-post", avatar: null as string | null };
   window.desktop = {
     onCommand: vi.fn((listener) => {
       commandListener = listener;
@@ -23,6 +24,12 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     })),
     publishSettings: vi.fn().mockResolvedValue({ silent: false }),
     setSilentPublish: vi.fn().mockImplementation(async (silent: boolean) => ({ silent })),
+    profileSettings: vi.fn(async () => profile),
+    setProfile: vi.fn(async (next: { name: string; avatar: string | null }) => {
+      profile = next;
+      return profile;
+    }),
+    chooseAvatar: vi.fn().mockResolvedValue(null),
     accounts: vi.fn().mockResolvedValue([]),
     addAccount: vi.fn().mockResolvedValue({
       id: "account-1",
@@ -85,14 +92,15 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   ).toBe("true");
   fireEvent.click(screen.getByRole("button", { name: "添加账号", exact: true }));
   expect(screen.getByRole("dialog", { name: "添加账号" })).toBeTruthy();
-  expect((screen.getByRole("button", { name: "开始授权" }) as HTMLButtonElement).disabled).toBe(
-    true,
-  );
-  fireEvent.click(screen.getByRole("button", { name: /Facebook/ }));
-  expect(window.desktop.addAccount).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "开始授权" }));
+  expect(screen.getByRole("button", { name: "抖音" }).querySelector("img")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "小红书" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "YouTube" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "TikTok" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "其他账号" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "开始授权" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Facebook" }));
   await waitFor(() => expect(window.desktop.openAccount).toHaveBeenCalledWith("account-1"));
-  expect(window.desktop.addAccount).toHaveBeenCalledWith("Facebook 账号 1");
+  expect(window.desktop.addAccount).toHaveBeenCalledWith("Facebook 账号 1", "facebook");
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(screen.getByRole("tab", { name: "Facebook 账号 1" }).getAttribute("aria-selected")).toBe(
     "true",
@@ -105,11 +113,18 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   await waitFor(() => expect(screen.queryByRole("tab", { name: "Facebook 账号 1" })).toBeNull());
   expect(screen.queryByRole("button", { name: "设置", exact: true })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "打开头像菜单" }));
-  expect(screen.getByRole("dialog", { name: "用户菜单" })).toBeTruthy();
+  expect(screen.getByRole("dialog", { name: "用户菜单" }).textContent).toContain("media-post");
   fireEvent.click(screen.getByRole("button", { name: "设置", exact: true }));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "用户菜单" })).toBeNull());
   await waitFor(() =>
     expect((screen.getByLabelText("全局呼出快捷键") as HTMLInputElement).disabled).toBe(false),
+  );
+  expect((screen.getByLabelText("个人名称") as HTMLInputElement).value).toBe("media-post");
+  expect(screen.getByRole("button", { name: "更换头像" })).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("个人名称"), { target: { value: "张三" } });
+  fireEvent.blur(screen.getByLabelText("个人名称"));
+  await waitFor(() =>
+    expect(window.desktop.setProfile).toHaveBeenCalledWith({ name: "张三", avatar: null }),
   );
   fireEvent.click(screen.getByRole("switch", { name: "静默发布" }));
   await waitFor(() => expect(window.desktop.setSilentPublish).toHaveBeenCalledWith(true));
@@ -196,8 +211,7 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     ).toBe(false),
   );
   fireEvent.click(screen.getByRole("button", { name: "添加账号", exact: true }));
-  fireEvent.click(screen.getByRole("button", { name: /Facebook/ }));
-  fireEvent.click(screen.getByRole("button", { name: "开始授权", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Facebook" }));
   await waitFor(() =>
     expect(screen.getByRole("tab", { name: "Facebook 账号 1" }).getAttribute("aria-selected")).toBe(
       "true",
@@ -213,7 +227,18 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   expect(screen.getByRole("heading", { name: "删除账号" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "取消" }));
   expect(screen.queryByRole("heading", { name: "删除账号" })).toBeNull();
+  let finishRefresh: (value: typeof account) => void = () => {};
+  vi.mocked(window.desktop.refreshAccount).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finishRefresh = resolve;
+      }),
+  );
   fireEvent.click(screen.getByRole("button", { name: "检查状态" }));
+  expect(
+    (screen.getByRole("button", { name: "添加账号", exact: true }) as HTMLButtonElement).disabled,
+  ).toBe(false);
+  finishRefresh(account);
   await waitFor(() => expect(window.desktop.refreshAccount).toHaveBeenCalled());
   await waitFor(() =>
     expect((screen.getByRole("button", { name: "检查状态" }) as HTMLButtonElement).disabled).toBe(
@@ -225,6 +250,7 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     "Latest draft from menu",
   );
   fireEvent.click(screen.getByRole("button", { name: "打开头像菜单" }));
+  expect(screen.getByRole("dialog", { name: "用户菜单" }).textContent).toContain("张三");
   fireEvent.click(screen.getByRole("button", { name: "设置", exact: true }));
   await screen.findByRole("main", { name: "设置页面" });
   await waitFor(() =>

@@ -14,6 +14,9 @@ it("lists publish records with filters from the reference layout", async () => {
       .mockResolvedValue({ accelerator: "CommandOrControl+M", registered: true }),
     publishSettings: vi.fn().mockResolvedValue({ silent: false }),
     setSilentPublish: vi.fn().mockResolvedValue({ silent: false }),
+    profileSettings: vi.fn().mockResolvedValue({ name: "media-post", avatar: null }),
+    setProfile: vi.fn().mockImplementation(async (profile) => profile),
+    chooseAvatar: vi.fn().mockResolvedValue(null),
     accounts: vi
       .fn()
       .mockResolvedValue([{ id: "account-1", name: "用户K7Wa", login: "logged_in", targets: [] }]),

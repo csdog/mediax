@@ -5,6 +5,7 @@ import {
   ExternalLink,
   FileText,
   Image as ImageIcon,
+  Video,
   LayoutGrid,
   List,
   Monitor,
@@ -144,7 +145,7 @@ export function HistoryPage() {
         }))
         .filter(({ task, targets }) => {
           const names = publisherNames(targets, accounts);
-          const workKind = task.images.length ? "image" : "article";
+          const workKind = contentKind(task.images);
           const text = `${task.body} ${names.join(" ")}`.toLocaleLowerCase();
           return (
             text.includes(query.trim().toLocaleLowerCase()) &&
@@ -168,7 +169,7 @@ export function HistoryPage() {
         const accountCount = new Set(targets.map((target) => target.accountId)).size;
         return [
           titleOf(task.body),
-          task.images.length ? "图文" : "文章",
+          kindLabel[contentKind(task.images)],
           names.join("、"),
           "立即发布",
           `${accountCount} 账号 · ${targets.length} 任务`,
@@ -241,6 +242,7 @@ export function HistoryPage() {
                     { value: "all", label: "全部作品类型" },
                     { value: "article", label: "文章" },
                     { value: "image", label: "图文" },
+                    { value: "video", label: "视频" },
                   ]}
                 />
                 <Filter
@@ -424,9 +426,15 @@ function Filter({
   );
 }
 
+function contentKind(paths: string[]) {
+  if (paths.some((path) => /\.(mp4|mov|m4v|webm)$/i.test(path))) return "video" as const;
+  if (paths.length) return "image" as const;
+  return "article" as const;
+}
+const kindLabel = { article: "文章", image: "图文", video: "视频" };
 function Work({ task, cover = task.cover }: { task: Task; cover?: string | null }) {
-  const pictorial = task.images.length > 0 || Boolean(cover);
-  const Icon = pictorial ? ImageIcon : FileText;
+  const kind = contentKind(task.images);
+  const Icon = kind === "video" ? Video : kind === "image" || cover ? ImageIcon : FileText;
   return (
     <div className="history-work">
       <span className="history-thumb">
@@ -442,7 +450,7 @@ function Work({ task, cover = task.cover }: { task: Task; cover?: string | null 
         </span>
         <span className="history-kind">
           <Icon />
-          {pictorial ? "图文" : "文章"}
+          {kindLabel[kind]}
         </span>
       </span>
     </div>

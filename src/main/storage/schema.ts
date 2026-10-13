@@ -1,12 +1,13 @@
 import { sql } from "drizzle-orm";
 import { check, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import type { ImageAsset, Status, Target } from "../../shared/models";
+import type { ImageAsset, PlatformId, Status, Target } from "../../shared/models";
 
 export type DraftImage = Pick<ImageAsset, "path" | "name">;
 
 export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  platform: text("platform").$type<PlatformId>().notNull().default("facebook"),
 });
 
 export const drafts = sqliteTable(
