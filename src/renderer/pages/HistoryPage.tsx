@@ -9,7 +9,6 @@ import {
   Video,
   LayoutGrid,
   List,
-  Monitor,
   MoreHorizontal,
   Play,
   Plus,
@@ -601,7 +600,7 @@ function RecordMenu({ task, targets }: { task: Task; targets: TaskTarget[] }) {
               )
             }
           >
-            <Monitor />
+            <ExternalLink />
             {actionLabel(
               "打开",
               accounts.find((account) => account.id === target.accountId)?.name ?? target.name,

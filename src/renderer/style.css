@@ -3,6 +3,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --cursor-default: url("./assets/cursor.svg") 4 2, default;
   --font-size-caption: 12px;
   --font-size-control: 13px;
   --font-size-tab: 13px;
@@ -151,6 +152,11 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 @layer base {
+  html,
+  button,
+  input:where([type="button"], [type="reset"], [type="submit"]) {
+    cursor: var(--cursor-default);
+  }
   * {
     @apply border-border outline-ring/50;
     scrollbar-width: thin;
@@ -186,6 +192,12 @@
   body {
     @apply bg-background text-foreground font-sans;
     margin: 0;
+  }
+}
+
+@layer utilities {
+  .cursor-default {
+    cursor: var(--cursor-default);
   }
 }
 
@@ -246,7 +258,7 @@ body {
   display: none;
 }
 .workspace svg {
-  stroke-width: 2;
+  stroke-width: 1.65;
 }
 .app-toolbar {
   position: fixed;
@@ -295,7 +307,7 @@ body {
   color: var(--muted-foreground);
 }
 .activity-rail button {
-  border-radius: var(--radius-navigation);
+  border-radius: 8px;
 }
 .activity-rail button[data-active="true"] {
   color: var(--foreground);
@@ -366,8 +378,8 @@ body {
   font-weight: 430;
 }
 .workspace [data-slot="sidebar-menu-button"] svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 .workspace [data-slot="sidebar-footer"] {
   color: var(--hint);
@@ -412,8 +424,8 @@ body {
   box-shadow: none;
 }
 .workspace [data-slot="button"] svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 .workspace [data-slot="input"] {
   height: 36px;
@@ -780,8 +792,8 @@ body {
 }
 [data-slot="dropdown-menu-item"] svg,
 [data-slot="context-menu-item"] svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 [data-slot="dropdown-menu-content"],
 [data-slot="context-menu-content"],
@@ -804,12 +816,16 @@ body {
   backdrop-filter: none;
 }
 .workspace [data-slot="button"] svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 .activity-rail [data-slot="button"] {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+.activity-rail [data-slot="button"].rounded-full {
+  border-radius: 999px;
 }
 .activity-rail [data-slot="button"] svg {
   width: 20px;
@@ -1111,8 +1127,8 @@ body {
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  width: 15px;
-  height: 15px;
+  width: 20px;
+  height: 20px;
   color: var(--hint);
   pointer-events: none;
 }
@@ -1136,8 +1152,8 @@ body {
 .account-filter-item > .platform-icon,
 .account-filter-item > .platform-mark,
 .account-filter-item > .facebook-mark {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   color: var(--muted-foreground);
 }
 .account-filter-item > span:last-child {
@@ -1304,25 +1320,17 @@ body {
 .reddit-mark {
   background: #ff4500;
 }
-.account-login {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  white-space: nowrap;
+.account-login-badge.status-logged_in {
+  background: #e5f6eb;
+  color: #008635;
+}
+.account-login-badge.status-logged_out,
+.account-login-badge.status-unchecked {
   color: var(--muted-foreground);
-  font-size: var(--font-size-caption);
 }
-.account-status-dot {
-  height: 6px;
-  width: 6px;
-  border-radius: 50%;
-  background: var(--hint);
-}
-.status-logged_in {
-  background: #008635;
-}
-.status-needs_verification {
-  background: #b9480d;
+.account-login-badge.status-needs_verification {
+  background: #fff1e8;
+  color: #b9480d;
 }
 .account-targets {
   display: flex;
@@ -1451,9 +1459,9 @@ body {
 .settings-search > svg {
   position: absolute;
   left: 12px;
-  top: 10px;
-  width: 14px;
-  height: 14px;
+  top: 7px;
+  width: 20px;
+  height: 20px;
   color: var(--hint);
 }
 .settings-search [data-slot="input"] {
@@ -1485,9 +1493,9 @@ body {
   border-radius: 10px;
 }
 .settings-navigation nav svg {
-  width: 18px;
-  height: 18px;
-  stroke-width: 2;
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.65;
 }
 .settings-navigation nav [aria-current="page"] {
   background: var(--selected);

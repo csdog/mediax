@@ -3,14 +3,15 @@ import {
   Layers,
   Search,
   Plus,
+  ExternalLink,
   LayoutGrid,
   List,
-  Monitor,
   RefreshCw,
   Trash2,
   Users,
   Folder,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -124,10 +125,9 @@ export function AccountManagement({
     </div>
   );
   const login = (account: AccountInfo) => (
-    <span className="account-login">
-      <span className={`account-status-dot status-${account.login}`} />
+    <Badge variant="secondary" className={`account-login-badge status-${account.login}`}>
       {loginLabels[account.login]}
-    </span>
+    </Badge>
   );
   const actions = (account: AccountInfo) => (
     <div className="account-row-actions">
@@ -141,7 +141,7 @@ export function AccountManagement({
               disabled={busy}
               onClick={() => onOpen(account)}
             >
-              <Monitor />
+              <ExternalLink />
             </Button>
           }
         />
