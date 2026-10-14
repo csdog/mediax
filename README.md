@@ -48,40 +48,47 @@
 
 授权网格共 **56** 个平台；其中 **32** 个已接入发布流程，其余可登录、发布适配后续补齐。
 
-![抖音](src/renderer/assets/platforms/douyin.png "抖音")![快手](src/renderer/assets/platforms/kuaishou.png "快手")![视频号](src/renderer/assets/platforms/channels.png "视频号")![小红书](src/renderer/assets/platforms/xiaohongshu.png "小红书")![哔哩哔哩](src/renderer/assets/platforms/bilibili.png "哔哩哔哩")![微博](src/renderer/assets/platforms/weibo.png "微博")![知乎](src/renderer/assets/platforms/zhihu.png "知乎")![头条号](src/renderer/assets/platforms/toutiao.png "头条号")![百家号](src/renderer/assets/platforms/baijiahao.png "百家号")![微信公众号](src/renderer/assets/platforms/wechat.png "微信公众号")![YouTube](src/renderer/assets/platforms/youtube.png "YouTube")![TikTok](src/renderer/assets/platforms/tiktok.png "TikTok")![Facebook](src/renderer/assets/platforms/facebook.png "Facebook")![Instagram](src/renderer/assets/platforms/instagram.png "Instagram")![X](src/renderer/assets/platforms/twitter.png "X")![Threads](src/renderer/assets/platforms/threads.png "Threads")
-
 #### 已支持发布
 
-| 平台            | 文章 | 动态 | 视频 |
-| --------------- | ---- | ---- | ---- |
-| 头条号          | ✅   | ✅   | ✅   |
-| 知乎            | ✅   | ✅   | ✅   |
-| 抖音            | ✅   | ✅   | ✅   |
-| 小红书          | ✅   | ✅   | ✅   |
-| 微博            | ✅   | ✅   | ✅   |
-| 百家号          | ✅   | ✅   | ✅   |
-| Facebook        | ✅   | ✅   | ✅   |
-| 微信公众号      | ✅   | ✅   |      |
-| 豆瓣            | ✅   | ✅   |      |
-| 知识星球        | ✅   | ✅   |      |
-| 哔哩哔哩        | ✅   |      | ✅   |
-| 企鹅号          | ✅   |      | ✅   |
-| 简书            | ✅   |      |      |
-| Reddit          | ✅   |      |      |
-| 快手            |      | ✅   | ✅   |
-| 视频号          |      | ✅   | ✅   |
-| Instagram       |      | ✅   | ✅   |
-| X               |      | ✅   | ✅   |
-| Threads         |      | ✅   |      |
-| Pinterest       |      | ✅   |      |
-| LinkedIn        |      | ✅   |      |
-| Google Business |      | ✅   |      |
-| YouTube         |      |      | ✅   |
-| TikTok          |      |      | ✅   |
-| 虎扑            |      |      | ✅   |
-| 支付宝生活号    |      |      | ✅   |
+|                                                                                            | 平台            | 文章 | 动态 | 视频 |
+| ------------------------------------------------------------------------------------------ | --------------- | ---- | ---- | ---- |
+| <img src="src/renderer/assets/platforms/toutiao.png" width="20" height="20" alt="">        | 头条号          | ✅   | ✅   | ✅   |
+| <img src="src/renderer/assets/platforms/zhihu.png" width="20" height="20" alt="">          | 知乎            | ✅   | ✅   | ✅   |
+| <img src="src/renderer/assets/platforms/douyin.png" width="20" height="20" alt="">         | 抖音            | ✅   | ✅   | ✅   |
+| <img src="src/renderer/assets/platforms/xiaohongshu.png" width="20" height="20" alt="">    | 小红书          | ✅   | ✅   | ✅   |
+| <img src="src/renderer/assets/platforms/weibo.png" width="20" height="20" alt="">          | 微博            | ✅   | ✅   | ✅   |
+| <img src="src/renderer/assets/platforms/baijiahao.png" width="20" height="20" alt="">      | 百家号          | ✅   | ✅   | ✅   |
+| <img src="src/renderer/assets/platforms/facebook.png" width="20" height="20" alt="">       | Facebook        | ✅   | ✅   | ✅   |
+| <img src="src/renderer/assets/platforms/wechat.png" width="20" height="20" alt="">         | 微信公众号      | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/douban.png" width="20" height="20" alt="">         | 豆瓣            | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/zsxq.png" width="20" height="20" alt="">           | 知识星球        | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/bilibili.png" width="20" height="20" alt="">       | 哔哩哔哩        | ✅   |      | ✅   |
+| <img src="src/renderer/assets/platforms/qq.png" width="20" height="20" alt="">             | 企鹅号          | ✅   |      | ✅   |
+| <img src="src/renderer/assets/platforms/jianshu.png" width="20" height="20" alt="">        | 简书            | ✅   |      |      |
+| <img src="src/renderer/assets/platforms/reddit.png" width="20" height="20" alt="">         | Reddit          | ✅   |      |      |
+| <img src="src/renderer/assets/platforms/kuaishou.png" width="20" height="20" alt="">       | 快手            |      | ✅   | ✅   |
+| <img src="src/renderer/assets/platforms/channels.png" width="20" height="20" alt="">       | 视频号          |      | ✅   | ✅   |
+| <img src="src/renderer/assets/platforms/instagram.png" width="20" height="20" alt="">      | Instagram       |      | ✅   | ✅   |
+| <img src="src/renderer/assets/platforms/twitter.png" width="20" height="20" alt="">        | X               |      | ✅   | ✅   |
+| <img src="src/renderer/assets/platforms/threads.png" width="20" height="20" alt="">        | Threads         |      | ✅   |      |
+| <img src="src/renderer/assets/platforms/pinterest.png" width="20" height="20" alt="">      | Pinterest       |      | ✅   |      |
+| <img src="src/renderer/assets/platforms/linkedin.png" width="20" height="20" alt="">       | LinkedIn        |      | ✅   |      |
+| <img src="src/renderer/assets/platforms/googlebusiness.png" width="20" height="20" alt=""> | Google Business |      | ✅   |      |
+| <img src="src/renderer/assets/platforms/youtube.png" width="20" height="20" alt="">        | YouTube         |      |      | ✅   |
+| <img src="src/renderer/assets/platforms/tiktok.png" width="20" height="20" alt="">         | TikTok          |      |      | ✅   |
+| <img src="src/renderer/assets/platforms/hupu.png" width="20" height="20" alt="">           | 虎扑            |      |      | ✅   |
+| <img src="src/renderer/assets/platforms/alipay.png" width="20" height="20" alt="">         | 支付宝生活号    |      |      | ✅   |
 
-音频（仅音频）：喜马拉雅、小宇宙、网易云音乐、QQ音乐、蜻蜓FM、荔枝FM。
+音频（仅音频）：
+
+|                                                                                        | 平台       |
+| -------------------------------------------------------------------------------------- | ---------- |
+| <img src="src/renderer/assets/platforms/ximalaya.png" width="20" height="20" alt="">   | 喜马拉雅   |
+| <img src="src/renderer/assets/platforms/xiaoyuzhou.png" width="20" height="20" alt=""> | 小宇宙     |
+| <img src="src/renderer/assets/platforms/music163.png" width="20" height="20" alt="">   | 网易云音乐 |
+| <img src="src/renderer/assets/platforms/qqmusic.png" width="20" height="20" alt="">    | QQ音乐     |
+| <img src="src/renderer/assets/platforms/qingting.png" width="20" height="20" alt="">   | 蜻蜓FM     |
+| <img src="src/renderer/assets/platforms/lizhi.png" width="20" height="20" alt="">      | 荔枝FM     |
 
 #### 可登录（发布适配中）
 
@@ -238,11 +245,13 @@ mise exec -- pnpm run db:check
 
 给 Cursor、Claude 等起草文案、创建或调整排期用的机器接口，放在独立仓库 `[csdog/mediax-agent](https://github.com/csdog/mediax-agent)`（与本桌面仓分开维护）。
 
-| 项   | 规划                                                                   |
-| ---- | ---------------------------------------------------------------------- |
-| 形态 | CLI（命令 `mediax`，别名 `mx`）+ Agent Skill；MCP 为同一套能力的薄封装 |
-| 连接 | 本机 loopback HTTP（`127.0.0.1`）+ 本地 token，不经第三方云中转        |
-| 依赖 | **排期发布**与**内容日历**落地后再做可用命令；仓内目前仅为骨架         |
+| 项     | 规划                                                                    |
+| ------ | ----------------------------------------------------------------------- |
+| 形态   | CLI（命令 `mediax`，别名 `mx`）+ Agent Skill；MCP 为同一套能力的薄封装  |
+| 连接   | 本机 loopback HTTP（`127.0.0.1`）+ 本地 token，不经第三方云中转         |
+| 桌面侧 | 主进程 **Hono + OpenAPI/Swagger**（契约源）                             |
+| CLI 侧 | **Bun compile** 单文件；客户端用 **`@openapi-codegen/typescript`** 生成 |
+| 依赖   | **排期发布**与**内容日历**落地后再做可用命令；仓内目前仅为骨架          |
 
 细节与阻塞关系见 [docs/TODO.md](docs/TODO.md)。仓库内 [AGENTS.md](AGENTS.md) 是给写本仓代码的 Agent 看的开发约定，不是上述产品 Agent 面。
 
