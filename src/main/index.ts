@@ -236,6 +236,9 @@ async function start(): Promise<void> {
   app.on("will-quit", () => {
     accounts.stopAutoRefresh();
     disposeMediaImportHost();
+    void import("./control/ControlServer").then(({ stopControlServer }) =>
+      stopControlServer().catch((error) => log.warn("Control API stop failed", error)),
+    );
   });
   registerIpc(db, accounts, win, () => shell.rendererReady(), shell, updater);
   if (maximized) win.maximize();
@@ -251,10 +254,13 @@ async function start(): Promise<void> {
   measure("mediax/startup", "mediax/willStart", "mediax/didLoadWindow");
   log.info("Application window loaded");
   lifecycle.markRestored();
-  // Eventually phase: account sync + updater after first paint settles (VS Code pattern).
+  // Eventually phase: account sync + updater + Agent control API after first paint settles.
   lifecycle.whenEventually(() => {
     accounts.startAutoRefresh();
     updater.start();
+    void import("./control/ControlServer")
+      .then(({ startControlServer }) => startControlServer())
+      .catch((error) => log.error("Control API failed to start", error));
     log.info("Startup performance marks", { marks: startupPerfSnapshot() });
   });
 }

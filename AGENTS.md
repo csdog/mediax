@@ -4,7 +4,7 @@ macOS 本地多平台发布应用。Git 仓库是 `mediax-desktop/`；外层 `me
 
 ## 命令
 
-Node 与 pnpm 以 `mise.toml` 为准。`electron` 不在 PATH 上，用 `pnpm run` 或 `pnpm exec`。
+完整本地开发 / 测试 / 打包步骤见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。Node 与 pnpm 以 `mise.toml` 为准；`electron` 不在 PATH 上，用 `pnpm run` 或 `pnpm exec`。
 
 ```sh
 pnpm run dev
@@ -15,9 +15,7 @@ pnpm run lint
 pnpm run fmt
 ```
 
-`pnpm dev --watch` 在保存主进程文件时会重建，并可能断开正在使用的 CDP。集成测试会启动真实 Electron，且包含 Facebook 发布夹具；只有用户明确要求时才运行 `test:integration` 或 `test:packaged`。不要为了验证而向真实账号再发一条帖。
-
-macOS 开发态 Dock / ⌘-Tab 名称优先看 `.app` **文件夹名**（不是 `app.setName`）。`pnpm dev` 前与 `postinstall` 会把 `Electron.app` 重命名为 `MediaX.app` 并同步 `path.txt`；仅改 Info.plist 不够。改完后需完全退出旧进程再开；若 Dock 仍钉着旧的 Electron，右键从 Dock 移除后再启动。
+集成 / 打包测试只有用户明确要求时才跑；不要为了验证向真实账号再发一条帖。Dock 名与 `MediaX.app` 重命名细节见 DEVELOPMENT.md。
 
 ## 版本与发版
 
@@ -45,6 +43,7 @@ GitHub Release 的自动 **What's Changed** 只汇总**合并进默认分支的 
 - `src/main/platforms/web/`：文章、动态和音频的浏览器编辑流程。已有视频平台的成功路径留在各自适配器里。
 - `src/main/publish/`：发布前校验、复制素材、可配置并行队列。
 - `src/main/storage/`：Drizzle schema 与 SQLite。
+- `src/main/control/`：Agent 本机控制面（Hono + OpenAPI）。`Eventually` 阶段监听 `127.0.0.1`，写 `~/.mediax/control.json`（或 `MEDIAX_HOME`）；`GET /health` 需 bearer；`GET /doc` 为 OpenAPI。可用 `MEDIAX_CONTROL_DISABLE=1` / `MEDIAX_CONTROL_PORT`。
 - `src/renderer/pages/ComposePage.tsx`：文章、动态、视频、音频创作页。
 
 界面用 React、TanStack Router/Query、Tailwind 和 shadcn/Base UI。图标只用 Lucide。视觉规范见 `docs/ui-style.md`。

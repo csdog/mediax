@@ -8,7 +8,7 @@
 
 ![release](https://img.shields.io/github/v/release/csdog/mediax?style=flat-square&label=release)![build](https://img.shields.io/github/actions/workflow/status/csdog/mediax/build.yml?style=flat-square&label=build)![desktop platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-111827?style=flat-square)![publish platforms](https://img.shields.io/badge/publish-32%20platforms-2563eb?style=flat-square)![login platforms](https://img.shields.io/badge/login-56%20platforms-0f766e?style=flat-square)![Electron](https://img.shields.io/badge/Electron-44-47848f?style=flat-square&logo=electron&logoColor=white)![TypeScript](https://img.shields.io/badge/TypeScript-7-3178c6?style=flat-square&logo=typescript&logoColor=white)![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=black)
 
-[支持的平台](#支持的平台) · [特性](#特性) · [主要功能](#主要功能) · [快速开始](#快速开始) · [打包](#打包) · [开发](#开发) · [Agent 面](#agent-面) · TODO · [贡献约定](AGENTS.md)
+[支持的平台](#支持的平台) · [特性](#特性) · [主要功能](#主要功能) · [快速开始](#快速开始) · [Agent 面](#agent-面) · [开发](docs/DEVELOPMENT.md) · [TODO](docs/TODO.md) · [Contributing](CONTRIBUTING.md)
 
 ---
 
@@ -98,45 +98,11 @@
 
 ## 快速开始
 
-### 下载使用
-
 1. 打开 [Releases](https://github.com/csdog/mediax/releases)
 2. 按系统下载安装包并打开
 3. 在「账号管理」登录平台 → 「内容发布」创作 → 「发布记录」跟进状态
 
-### 本地开发
-
-```sh
-mise trust
-mise install
-mise exec -- pnpm install --frozen-lockfile
-mise exec -- pnpm run dev
-```
-
-开发界面默认 `http://127.0.0.1:5186`，可用 `.env.local` 的 `MAIN_VITE_DEV_SERVER_PORT` 修改。
-
-```sh
-mise exec -- pnpm run typecheck
-mise exec -- pnpm run test:unit
-mise exec -- pnpm run test:ui
-mise exec -- pnpm run test:integration
-mise exec -- pnpm run package:mac
-mise exec -- pnpm run test:packaged
-```
-
-## 打包
-
-| 命令                        | 产物                               |
-| --------------------------- | ---------------------------------- |
-| `pnpm run package:mac`      | macOS 未打包目录（本地测试）       |
-| `pnpm run package:mac:dist` | macOS `dmg` / `zip`（arm64 + x64） |
-| `pnpm run package:win`      | Windows `nsis` / `portable`（x64） |
-| `pnpm run package:linux`    | Linux `AppImage` / `deb`（x64）    |
-| `pnpm run package`          | 当前机器尽量打出三端               |
-
-跨平台产物优先用 GitHub Actions（`.github/workflows/build.yml`）：打 `v*` 标签或手动触发。本机交叉打包可能受签名工具与原生模块限制。
-
-打包版通过 `electron-updater` 从 GitHub Releases（`csdog/mediax`）检查更新：启动约 15 秒后后台检查，设置 → 常规 → 更新可手动检查；下载完成后可「重启安装」。开发模式不检查。正式签名与公证仍待补齐。
+本地改代码、测试与打包见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 
 ## 使用流程
 
@@ -148,112 +114,43 @@ mise exec -- pnpm run test:packaged
 
 定时发布不在当前范围内。关闭账号标签页后，任务会重开同一账号会话。
 
-## 技术栈
-
-| 层     | 选型                                                                     |
-| ------ | ------------------------------------------------------------------------ |
-| 桌面   | Electron 44 · electron-vite · electron-builder                           |
-| 界面   | React 19 · TanStack Router / Query · Tailwind CSS · shadcn/ui（Base UI） |
-| 数据   | Drizzle ORM · better-sqlite3 · WAL                                       |
-| 自动化 | Playwright（操作各平台网页编辑器）                                       |
-| 工具链 | mise（Node 26.9 · pnpm 12.4）· TypeScript 7 · oxlint · oxfmt · Vitest    |
-
-给代理的工作约定见 [AGENTS.md](AGENTS.md)。UI 与窗口说明见 [docs/ui-style.md](docs/ui-style.md)、[docs/window-chrome.md](docs/window-chrome.md)。
-
-## 开发说明
-
-### 仓库位置
-
-Git 与工具配置在本目录（GitHub 仓库根）。若本地还有外层 `mediax/` 容器目录，请进入本目录执行开发与打包命令。
-
-### 工具链
-
-`mise.toml` 固定 Node / pnpm；`pnpm run fmt` / `lint` 使用 oxfmt / oxlint。Husky pre-commit 仅检查暂存文件。
-
-### UI
-
-shadcn 使用官方 `base-nova`（Base UI），配置在 `components.json`。组件组合用 Base UI `render` API；Toast 优先 Sonner。
-
-### 渲染结构
-
-```text
-src/renderer/
-  src.tsx                 # 入口
-  app/                    # Router、Query、工作区 Context
-  pages/                  # 账号、发布、记录、设置、浏览器
-  components/workspace/   # 工具栏、导航、页面容器
-  components/dialogs/     # 公共弹窗
-  components/ui/          # shadcn / Base UI
-  hooks/                  # 桌面协调、布局、快捷键
-```
-
-### SQLite 迁移
-
-```sh
-mise exec -- pnpm run db:generate --name=describe_change
-mise exec -- pnpm run db:check
-```
-
-表定义在 `src/main/storage/schema.ts`；迁移输出在 `drizzle/`。不要对真实用户库执行 `drizzle-kit push`。
-
-### 环境与日志
-
-| 文件                                   | 作用                     |
-| -------------------------------------- | ------------------------ |
-| `.env`                                 | 共用非敏感默认值         |
-| `.env.development` / `.env.production` | 开发 / 生产日志等级      |
-| `.env.local` / `.env.*.local`          | 本机覆盖（已 gitignore） |
-
-| 变量                        | 用途                        |
-| --------------------------- | --------------------------- |
-| `MAIN_VITE_DEV_SERVER_PORT` | 开发服务器端口，默认 `5186` |
-| `VITE_LOG_CONSOLE_LEVEL`    | console 等级                |
-| `MAIN_VITE_LOG_FILE_LEVEL`  | 文件日志等级                |
-| `MAIN_VITE_LOG_MAX_SIZE`    | 单文件轮转阈值，默认 5 MiB  |
-
-开发日志：`logs/main.log`。安装包日志：`<userData>/logs/main.log`（macOS 一般为 `~/Library/Application Support/mediax/logs/main.log`）。超过大小限制后滚动为 `main.YYYY-MM-DD.log`（同日多次滚动为 `main.YYYY-MM-DD.1.log`…）。不记录正文、Cookie、密码。
-
-### 桌面行为（macOS 等）
-
-关闭主窗口默认隐藏到托盘；菜单栏 / Dock 可恢复。窗口几何、标签与草稿保存在 SQLite。单实例运行。全局呼出快捷键默认 `⌘M`，可在设置中修改。
-
 ## 主要功能
 
-| 功能               | 说明                                                   | 状态 |
-| ------------------ | ------------------------------------------------------ | ---- |
-| 多账号会话         | 每账号独立 Electron 分区，登录态互不串扰               | ✅   |
-| 体裁筛选           | 文章 / 动态 / 视频 / 音频，按平台能力筛选可发账号      | ✅   |
-| 本机发布队列       | 确认后并行发布，可配并行数与网速限制                   | ✅   |
-| 草稿与工作区       | SQLite 草稿、标签页与窗口几何可恢复                    | ✅   |
-| 暂停 / 重试 / 核验 | 验证码或改版时暂停，失败可重试，成功可打开结果页       | ✅   |
-| 任务通知           | 成功 / 失败 / 等待处理等系统通知                       | ✅   |
-| 自动更新           | GitHub Releases 检查、设置页手动检查、头像上方更新入口 | ✅   |
-| 主题               | 跟随系统浅色 / 深色                                    | ✅   |
-| 登录时启动         | 系统登录后自动启动，可隐藏到菜单栏                     | ✅   |
-| 深度链接           | `mediax://compose` 等协议打开对应页面                  | ✅   |
-| Dock / 任务栏      | 快捷菜单、发布进度、待处理角标与提醒                   | ✅   |
-| 通知与权限         | 开关、隐私、系统通知权限状态                           | ✅   |
-| 日志与诊断         | 查看 / 打开日志，导出本机诊断报告                      | ✅   |
-| 桌面安装包         | macOS / Windows / Linux（CI 打 `v*` 标签）             | ✅   |
-| 代码签名与公证     | 正式签名、macOS 公证                                   | ⏳   |
-| 定时 / 排期发布    | 内容日历、跨平台排期                                   | ⏳   |
-| Agent 面           | 独立仓 CLI / Skill / MCP，连接本机桌面                 | ⏳   |
+| 功能               | 说明                                                          | 状态 |
+| ------------------ | ------------------------------------------------------------- | ---- |
+| 多账号会话         | 每账号独立 Electron 分区，登录态互不串扰                      | ✅   |
+| 体裁筛选           | 文章 / 动态 / 视频 / 音频，按平台能力筛选可发账号             | ✅   |
+| 本机发布队列       | 确认后并行发布，可配并行数与网速限制                          | ✅   |
+| 草稿与工作区       | SQLite 草稿、标签页与窗口几何可恢复                           | ✅   |
+| 暂停 / 重试 / 核验 | 验证码或改版时暂停，失败可重试，成功可打开结果页              | ✅   |
+| 任务通知           | 成功 / 失败 / 等待处理等系统通知                              | ✅   |
+| 自动更新           | GitHub Releases 检查、设置页手动检查、头像上方更新入口        | ✅   |
+| 主题               | 跟随系统浅色 / 深色                                           | ✅   |
+| 登录时启动         | 系统登录后自动启动，可隐藏到菜单栏                            | ✅   |
+| 深度链接           | `mediax://compose` 等协议打开对应页面                         | ✅   |
+| Dock / 任务栏      | 快捷菜单、发布进度、待处理角标与提醒                          | ✅   |
+| 通知与权限         | 开关、隐私、系统通知权限状态                                  | ✅   |
+| 日志与诊断         | 查看 / 打开日志，导出本机诊断报告                             | ✅   |
+| 桌面安装包         | macOS / Windows / Linux（CI 打 `v*` 标签）                    | ✅   |
+| 代码签名与公证     | 正式签名、macOS 公证                                          | ⏳   |
+| 定时 / 排期发布    | 内容日历、跨平台排期                                          | ⏳   |
+| Agent 面           | 控制面 `/health`+`/doc`+`control.json` 已接；业务命令仍待排期 | 🚧   |
 
 后续桌面能力与排期方向见 [docs/TODO.md](docs/TODO.md)。其余平台编辑器已接入，站点改版后需在对应账号再核对。
 
 ## Agent 面
 
-给 Cursor、Claude 等起草文案、创建或调整排期用的机器接口，放在独立仓库 `[csdog/mediax-agent](https://github.com/csdog/mediax-agent)`（与本桌面仓分开维护）。
+给 Cursor、Claude 等起草文案、创建或调整排期用的机器接口，放在独立仓库 [`csdog/mediax-agent`](https://github.com/csdog/mediax-agent)（与本桌面仓分开维护）。
 
-| 项     | 规划                                                                    |
-| ------ | ----------------------------------------------------------------------- |
-| 形态   | CLI（命令 `mediax`，别名 `mx`）+ Agent Skill；MCP 为同一套能力的薄封装  |
-| 连接   | 本机 loopback HTTP（`127.0.0.1`）+ 本地 token，不经第三方云中转         |
-| 桌面侧 | 主进程 **Hono + OpenAPI/Swagger**（契约源）                             |
-| CLI 侧 | **Bun compile** 单文件；客户端用 **`@openapi-codegen/typescript`** 生成 |
-| 依赖   | **排期发布**与**内容日历**落地后再做可用命令；仓内目前仅为骨架          |
+| 项     | 规划                                                                                                                                 |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 形态   | CLI（命令 `mediax`，别名 `mx`）+ Agent Skill；MCP 为同一套能力的薄封装                                                               |
+| 连接   | 本机 loopback HTTP（`127.0.0.1`）+ 本地 token，不经第三方云中转                                                                      |
+| 桌面侧 | 主进程 **Hono + OpenAPI**：`Eventually` 后监听 loopback，写 `~/.mediax/control.json`；`GET /health`（bearer）、`GET /doc`（OpenAPI） |
+| CLI 侧 | **Bun compile** 单文件；客户端用 **`@openapi-codegen/typescript`** 生成                                                              |
+| 依赖   | **排期发布**与**内容日历**落地后再做可用命令；仓内目前仅为骨架                                                                       |
 
-细节与阻塞关系见 [docs/TODO.md](docs/TODO.md)。仓库内 [AGENTS.md](AGENTS.md) 是给写本仓代码的 Agent 看的开发约定，不是上述产品 Agent 面。
+细节与阻塞关系见 [docs/TODO.md](docs/TODO.md)。人怎么提 PR 见 [CONTRIBUTING.md](CONTRIBUTING.md)；[AGENTS.md](AGENTS.md) 是给写本仓代码的 Agent 看的约定，不是上述产品 Agent 面。
 
 ## Star History
 
