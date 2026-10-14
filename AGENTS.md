@@ -19,6 +19,14 @@ pnpm run fmt
 
 macOS 开发态 Dock / ⌘-Tab 名称优先看 `.app` **文件夹名**（不是 `app.setName`）。`pnpm dev` 前与 `postinstall` 会把 `Electron.app` 重命名为 `MediaX.app` 并同步 `path.txt`；仅改 Info.plist 不够。改完后需完全退出旧进程再开；若 Dock 仍钉着旧的 Electron，右键从 Dock 移除后再启动。
 
+## 版本与发版
+
+对用户可见的功能、重命名、安装包行为或默认配置有实质变化时，**同一批提交里**要抬 `package.json` 的 `version`（semver：破坏性/大改 → minor 或 major；小修 → patch）。不要只推代码、事后再补版本。
+
+打 `v*` 标签（与 `package.json` 一致，如 `v0.2.0`）才会触发 GitHub Actions 打安装包并发 Release。仅 `git push` 主分支不会发版。用户要求「提交并推送」且本批改动属于上述范围时，默认抬版本并推对应标签，除非用户明确说不要发版。
+
+显示名是 **MediaX**；协议、包名、数据目录等标识符用小写 `mediax`（见 `src/shared/product.ts`）。
+
 ## 代码位置
 
 - `src/shared/models.ts`：平台 ID、任务、桌面 API。
