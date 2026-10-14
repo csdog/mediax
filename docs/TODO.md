@@ -26,4 +26,4 @@
 - [ ] **内容日历**：按天 / 周查看排期，拖拽改时间，跨账号统一管理。
 - [ ] **数据分析**：账号与作品维度的阅读、互动等汇总（各平台数据源与权限单独接入）。
 - [ ] **自动化接入**：Public API、n8n / Make、SDK。
-- [ ] **Agent 面**：MCP / CLI，方便用 Cursor、Claude 等起草文案并创建或调整排期。
+- [ ] **Agent 面**（独立仓 [`csdog/mediax-agent`](https://github.com/csdog/mediax-agent)）：CLI（`mediax` / 别名 `mx`）+ Skill，MCP 为同一套能力的薄封装；经本机 loopback HTTP + token 连接桌面。**blocked by** 上方「多平台排期发布」与「内容日历」；仓内目前仅为骨架，无可用命令。

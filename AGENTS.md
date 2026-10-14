@@ -23,7 +23,15 @@ macOS 开发态 Dock / ⌘-Tab 名称优先看 `.app` **文件夹名**（不是 
 
 对用户可见的功能、重命名、安装包行为或默认配置有实质变化时，**同一批提交里**要抬 `package.json` 的 `version`（semver：破坏性/大改 → minor 或 major；小修 → patch）。不要只推代码、事后再补版本。
 
-打 `v*` 标签（与 `package.json` 一致，如 `v0.2.0`）才会触发 GitHub Actions 打安装包并发 Release。仅 `git push` 主分支不会发版。用户要求「提交并推送」且本批改动属于上述范围时，默认抬版本并推对应标签，除非用户明确说不要发版。
+### 走 PR，再打 tag
+
+GitHub Release 的自动 **What's Changed** 只汇总**合并进默认分支的 PR**，不列出直推 `main` 的 commit。因此：
+
+1. 在功能分支上开发并提交（含需要的 version bump）。
+2. 开 PR → 审查 → **merge 进 `main`**（不要把发版相关改动只直推 `main`）。
+3. 在已合并的 `main` 上打并推送 `v*` 标签（与 `package.json` 一致，如 `v0.2.0`），触发 GitHub Actions 打安装包并发 Release。
+
+仅 `git push` 主分支不会发版；仅打 tag 但中间没有合并 PR 时，Release 往往只有 Full Changelog 链接、没有 What's Changed。用户要求「提交并推送」且属于发版范围时：默认走 PR 合并后再打 tag；用户明确说「直推 / 不要 PR」时才直推，并自行写清 release 正文（或接受无 What's Changed）。
 
 显示名是 **MediaX**；协议、包名、数据目录等标识符用小写 `mediax`（见 `src/shared/product.ts`）。
 

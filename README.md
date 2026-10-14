@@ -1,36 +1,14 @@
-<p align="center">
-  <img src="build/icon.png" width="128" height="128" alt="MediaX">
-</p>
+![MediaX](build/icon.png)
 
-<h1 align="center">MediaX</h1>
+# MediaX
 
-<p align="center">
-  <strong>本地多平台内容发布桌面端</strong><br>
-  一次创作，分发到国内外主流媒体平台<br>
-  账号会话隔离 · 本机并行发布 · 不经过第三方云端
-</p>
+**本地多平台内容发布桌面端**  
+一次创作，分发到国内外主流媒体平台  
+账号会话隔离 · 本机并行发布 · 不经过第三方云端
 
-<p align="center">
-  <a href="https://github.com/csdog/mediax/releases"><img src="https://img.shields.io/github/v/release/csdog/mediax?style=flat-square&label=release" alt="release"></a>
-  <a href="https://github.com/csdog/mediax/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/csdog/mediax/build.yml?style=flat-square&label=build" alt="build"></a>
-  <img src="https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-111827?style=flat-square" alt="desktop platforms">
-  <img src="https://img.shields.io/badge/publish-32%20platforms-2563eb?style=flat-square" alt="publish platforms">
-  <img src="https://img.shields.io/badge/login-56%20platforms-0f766e?style=flat-square" alt="login platforms">
-  <img src="https://img.shields.io/badge/Electron-44-47848f?style=flat-square&logo=electron&logoColor=white" alt="Electron">
-  <img src="https://img.shields.io/badge/TypeScript-7-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=black" alt="React">
-</p>
+![release](https://img.shields.io/github/v/release/csdog/mediax?style=flat-square&label=release)![build](https://img.shields.io/github/actions/workflow/status/csdog/mediax/build.yml?style=flat-square&label=build)![desktop platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-111827?style=flat-square)![publish platforms](https://img.shields.io/badge/publish-32%20platforms-2563eb?style=flat-square)![login platforms](https://img.shields.io/badge/login-56%20platforms-0f766e?style=flat-square)![Electron](https://img.shields.io/badge/Electron-44-47848f?style=flat-square&logo=electron&logoColor=white)![TypeScript](https://img.shields.io/badge/TypeScript-7-3178c6?style=flat-square&logo=typescript&logoColor=white)![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=black)
 
-<p align="center">
-  <a href="#支持的平台">支持的平台</a> ·
-  <a href="#特性">特性</a> ·
-  <a href="#主要功能">主要功能</a> ·
-  <a href="#快速开始">快速开始</a> ·
-  <a href="#打包">打包</a> ·
-  <a href="#开发">开发</a> ·
-  <a href="docs/TODO.md">TODO</a> ·
-  <a href="AGENTS.md">Agent 约定</a>
-</p>
+[支持的平台](#支持的平台) · [特性](#特性) · [主要功能](#主要功能) · [快速开始](#快速开始) · [打包](#打包) · [开发](#开发) · [Agent 面](#agent-面) · TODO · [贡献约定](AGENTS.md)
 
 ---
 
@@ -70,55 +48,38 @@
 
 授权网格共 **56** 个平台；其中 **32** 个已接入发布流程，其余可登录、发布适配后续补齐。
 
-<p align="center">
-  <img src="src/renderer/assets/platforms/douyin.png" width="40" height="40" alt="抖音" title="抖音">
-  <img src="src/renderer/assets/platforms/kuaishou.png" width="40" height="40" alt="快手" title="快手">
-  <img src="src/renderer/assets/platforms/channels.png" width="40" height="40" alt="视频号" title="视频号">
-  <img src="src/renderer/assets/platforms/xiaohongshu.png" width="40" height="40" alt="小红书" title="小红书">
-  <img src="src/renderer/assets/platforms/bilibili.png" width="40" height="40" alt="哔哩哔哩" title="哔哩哔哩">
-  <img src="src/renderer/assets/platforms/weibo.png" width="40" height="40" alt="微博" title="微博">
-  <img src="src/renderer/assets/platforms/zhihu.png" width="40" height="40" alt="知乎" title="知乎">
-  <img src="src/renderer/assets/platforms/toutiao.png" width="40" height="40" alt="头条号" title="头条号">
-  <img src="src/renderer/assets/platforms/baijiahao.png" width="40" height="40" alt="百家号" title="百家号">
-  <img src="src/renderer/assets/platforms/wechat.png" width="40" height="40" alt="微信公众号" title="微信公众号">
-  <img src="src/renderer/assets/platforms/youtube.png" width="40" height="40" alt="YouTube" title="YouTube">
-  <img src="src/renderer/assets/platforms/tiktok.png" width="40" height="40" alt="TikTok" title="TikTok">
-  <img src="src/renderer/assets/platforms/facebook.png" width="40" height="40" alt="Facebook" title="Facebook">
-  <img src="src/renderer/assets/platforms/instagram.png" width="40" height="40" alt="Instagram" title="Instagram">
-  <img src="src/renderer/assets/platforms/twitter.png" width="40" height="40" alt="X" title="X">
-  <img src="src/renderer/assets/platforms/threads.png" width="40" height="40" alt="Threads" title="Threads">
-</p>
+![抖音](src/renderer/assets/platforms/douyin.png "抖音")![快手](src/renderer/assets/platforms/kuaishou.png "快手")![视频号](src/renderer/assets/platforms/channels.png "视频号")![小红书](src/renderer/assets/platforms/xiaohongshu.png "小红书")![哔哩哔哩](src/renderer/assets/platforms/bilibili.png "哔哩哔哩")![微博](src/renderer/assets/platforms/weibo.png "微博")![知乎](src/renderer/assets/platforms/zhihu.png "知乎")![头条号](src/renderer/assets/platforms/toutiao.png "头条号")![百家号](src/renderer/assets/platforms/baijiahao.png "百家号")![微信公众号](src/renderer/assets/platforms/wechat.png "微信公众号")![YouTube](src/renderer/assets/platforms/youtube.png "YouTube")![TikTok](src/renderer/assets/platforms/tiktok.png "TikTok")![Facebook](src/renderer/assets/platforms/facebook.png "Facebook")![Instagram](src/renderer/assets/platforms/instagram.png "Instagram")![X](src/renderer/assets/platforms/twitter.png "X")![Threads](src/renderer/assets/platforms/threads.png "Threads")
 
 #### 已支持发布
 
 | 平台            | 文章 | 动态 | 视频 |
-| --------------- | :--: | :--: | :--: |
-| 头条号          |  ✅  |  ✅  |  ✅  |
-| 知乎            |  ✅  |  ✅  |  ✅  |
-| 抖音            |  ✅  |  ✅  |  ✅  |
-| 小红书          |  ✅  |  ✅  |  ✅  |
-| 微博            |  ✅  |  ✅  |  ✅  |
-| 百家号          |  ✅  |  ✅  |  ✅  |
-| Facebook        |  ✅  |  ✅  |  ✅  |
-| 微信公众号      |  ✅  |  ✅  |      |
-| 豆瓣            |  ✅  |  ✅  |      |
-| 知识星球        |  ✅  |  ✅  |      |
-| 哔哩哔哩        |  ✅  |      |  ✅  |
-| 企鹅号          |  ✅  |      |  ✅  |
-| 简书            |  ✅  |      |      |
-| Reddit          |  ✅  |      |      |
-| 快手            |      |  ✅  |  ✅  |
-| 视频号          |      |  ✅  |  ✅  |
-| Instagram       |      |  ✅  |  ✅  |
-| X               |      |  ✅  |  ✅  |
-| Threads         |      |  ✅  |      |
-| Pinterest       |      |  ✅  |      |
-| LinkedIn        |      |  ✅  |      |
-| Google Business |      |  ✅  |      |
-| YouTube         |      |      |  ✅  |
-| TikTok          |      |      |  ✅  |
-| 虎扑            |      |      |  ✅  |
-| 支付宝生活号    |      |      |  ✅  |
+| --------------- | ---- | ---- | ---- |
+| 头条号          | ✅   | ✅   | ✅   |
+| 知乎            | ✅   | ✅   | ✅   |
+| 抖音            | ✅   | ✅   | ✅   |
+| 小红书          | ✅   | ✅   | ✅   |
+| 微博            | ✅   | ✅   | ✅   |
+| 百家号          | ✅   | ✅   | ✅   |
+| Facebook        | ✅   | ✅   | ✅   |
+| 微信公众号      | ✅   | ✅   |      |
+| 豆瓣            | ✅   | ✅   |      |
+| 知识星球        | ✅   | ✅   |      |
+| 哔哩哔哩        | ✅   |      | ✅   |
+| 企鹅号          | ✅   |      | ✅   |
+| 简书            | ✅   |      |      |
+| Reddit          | ✅   |      |      |
+| 快手            |      | ✅   | ✅   |
+| 视频号          |      | ✅   | ✅   |
+| Instagram       |      | ✅   | ✅   |
+| X               |      | ✅   | ✅   |
+| Threads         |      | ✅   |      |
+| Pinterest       |      | ✅   |      |
+| LinkedIn        |      | ✅   |      |
+| Google Business |      | ✅   |      |
+| YouTube         |      |      | ✅   |
+| TikTok          |      |      | ✅   |
+| 虎扑            |      |      | ✅   |
+| 支付宝生活号    |      |      | ✅   |
 
 音频（仅音频）：喜马拉雅、小宇宙、网易云音乐、QQ音乐、蜻蜓FM、荔枝FM。
 
@@ -269,12 +230,25 @@ mise exec -- pnpm run db:check
 | 桌面安装包         | macOS / Windows / Linux（CI 打 `v*` 标签）             | ✅   |
 | 代码签名与公证     | 正式签名、macOS 公证                                   | ⏳   |
 | 定时 / 排期发布    | 内容日历、跨平台排期                                   | ⏳   |
+| Agent 面           | 独立仓 CLI / Skill / MCP，连接本机桌面                 | ⏳   |
 
 后续桌面能力与排期方向见 [docs/TODO.md](docs/TODO.md)。其余平台编辑器已接入，站点改版后需在对应账号再核对。
 
+## Agent 面
+
+给 Cursor、Claude 等起草文案、创建或调整排期用的机器接口，放在独立仓库 `[csdog/mediax-agent](https://github.com/csdog/mediax-agent)`（与本桌面仓分开维护）。
+
+| 项   | 规划                                                                   |
+| ---- | ---------------------------------------------------------------------- |
+| 形态 | CLI（命令 `mediax`，别名 `mx`）+ Agent Skill；MCP 为同一套能力的薄封装 |
+| 连接 | 本机 loopback HTTP（`127.0.0.1`）+ 本地 token，不经第三方云中转        |
+| 依赖 | **排期发布**与**内容日历**落地后再做可用命令；仓内目前仅为骨架         |
+
+细节与阻塞关系见 [docs/TODO.md](docs/TODO.md)。仓库内 [AGENTS.md](AGENTS.md) 是给写本仓代码的 Agent 看的开发约定，不是上述产品 Agent 面。
+
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=csdog/mediax&type=Date)](https://star-history.com/#csdog/mediax&Date)
+![Star History Chart](https://api.star-history.com/svg?repos=csdog/mediax&type=Date)
 
 ## License
 
