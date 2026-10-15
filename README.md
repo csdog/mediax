@@ -144,13 +144,13 @@
 
 给 Cursor、Claude 等起草文案、创建或调整排期用的机器接口，放在独立仓库 [`csdog/mediax-agent`](https://github.com/csdog/mediax-agent)（与本桌面仓分开维护）。
 
-| 项     | 规划                                                                                                                                 |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 形态   | CLI（命令 `mediax`，别名 `mx`）+ Agent Skill；MCP 为同一套能力的薄封装                                                               |
-| 连接   | 本机 loopback HTTP（`127.0.0.1`）+ 本地 token，不经第三方云中转                                                                      |
-| 桌面侧 | 主进程 **Hono + OpenAPI**：`Eventually` 后监听 loopback，写 `~/.mediax/control.json`；`GET /health`（bearer）、`GET /doc`（OpenAPI） |
-| CLI 侧 | **Bun compile** 单文件；客户端用 **`@openapi-codegen/typescript`** 生成                                                              |
-| 依赖   | 桌面已有本机排期/日历；Agent 业务命令仍待接到控制面                                                                                  |
+| 项     | 规划                                                                                                                                       |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 形态   | CLI（命令 `mediax`，别名 `mx`）+ Agent Skill；MCP 为同一套能力的薄封装                                                                     |
+| 连接   | 本机 loopback HTTP（`127.0.0.1`）+ 本地 token，不经第三方云中转                                                                            |
+| 桌面侧 | 主进程 **Hono + OpenAPI**：`Eventually` 后监听 loopback，写 `~/.mediax/agent/control.json`；`GET /health`（bearer）、`GET /doc`（OpenAPI） |
+| CLI 侧 | **Bun compile** 单文件；客户端用 **`@openapi-codegen/typescript`** 生成                                                                    |
+| 依赖   | 桌面已有本机排期/日历；Agent 业务命令仍待接到控制面                                                                                        |
 
 细节与阻塞关系见 [docs/TODO.md](docs/TODO.md)。人怎么提 PR 见 [CONTRIBUTING.md](CONTRIBUTING.md)；[AGENTS.md](AGENTS.md) 是给写本仓代码的 Agent 看的约定，不是上述产品 Agent 面。
 
@@ -158,9 +158,9 @@
 
 本项目由下列组织资助开发。
 
-|                                                                                                | 资助方                  | 简介                                                                                                                       | 链接                                                                                                                                                                                                                                                                                                                                                  |
-| :--------------------------------------------------------------------------------------------: | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <img src="https://www.angryecho.com/apple-touch-icon.png" width="40" height="40" alt="吐槽网"> | **吐槽网（AngryEcho）** | 以兴趣为核心的实时社区：帖子即讨论室，点赞与互动实时同步；从兴趣热点到圈内新鲜事，随时加入讨论，在多元观点中看见事件全貌。 | <a href="https://www.angryecho.com"><img src="https://img.shields.io/badge/官网-angryecho.com-111827?style=flat-square&logo=googlechrome&logoColor=white" alt="官网"></a> <a href="https://www.angryecho.com/c/angryecho"><img src="https://img.shields.io/badge/社区-angryecho-ea580c?style=flat-square&logo=reddit&logoColor=white" alt="社区"></a> |
+|                                                                          | 资助方                  | 简介                                                                                                                       | 链接                                                                                                                                                                                                                                                                                                                                                  |
+| :----------------------------------------------------------------------: | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="build/angryecho-icon.png" width="40" height="40" alt="吐槽网"> | **吐槽网（AngryEcho）** | 以兴趣为核心的实时社区：帖子即讨论室，点赞与互动实时同步；从兴趣热点到圈内新鲜事，随时加入讨论，在多元观点中看见事件全貌。 | <a href="https://www.angryecho.com"><img src="https://img.shields.io/badge/官网-angryecho.com-111827?style=flat-square&logo=googlechrome&logoColor=white" alt="官网"></a> <a href="https://www.angryecho.com/c/angryecho"><img src="https://img.shields.io/badge/社区-angryecho-ea580c?style=flat-square&logo=reddit&logoColor=white" alt="社区"></a> |
 
 ## Star History
 

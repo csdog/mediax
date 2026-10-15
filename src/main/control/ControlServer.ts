@@ -1,9 +1,9 @@
+import type { ServerType } from "@hono/node-server";
+import { app } from "electron";
 import { randomBytes } from "node:crypto";
 import { chmod, mkdir, unlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { dirname } from "node:path";
-import { app } from "electron";
-import type { ServerType } from "@hono/node-server";
 import { log } from "../logging";
 import { createControlApp } from "./createApp";
 import { controlConfigPath } from "./paths";
@@ -62,7 +62,7 @@ async function writeControlConfig(info: {
   }
 }
 
-/** Start loopback Hono control API and publish `~/.mediax/control.json` for mediax-agent. */
+/** Start loopback Hono control API and publish `~/.mediax/agent/control.json` for mediax-agent. */
 export async function startControlServer(): Promise<ControlListenInfo | null> {
   if (process.env.MEDIAX_CONTROL_DISABLE === "1") {
     log.info("Control API disabled via MEDIAX_CONTROL_DISABLE");
