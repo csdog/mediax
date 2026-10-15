@@ -126,7 +126,7 @@ export function AnalyticsPage() {
 
   return (
     <DocumentPage>
-      <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col gap-4 overflow-auto p-0">
+      <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col gap-4 overflow-auto px-8 py-6">
         <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">数据分析</h1>

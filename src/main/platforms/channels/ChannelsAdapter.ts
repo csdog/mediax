@@ -5,6 +5,7 @@ import { openKindEditor, submitKindEditor } from "../editor";
 import { NeedsUser, type Publisher } from "../Publisher";
 import { discoverProfile, replaceText, requireVideo, selectAll, waitUntil } from "../form";
 import { postTitle } from "../postText";
+import { isChannelsPlatformUrl } from "./session";
 
 const homeUrl = "https://channels.weixin.qq.com/platform";
 
@@ -43,9 +44,8 @@ export class ChannelsAdapter implements Publisher {
 
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
-    if (!page.url().includes("channels.weixin.qq.com")) {
-      await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    }
+    // Login polling can run during the QR handoff. Never navigate away from it.
+    if (!isChannelsPlatformUrl(page.url())) return [];
     return discoverProfile(page, accountId, "视频号", loggedOut);
   }
 

@@ -161,11 +161,13 @@ export type TabPreviewOverlay = {
   placeholder: boolean;
 };
 export type ToastOverlayItem = {
+  icon?: string;
   type: string;
   title: string;
   description?: string;
 };
 export type ToastOverlay = {
+  theme?: "light" | "dark";
   x: number;
   y: number;
   width: number;

@@ -358,7 +358,9 @@ export function registerIpc(
   on("closeAccountBrowser", (id) => accounts.close(text(id)));
   on("showTabPreview", (value) => tabPreview.show(previewOverlay(value)));
   on("hideTabPreview", () => tabPreview.hide());
-  on("showToastOverlay", (value) => toastOverlay.show(toastOverlayPayload(value)));
+  on("showToastOverlay", (value) =>
+    toastOverlay.show(toastOverlayPayload(value, window.getContentSize()[0])),
+  );
   on("hideToastOverlay", () => toastOverlay.hide());
   on("refreshAccount", (id) => accounts.refresh(text(id)));
   on("deleteAccount", (id) => accounts.remove(text(id)));
@@ -575,7 +577,7 @@ export function registerIpc(
   );
 }
 
-function toastOverlayPayload(value: unknown): ToastOverlay {
+function toastOverlayPayload(value: unknown, windowWidth: number): ToastOverlay {
   if (!value || typeof value !== "object") throw new Error("无效通知叠层");
   const overlay = value as Record<string, unknown>;
   const number = (item: unknown, name: string) => {
@@ -584,19 +586,27 @@ function toastOverlayPayload(value: unknown): ToastOverlay {
   };
   const width = number(overlay.width, "宽度");
   const height = number(overlay.height, "高度");
-  if (width < 1 || height < 1 || width > 1200 || height > 800) throw new Error("无效通知尺寸");
+  if (width < 1 || height < 1 || width > windowWidth || height > 800)
+    throw new Error("无效通知尺寸");
   const items = Array.isArray(overlay.toasts) ? overlay.toasts : [];
   return {
     x: number(overlay.x, "位置"),
     y: number(overlay.y, "位置"),
     width,
     height,
+    theme: overlay.theme === "dark" ? "dark" : "light",
     toasts: items.slice(0, 3).map((item) => {
       if (!item || typeof item !== "object") throw new Error("无效通知条目");
       const toast = item as Record<string, unknown>;
       const title = typeof toast.title === "string" ? toast.title.slice(0, 200) : "";
       if (!title) throw new Error("无效通知文案");
       return {
+        icon:
+          typeof toast.icon === "string" &&
+          toast.icon.startsWith("data:image/svg+xml,") &&
+          toast.icon.length <= 16_000
+            ? toast.icon
+            : undefined,
         type: typeof toast.type === "string" ? toast.type.slice(0, 32) : "default",
         title,
         description:

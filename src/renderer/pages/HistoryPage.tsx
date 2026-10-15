@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { cn } from "cn";
 import {
   CircleHelp,
@@ -607,6 +608,12 @@ function actionLabel(verb: string, name: string, many: boolean) {
 
 function RecordActions({ task: _task, targets }: { task: Task; targets: TaskTarget[] }) {
   const { run, busy, openBrowser, accounts, reload } = useWorkspace();
+  const republish = useMutation({
+    mutationFn: async (id: string) => {
+      await window.desktop.republish(id);
+      await reload();
+    },
+  });
   const accountsInTask = [...new Map(targets.map((target) => [target.accountId, target])).values()];
   const manyTargets = targets.length > 1;
   const manyAccounts = accountsInTask.length > 1;
@@ -628,16 +635,21 @@ function RecordActions({ task: _task, targets }: { task: Task; targets: TaskTarg
           items.push(
             <ActionIconButton
               key={`${target.id}-republish`}
-              label={actionLabel("重新发布", target.name, manyTargets)}
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await window.desktop.republish(target.id);
-                  await reload();
-                })
-              }
+              label={actionLabel(
+                republish.isPending && republish.variables === target.id
+                  ? "正在重新发布…"
+                  : "重新发布",
+                target.name,
+                manyTargets,
+              )}
+              disabled={busy || republish.isPending}
+              onClick={() => void run(() => republish.mutateAsync(target.id))}
             >
-              <RefreshCw />
+              <RefreshCw
+                className={cn(
+                  republish.isPending && republish.variables === target.id && "animate-spin",
+                )}
+              />
             </ActionIconButton>,
           );
         if (target.status === "pending" || target.status === "awaiting_user")

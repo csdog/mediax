@@ -353,7 +353,7 @@ export function CalendarPage() {
     const at = addScheduleAt.getTime() < min.getTime() ? min : addScheduleAt;
     setAddScheduleOpen(false);
     if (!accounts.length) {
-      toast("请先添加账号", { description: "账号管理中登录后即可排期发布。" });
+      toast("请先在账号管理中添加并登录账号，再排期发布。");
       setPage("accounts");
       return;
     }
@@ -370,7 +370,7 @@ export function CalendarPage() {
             : "请重试；若仍失败，可先使用创作或其他页面。详细信息已写入本地日志。"
         }
       >
-        <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+        <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto px-8 py-6">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">内容日历</h1>
             <p className="text-sm text-muted-foreground">

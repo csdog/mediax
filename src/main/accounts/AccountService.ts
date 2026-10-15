@@ -62,8 +62,10 @@ export class AccountService {
     const account = this.db.account(id);
     const target =
       typeof url === "string" && url.trim() ? url.trim() : platformHome[account.platform];
-    await this.browsers.open(id, target, { platform: account.platform });
+    const view = await this.browsers.open(id, target, { platform: account.platform });
+    if (view.webContents.isDestroyed()) return;
     this.browsers.show(id);
+    await this.syncStatus(id);
     await this.updateAvatar(id);
   }
   /** Open a plain webpage tab (not tied to an account session). */
@@ -71,7 +73,8 @@ export class AccountService {
     if (!/^web-[a-zA-Z0-9-]{1,80}$/.test(id)) throw new Error("无效网页标签");
     const target = url.trim();
     if (!/^https?:\/\//i.test(target)) throw new Error("无效网址");
-    await this.browsers.open(id, target, { partition: `persist:${id}` });
+    const view = await this.browsers.open(id, target, { partition: `persist:${id}` });
+    if (view.webContents.isDestroyed()) return;
     this.browsers.show(id);
   }
   private browserContents(id: string) {
@@ -197,7 +200,7 @@ export class AccountService {
       });
       const pageUrl = view.webContents.getURL();
       const owner =
-        sessionOwner(account.platform, cookies) ??
+        sessionOwner(account.platform, cookies, pageUrl) ??
         (urlLooksLoggedIn(account.platform, pageUrl) ? account.platform : null);
       const actor =
         account.platform === "facebook"
@@ -390,7 +393,30 @@ export class AccountService {
     }
   }
   async refresh(id: string): Promise<AccountInfo> {
-    return this.exclusive(() => this.inspect(id));
+    return this.exclusive(async () => {
+      const account = this.db.account(id);
+      const existing = this.browsers.get(id);
+      if (!existing || existing.webContents.isDestroyed()) {
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const view = await Promise.race([
+            this.browsers.open(id, platformHome[account.platform], {
+              platform: account.platform,
+              focus: false,
+            }),
+            new Promise<never>((_resolve, reject) => {
+              timeout = setTimeout(() => {
+                reject(new Error("账号页面加载超时，请打开账号浏览器确认网络后重试"));
+              }, 15_000);
+            }),
+          ]);
+          if (view.webContents.isDestroyed()) throw new Error("账号检查已取消，请重新检查");
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+      return this.inspect(id);
+    });
   }
   private async inspect(id: string): Promise<AccountInfo> {
     const a = this.db.account(id),
@@ -402,11 +428,14 @@ export class AccountService {
         message: current.login === "unchecked" ? "请先打开账号浏览器并登录" : current.message,
       };
     }
+    if (a.platform === "channels" && view.webContents.isLoadingMainFrame())
+      return this.states.get(id) ?? this.stored(id);
     const url = view.webContents.getURL();
     const cookies = await view.webContents.session.cookies.get({
       url: platformCookieUrl[a.platform],
     });
-    const hasSession = hasPlatformSession(a.platform, cookies) || urlLooksLoggedIn(a.platform, url);
+    const hasSession =
+      hasPlatformSession(a.platform, cookies, url) || urlLooksLoggedIn(a.platform, url);
     const result: AccountInfo = {
       ...a,
       avatar: await this.updateAvatar(id),
@@ -427,7 +456,7 @@ export class AccountService {
           targets?: AccountInfo["targets"];
         } | null;
         const owner =
-          sessionOwner(a.platform, cookies) ??
+          sessionOwner(a.platform, cookies, url) ??
           (urlLooksLoggedIn(a.platform, url) ? a.platform : null);
         const retained = saved && saved.owner === owner ? (saved.targets ?? []) : [];
         const targets = new Map(retained.map((t) => [t.identityId, t]));
@@ -528,6 +557,13 @@ export class AccountService {
   private async syncStatus(id: string) {
     const account = this.db.account(id);
     const view = this.browsers.get(id);
+    if (
+      account.platform === "channels" &&
+      view &&
+      !view.webContents.isDestroyed() &&
+      view.webContents.isLoadingMainFrame()
+    )
+      return;
     const partition =
       view && !view.webContents.isDestroyed()
         ? view.webContents.session
@@ -538,10 +574,12 @@ export class AccountService {
       !url &&
       keepsClosedSession(account.platform) &&
       (this.states.get(id) ?? this.stored(id)).login === "logged_in";
-    const owner =
-      sessionOwner(account.platform, cookies) ??
-      (urlLooksLoggedIn(account.platform, url) || closedLoggedIn ? account.platform : null);
     const previous = this.states.get(id) ?? this.stored(id);
+    const owner =
+      account.platform === "channels" && !url && previous.login !== "logged_in"
+        ? null
+        : (sessionOwner(account.platform, cookies, url) ??
+          (urlLooksLoggedIn(account.platform, url) || closedLoggedIn ? account.platform : null));
     let login: AccountInfo["login"];
     let message = previous.message;
     if (needsVerification(account.platform, url)) {

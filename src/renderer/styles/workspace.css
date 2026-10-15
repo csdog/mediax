@@ -96,6 +96,46 @@ body {
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  view-transition-name: workspace-page;
+}
+.settings-full-page {
+  view-transition-name: workspace-page;
+}
+::view-transition-group(root),
+::view-transition-group(workspace-page) {
+  animation-duration: 0s;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-image-pair(workspace-page) {
+  isolation: isolate;
+}
+::view-transition-old(workspace-page),
+::view-transition-new(workspace-page) {
+  width: 100%;
+  height: 100%;
+  overflow: clip;
+  object-fit: none;
+  object-position: left top;
+  mix-blend-mode: normal;
+}
+::view-transition-old(workspace-page) {
+  animation: workspace-page-out var(--motion-duration) ease both;
+}
+::view-transition-new(workspace-page) {
+  animation: workspace-page-in var(--motion-duration) ease both;
+}
+@keyframes workspace-page-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes workspace-page-in {
+  from {
+    opacity: 0;
+  }
 }
 .workspace-main > * {
   flex: 1;
@@ -306,18 +346,19 @@ body {
 .activity-rail {
   position: relative;
   z-index: 1;
-  width: 44px;
-  min-width: 44px;
+  flex-shrink: 0;
+  width: var(--rail-width);
   height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 10px 0;
+  gap: 8px;
+  padding: 8px var(--rail-padding-x);
   background: transparent;
   color: var(--muted-foreground);
 }
 .activity-rail button {
-  border-radius: 8px;
+  border-radius: 10px;
 }
 .activity-rail button[data-active="true"] {
   color: var(--foreground);
@@ -334,17 +375,17 @@ body {
 .workspace [data-slot="sidebar-container"] {
   top: var(--toolbar-height);
   height: calc(100svh - var(--toolbar-height) - var(--frame-inset));
-  left: 44px;
+  left: var(--rail-width);
   overflow: hidden;
   transition:
     width 0.3s ease,
     opacity 0.3s ease;
 }
 .workspace [data-slot="sidebar"][data-collapsible="offcanvas"] [data-slot="sidebar-container"] {
-  left: 44px;
+  left: var(--rail-width);
 }
 .workspace [data-slot="sidebar"][data-state="collapsed"] [data-slot="sidebar-container"] {
-  left: 44px;
+  left: var(--rail-width);
   width: 0;
   opacity: 0;
   pointer-events: none;
@@ -421,10 +462,10 @@ body {
   flex-direction: column;
   width: 100%;
   min-width: 0;
-  padding: 24px 32px;
+  padding: 0;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 .document-content > [role="status"] {
   margin-bottom: 20px;

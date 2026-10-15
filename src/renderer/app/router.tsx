@@ -70,6 +70,13 @@ export function createWorkspaceRouter() {
     routeTree,
     history: createMemoryHistory({ initialEntries: ["/accounts"] }),
     defaultPendingMinMs: 0,
+    defaultViewTransition: {
+      types: ({ pathChanged }) => {
+        if (!pathChanged) return false;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
+        return ["workspace-page"];
+      },
+    },
     defaultErrorComponent: RouteError,
     defaultOnCatch: (error, errorInfo) => {
       console.error("Route render failed", error, errorInfo);

@@ -1,81 +1,82 @@
-import { BrowserWindow } from "electron";
+import { WebContentsView, type BrowserWindow } from "electron";
 import type { ToastOverlay } from "../../shared/models";
-import type { PreviewRect } from "./preview-slide";
+import sonnerStyles from "../../renderer/styles/sonner.css?raw";
+
+const EDGE_PADDING = 8;
 
 const toastDocument = `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
+${sonnerStyles}
   html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; }
-  body {
-    font: 500 13px/1.5 ui-sans-serif, -apple-system, system-ui, sans-serif;
-    color: #0d0d0d;
-    display: flex;
-    flex-direction: column-reverse;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 8px;
-    box-sizing: border-box;
-    padding: 0;
+  body { box-sizing: border-box; padding: ${EDGE_PADDING}px; }
+  [data-sonner-toaster] {
+    position: static; width: 100%; transform: none; display: flex;
+    flex-direction: column-reverse; gap: 8px; --width: 100%;
   }
-  .toast {
-    box-sizing: border-box;
-    width: 100%;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 14px 16px;
-    border-radius: 16px;
-    border: 1px solid #ebebeb;
-    background: #fff;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+  [data-sonner-toast][data-styled="true"] {
+    position: relative; opacity: 1; transform: none; transition: none;
+    flex-shrink: 0; box-sizing: border-box;
   }
-  .toast[data-type="success"] { background: hsl(143 85% 96%); border-color: hsl(145 92% 87%); color: hsl(140 100% 27%); }
-  .toast[data-type="info"] { background: hsl(208 100% 97%); border-color: hsl(221 91% 93%); color: hsl(210 92% 45%); }
-  .toast[data-type="warning"] { background: hsl(49 100% 97%); border-color: hsl(49 91% 84%); color: hsl(31 92% 45%); }
-  .toast[data-type="error"] { background: hsl(359 100% 97%); border-color: hsl(359 100% 94%); color: hsl(360 100% 45%); }
-  .copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-  .title { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
-  .description { margin: 0; font-weight: 400; line-height: 1.4; opacity: 0.85; overflow-wrap: anywhere; }
+  [data-sonner-toast] [data-icon] img { width: 20px; height: 20px; }
+  [data-sonner-toast][data-type="loading"] [data-icon] img { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
+<div data-sonner-toaster dir="ltr"></div>
 <script>
 function render(data) {
-  document.body.replaceChildren();
+  const host = document.querySelector("[data-sonner-toaster]");
+  host.replaceChildren();
+  host.style.width = data.width + "px";
+  host.dataset.sonnerTheme = data.theme || "light";
   for (const item of data.toasts || []) {
     const toast = document.createElement("div");
-    toast.className = "toast";
+    toast.dataset.sonnerToast = "";
+    toast.dataset.styled = "true";
+    toast.dataset.richColors = "true";
     toast.dataset.type = item.type || "default";
     toast.setAttribute("role", "status");
+    if (item.icon) {
+      const icon = document.createElement("span");
+      icon.dataset.icon = "";
+      const image = document.createElement("img");
+      image.src = item.icon;
+      image.alt = "";
+      icon.append(image);
+      toast.append(icon);
+    }
     const copy = document.createElement("div");
-    copy.className = "copy";
+    copy.dataset.content = "";
     if (item.title) {
       const title = document.createElement("p");
-      title.className = "title";
+      title.dataset.title = "";
+      title.style.margin = "0";
       title.textContent = item.title;
       copy.append(title);
     }
     if (item.description) {
       const description = document.createElement("p");
-      description.className = "description";
+      description.dataset.description = "";
+      description.style.margin = "0";
       description.textContent = item.description;
       copy.append(description);
     }
     toast.append(copy);
-    document.body.append(toast);
+    host.append(toast);
   }
-  return [...document.body.children].reduce((height, toast) => height + toast.getBoundingClientRect().height, 0)
-    + Math.max(0, document.body.children.length - 1) * 8;
+  return host.getBoundingClientRect().height;
 }
 </script>
 </body>
 </html>`;
 
-// A child window stacks above the account WebContentsView, same pattern as tab preview.
+// A native sibling view can be stacked above external pages in the same window.
 export class ToastOverlayWindow {
-  private window: BrowserWindow | null = null;
+  private view: WebContentsView | null = null;
   private ready: Promise<void> | null = null;
   private generation = 0;
   private listening = false;
@@ -84,61 +85,55 @@ export class ToastOverlayWindow {
 
   async show(payload: ToastOverlay) {
     const generation = ++this.generation;
-    const win = this.ensure();
+    const view = this.ensure();
     await this.ready;
-    if (generation !== this.generation || win.isDestroyed() || this.parent.isDestroyed()) return;
-    win.setBounds(this.screenBounds(payload));
-    if (win.webContents.isDestroyed()) return;
-    const height: number = await win.webContents.executeJavaScript(
+    if (
+      generation !== this.generation ||
+      view.webContents.isDestroyed() ||
+      this.parent.isDestroyed()
+    )
+      return;
+    const width = Math.max(1, Math.round(payload.width)) + EDGE_PADDING * 2;
+    view.setBounds({
+      x: Math.round(payload.x) - EDGE_PADDING,
+      y: Math.round(payload.y),
+      width,
+      height: 1,
+    });
+    const height: number = await view.webContents.executeJavaScript(
       `render(${JSON.stringify(payload)})`,
     );
-    if (generation !== this.generation || win.isDestroyed()) return;
-    const bounds = this.screenBounds(payload);
+    if (
+      generation !== this.generation ||
+      view.webContents.isDestroyed() ||
+      this.parent.isDestroyed()
+    )
+      return;
     const measuredHeight = Math.max(1, Math.ceil(height));
-    win.setBounds({
-      ...bounds,
-      y: bounds.y + bounds.height - measuredHeight,
-      height: measuredHeight,
+    view.setBounds({
+      x: Math.round(payload.x) - EDGE_PADDING,
+      y: Math.round(payload.y + payload.height - measuredHeight) - EDGE_PADDING,
+      width,
+      height: measuredHeight + EDGE_PADDING * 2,
     });
-    if (!win.isVisible()) win.showInactive();
+    // Re-adding an existing child moves it above the active external page.
+    this.parent.contentView.addChildView(view);
+    view.setVisible(true);
   }
 
   hide() {
     this.generation++;
-    const win = this.window;
-    this.window = null;
+    const view = this.view;
+    this.view = null;
     this.ready = null;
-    if (win && !win.isDestroyed()) win.destroy();
-  }
-
-  private screenBounds(payload: ToastOverlay): PreviewRect {
-    const content = this.parent.getContentBounds();
-    return {
-      x: Math.round(content.x + payload.x),
-      y: Math.round(content.y + payload.y),
-      width: Math.max(1, Math.round(payload.width)),
-      height: Math.max(1, Math.round(payload.height)),
-    };
+    if (!view) return;
+    if (!this.parent.isDestroyed()) this.parent.contentView.removeChildView(view);
+    if (!view.webContents.isDestroyed()) view.webContents.close();
   }
 
   private ensure() {
-    if (this.window && !this.window.isDestroyed()) return this.window;
-    const win = new BrowserWindow({
-      parent: this.parent,
-      frame: false,
-      transparent: true,
-      hasShadow: false,
-      resizable: false,
-      movable: false,
-      minimizable: false,
-      maximizable: false,
-      fullscreenable: false,
-      closable: false,
-      focusable: false,
-      skipTaskbar: true,
-      show: false,
-      roundedCorners: true,
-      backgroundColor: "#00000000",
+    if (this.view && !this.view.webContents.isDestroyed()) return this.view;
+    const view = new WebContentsView({
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -146,13 +141,17 @@ export class ToastOverlayWindow {
         spellcheck: false,
       },
     });
-    win.setIgnoreMouseEvents(true);
-    this.ready = win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(toastDocument)}`);
+    view.setVisible(false);
+    view.setBackgroundColor("#00000000");
+    this.parent.contentView.addChildView(view);
+    this.ready = view.webContents.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(toastDocument)}`,
+    );
     if (!this.listening) {
       this.listening = true;
       this.parent.once("closed", () => this.hide());
     }
-    this.window = win;
-    return win;
+    this.view = view;
+    return view;
   }
 }

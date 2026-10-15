@@ -1,5 +1,6 @@
 import { BrowserWindow, WebContentsView, type Session } from "electron";
 import { CdpBridge } from "./CdpBridge";
+import { log } from "../logging";
 import type { BrowserBounds, PlatformId } from "../../shared/models";
 export class AccountBrowserManager {
   private windows = new Map<string, BrowserWindow>();
@@ -90,6 +91,14 @@ export class AccountBrowserManager {
     if (win && !win.isDestroyed()) win.destroy();
     if (this.activeId === id) this.activeId = null;
   }
+  private async loadURL(view: WebContentsView, url: string) {
+    try {
+      await view.webContents.loadURL(url);
+    } catch (error) {
+      // Closing a loading tab cancels navigation (sometimes ERR_FAILED, not ERR_ABORTED).
+      if (!view.webContents.isDestroyed()) throw error;
+    }
+  }
   async open(
     accountId: string,
     url: string,
@@ -100,9 +109,9 @@ export class AccountBrowserManager {
       if (!existing.webContents.isDestroyed()) this.onSession?.(existing.webContents.session);
       if (url && !existing.webContents.isDestroyed()) {
         const current = existing.webContents.getURL();
-        if (current !== url) await existing.webContents.loadURL(url);
+        if (current !== url) await this.loadURL(existing, url);
       }
-      if (options?.focus !== false) this.show(accountId);
+      if (!existing.webContents.isDestroyed() && options?.focus !== false) this.show(accountId);
       return existing;
     }
     if (!/^[a-zA-Z0-9-]+$/.test(accountId)) throw new Error("Invalid account ID");
@@ -124,6 +133,33 @@ export class AccountBrowserManager {
     view.setBounds({ x: 0, y: 44, width: 1000, height: 700 });
     view.setVisible(!this.host);
     view.webContents.setBackgroundThrottling(false);
+    // Keep the bundled Chromium version, but omit desktop-shell product tokens.
+    // Some platforms (including Channels) redirect Electron UAs before session validation.
+    view.webContents.setUserAgent(
+      view.webContents.getUserAgent().replace(/\s(?:Electron|MediaX)\/\S+/gi, ""),
+    );
+    if (options?.platform === "channels") {
+      const trace = (phase: string, url: string, status?: number) => {
+        try {
+          const page = new URL(url);
+          // OAuth codes/state live in the query/hash; never log either.
+          log.info("Channels navigation", {
+            phase,
+            path: `${page.origin}${page.pathname}`,
+            status,
+          });
+        } catch {
+          /* Ignore blank or non-URL navigation events. */
+        }
+      };
+      view.webContents.on("did-start-navigation", (_event, url, _inPlace, mainFrame) => {
+        if (mainFrame) trace("start", url);
+      });
+      view.webContents.on("did-redirect-navigation", (_event, url, _inPlace, mainFrame) => {
+        if (mainFrame) trace("redirect", url);
+      });
+      view.webContents.on("did-navigate", (_event, url, status) => trace("loaded", url, status));
+    }
     win.contentView.addChildView(view);
     this.views.set(accountId, view);
     view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -139,7 +175,7 @@ export class AccountBrowserManager {
       this.windows.set(accountId, win);
       win.on("closed", () => this.close(accountId));
     }
-    await view.webContents.loadURL(url);
+    await this.loadURL(view, url);
     return view;
   }
 }

@@ -109,3 +109,31 @@ it("stores the selected platform on a new account", () => {
   expect(reddit.platform).toBe("reddit");
   db.close();
 });
+
+it("does not treat a WeChat identity cookie or the Channels login page as an authenticated session", () => {
+  expect(hasPlatformSession("channels", [{ name: "wxuin" }])).toBe(false);
+  const cookies = [
+    { name: "sessionid", value: "expired" },
+    { name: "wxuin", value: "user" },
+  ];
+  expect(hasPlatformSession("channels", cookies, "https://channels.weixin.qq.com/login.html")).toBe(
+    false,
+  );
+  expect(sessionOwner("channels", cookies, "https://channels.weixin.qq.com/login.html")).toBeNull();
+  expect(
+    hasPlatformSession("channels", cookies, "https://open.weixin.qq.com/connect/qrconnect"),
+  ).toBe(false);
+  expect(
+    hasPlatformSession("channels", cookies, "https://open.weixin.qq.com/connect/confirm"),
+  ).toBe(false);
+  expect(
+    hasPlatformSession(
+      "channels",
+      cookies,
+      "https://channels.weixin.qq.com/auth/callback?code=test",
+    ),
+  ).toBe(false);
+  expect(hasPlatformSession("channels", cookies, "https://channels.weixin.qq.com/platform")).toBe(
+    true,
+  );
+});

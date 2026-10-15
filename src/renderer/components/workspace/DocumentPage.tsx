@@ -9,7 +9,6 @@ export function DocumentPage({ children }: { children: ReactNode }) {
         "document-content",
         (page === "compose" || page === "video") && "compose-content",
         page === "accounts" && "accounts-content",
-        page === "history" && "compose-content",
       )}
     >
       <h1 className="sr-only">{pageTitle}</h1>

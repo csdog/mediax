@@ -5,6 +5,18 @@ function toasterEl() {
   return document.querySelector<HTMLElement>("[data-sonner-toaster]");
 }
 
+function toastIcon(toast: HTMLElement) {
+  const svg = toast.querySelector<SVGElement>("[data-icon] svg");
+  if (!svg) return undefined;
+  const icon = svg.cloneNode(true) as SVGElement;
+  const style = getComputedStyle(svg);
+  icon.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  icon.setAttribute("width", "20");
+  icon.setAttribute("height", "20");
+  icon.setAttribute("style", `color:${style.color};stroke-width:${style.strokeWidth}`);
+  return `data:image/svg+xml,${encodeURIComponent(icon.outerHTML)}`;
+}
+
 function readToasts() {
   return [...document.querySelectorAll<HTMLElement>("[data-sonner-toast]")].map((toast) => {
     const title =
@@ -13,6 +25,7 @@ function readToasts() {
       "";
     const description = toast.querySelector<HTMLElement>("[data-description]")?.textContent?.trim();
     return {
+      icon: toastIcon(toast),
       type: toast.getAttribute("data-type") || "default",
       title: title.slice(0, 200),
       description: description ? description.slice(0, 200) : undefined,
@@ -20,7 +33,7 @@ function readToasts() {
   });
 }
 
-/** Mirror Sonner into a child window while an account WebContentsView would cover the HTML toaster. */
+/** Mirror Sonner into a native view while an account WebContentsView would cover the HTML toaster. */
 export function useNativeToastOverlay(enabled: boolean) {
   const { toasts } = useSonner();
   const toastCount = toasts.length;
@@ -48,18 +61,29 @@ export function useNativeToastOverlay(enabled: boolean) {
         return;
       }
       const payload = {
+        theme:
+          host.getAttribute("data-sonner-theme") === "dark"
+            ? ("dark" as const)
+            : ("light" as const),
         x: box.x,
         y: box.y,
         width: box.width,
         // Sonner positions every toast absolutely, so its host can have zero height.
-        // The native window measures its own content and anchors it at this bottom edge.
+        // The native view measures its own content and anchors it at this bottom edge.
         height: Math.max(1, box.height),
         toasts: items.slice(0, 3),
       };
       const key = JSON.stringify(payload);
       if (key === published) return;
       published = key;
-      void show(payload);
+      void show(payload)
+        .then(() => {
+          if (!stopped) host.setAttribute("data-native-mirrored", "");
+        })
+        .catch(() => {
+          published = "";
+          host.removeAttribute("data-native-mirrored");
+        });
     };
     const watch = () => {
       if (stopped) return;
@@ -83,6 +107,7 @@ export function useNativeToastOverlay(enabled: boolean) {
       cancelAnimationFrame(frame);
       resize.disconnect();
       mutations.disconnect();
+      toasterEl()?.removeAttribute("data-native-mirrored");
       void hide();
     };
   }, [enabled, toastCount]);

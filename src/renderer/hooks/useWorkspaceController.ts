@@ -370,7 +370,7 @@ export function useWorkspaceController() {
     if (!initialized) return;
     return window.desktop.onCommand?.((command) => {
       if (command.action === "toast") {
-        toast(command.title, { description: command.body, duration: 7000 });
+        toast([command.title, command.body].filter(Boolean).join("："), { duration: 7000 });
         return;
       }
       if (busy && command.action !== "navigate") return;
