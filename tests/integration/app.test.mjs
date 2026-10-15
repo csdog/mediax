@@ -74,7 +74,8 @@ test(
             path: join(tmpdir(), "mediax-accounts.png"),
             animations: "disabled",
           });
-          await page.getByRole("button", { name: "内容发布", exact: true }).click();
+          await page.getByRole("button", { name: "发布", exact: true }).click();
+          await page.getByRole("button", { name: "发布图文" }).click();
           await page.getByLabel("发布正文").waitFor();
           if (phase === "first") {
             await page.getByLabel("发布正文").fill("A durable local draft");

@@ -10,6 +10,7 @@ import {
 } from "@/components/workspace/CodexNavigationIcons";
 import { UsersIcon, createLucideIcon } from "lucide-react";
 import type { DesktopPage } from "../../shared/models";
+
 // Filled counterparts keep the same subject and silhouette as the outline icons.
 const UsersFilledIcon = createLucideIcon("UsersFilled", [
   [
@@ -61,12 +62,15 @@ const HistoryFilledIcon = createLucideIcon("HistoryFilled", [
   ],
 ]);
 
-export const navigation: {
+export type DesktopNavItem = {
   id: DesktopPage;
   title: string;
   icon: typeof UsersIcon;
   selectedIcon: typeof UsersIcon;
-}[] = [
+};
+
+/** All desktop pages (routes + titles). Compose/video are opened via the Publish dialog. */
+export const desktopPages: DesktopNavItem[] = [
   { id: "accounts", title: "账号管理", icon: CodexUsersIcon, selectedIcon: UsersFilledIcon },
   { id: "compose", title: "内容发布", icon: CodexSendIcon, selectedIcon: SendFilledIcon },
   { id: "video", title: "视频", icon: CodexVideoIcon, selectedIcon: CodexVideoFilledIcon },
@@ -79,3 +83,8 @@ export const navigation: {
   },
   { id: "history", title: "发布记录", icon: CodexHistoryIcon, selectedIcon: HistoryFilledIcon },
 ];
+
+/** Sidebar / activity rail entries — publish entry is the header「发布」dialog, not these pages. */
+export const navigation: DesktopNavItem[] = desktopPages.filter(
+  (item) => item.id !== "compose" && item.id !== "video",
+);

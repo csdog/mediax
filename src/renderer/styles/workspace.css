@@ -40,7 +40,7 @@ body {
   height: 100svh;
   min-height: 0;
   overflow: hidden;
-  padding-top: 44px;
+  padding-top: var(--toolbar-height);
   background: var(--chrome);
 }
 /* One rounded surface joins the sidebar and the content, inset from the window shell. */
@@ -63,20 +63,50 @@ body {
 .app-toolbar {
   position: fixed;
   inset: 0 0 auto;
-  height: 44px;
+  height: var(--toolbar-height);
   z-index: 30;
   display: flex;
   align-items: center;
   background: transparent;
   padding-left: 88px;
-  gap: 10px;
+  padding-right: 10px;
+  gap: 8px;
   color: var(--muted-foreground);
+}
+.browser-chrome-stack {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+.browser-chrome {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: var(--browser-chrome-height);
+  padding: 0 12px;
+  gap: 8px;
+  color: var(--muted-foreground);
+}
+.workspace-main {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.workspace-main > * {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 .toolbar-navigation {
   display: flex;
   align-items: center;
   gap: 2px;
-  width: 168px;
+  flex-shrink: 0;
 }
 .toolbar-navigation button,
 .toolbar-navigation .toolbar-nav-button {
@@ -92,9 +122,174 @@ body {
 .toolbar-navigation button:disabled {
   opacity: 0.4;
 }
-.workspace .toolbar-navigation [data-slot="button"] svg {
+.workspace .browser-chrome-actions [data-slot="button"] svg {
   width: 16px;
   height: 16px;
+}
+.toolbar-omnibox {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+.toolbar-omnibox:focus-within {
+  background: var(--card);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--emphasis) 45%, transparent);
+}
+.toolbar-omnibox input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: var(--font-size-control);
+  line-height: var(--line-height-caption);
+}
+.toolbar-omnibox input::placeholder {
+  color: var(--hint);
+}
+.browser-chrome-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 1px;
+  padding: 2px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+.browser-chrome-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 10px 6px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-control);
+  font-weight: 500;
+  color: var(--foreground);
+}
+.browser-chrome-panel-empty {
+  margin: 0;
+  padding: 28px 16px;
+  text-align: center;
+  font-size: var(--font-size-caption);
+  color: var(--muted-foreground);
+}
+.browser-download-list {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  max-height: 320px;
+  overflow: auto;
+}
+.browser-download-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 6px 8px 8px;
+  border-radius: 10px;
+}
+.browser-download-item:hover {
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+.browser-download-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  color: var(--muted-foreground);
+}
+.browser-download-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.browser-download-meta {
+  min-width: 0;
+  flex: 1;
+}
+.browser-download-name,
+.browser-download-status {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.browser-download-name {
+  font-size: var(--font-size-control);
+  color: var(--foreground);
+}
+.browser-download-status {
+  margin-top: 2px;
+  font-size: var(--font-size-caption);
+  color: var(--muted-foreground);
+}
+.browser-download-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 1px;
+}
+.browser-options-menu {
+  padding: 4px;
+}
+.browser-zoom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 8px;
+  font-size: var(--font-size-control);
+  color: var(--foreground);
+}
+.browser-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+.browser-zoom-value {
+  min-width: 3rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-caption);
+}
+.browser-find-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 12px 6px;
+}
+.browser-find-bar input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  outline: none;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 8%, transparent);
+  color: var(--foreground);
+  font-size: var(--font-size-control);
+}
+.browser-find-bar input:focus {
+  background: var(--card);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--emphasis) 45%, transparent);
 }
 .toolbar-tab {
   height: 36px;
@@ -137,8 +332,8 @@ body {
   transition: width 0.3s ease;
 }
 .workspace [data-slot="sidebar-container"] {
-  top: 44px;
-  height: calc(100svh - 44px - var(--frame-inset));
+  top: var(--toolbar-height);
+  height: calc(100svh - var(--toolbar-height) - var(--frame-inset));
   left: 44px;
   overflow: hidden;
   transition:
@@ -222,6 +417,8 @@ body {
   color: var(--muted-foreground);
 }
 .document-content {
+  display: flex;
+  flex-direction: column;
   width: 100%;
   padding: 24px 32px;
   flex: 1;

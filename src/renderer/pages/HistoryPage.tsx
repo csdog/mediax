@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   CircleHelp,
   Download,
@@ -9,10 +9,10 @@ import {
   Video,
   LayoutGrid,
   List,
-  MoreHorizontal,
+  Monitor,
   Play,
   Plus,
-  RotateCcw,
+  RefreshCw,
   Search,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,7 @@ import {
   EmptyDescription,
 } from "@/components/ui/empty";
 import { DocumentPage } from "@/components/workspace/DocumentPage";
+import { PublishKindDialog } from "@/components/workspace/PublishKindDialog";
 import { useWorkspace } from "@/app/WorkspaceContext";
 import type { AccountInfo, Status, Task, TaskTarget } from "../../shared/models";
 
@@ -128,7 +129,7 @@ function matchesStatus(targets: TaskTarget[], filter: string) {
 }
 
 export function HistoryPage() {
-  const { records, focusedTask, run, busy, accounts, reload, setPage, body, images } =
+  const { records, focusedTask, run, busy, accounts, reload, openPublish, body, images } =
     useWorkspace();
   const [pane, setPane] = useState<Pane>("records");
   const [query, setQuery] = useState("");
@@ -137,6 +138,7 @@ export function HistoryPage() {
   const [status, setStatus] = useState("all");
   const [mode, setMode] = useState("all");
   const [view, setView] = useState<"list" | "grid">("list");
+  const [publishKindOpen, setPublishKindOpen] = useState(false);
   const draftCount = body.trim() || images.length ? 1 : 0;
   const publishers = useMemo(() => {
     const names = new Map<string, string>();
@@ -333,12 +335,20 @@ export function HistoryPage() {
                   <Download />
                   导出
                 </Button>
-                <Button onClick={() => setPage("compose")}>
+                <Button onClick={() => setPublishKindOpen(true)}>
                   <Plus />
                   新增发布
                 </Button>
               </div>
             </div>
+            <PublishKindDialog
+              open={publishKindOpen}
+              onOpenChange={setPublishKindOpen}
+              onSelect={(next) => {
+                openPublish(next);
+                void run(reload);
+              }}
+            />
             <div
               className={`account-list-surface ${view === "grid" ? "account-grid-surface" : ""}`}
             >
@@ -368,7 +378,7 @@ export function HistoryPage() {
                       <TableHead>任务概况</TableHead>
                       <TableHead>状态</TableHead>
                       <TableHead>创建时间</TableHead>
-                      <TableHead>操作</TableHead>
+                      <TableHead className="text-center">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -387,7 +397,7 @@ export function HistoryPage() {
                     >
                       <Work task={row.task} />
                       <RecordFacts {...row} />
-                      <RecordMenu {...row} />
+                      <RecordActions {...row} />
                     </article>
                   ))}
                 </div>
@@ -539,8 +549,8 @@ function RecordRow({
       <TableCell className="text-muted-foreground">
         {task.scheduledAt ? stamp(task.scheduledAt) : stamp(task.createdAt)}
       </TableCell>
-      <TableCell>
-        <RecordMenu task={task} targets={targets} />
+      <TableCell className="text-center">
+        <RecordActions task={task} targets={targets} />
       </TableCell>
     </TableRow>
   );
@@ -550,97 +560,111 @@ function actionLabel(verb: string, name: string, many: boolean) {
   return many ? `${verb} ${name}` : verb;
 }
 
-function RecordMenu({ task, targets }: { task: Task; targets: TaskTarget[] }) {
+function ActionIconButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        delay={400}
+        render={
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={label}
+            disabled={disabled}
+            onClick={onClick}
+          >
+            {children}
+          </Button>
+        }
+      />
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function RecordActions({ task: _task, targets }: { task: Task; targets: TaskTarget[] }) {
   const { run, busy, openBrowser, accounts, reload } = useWorkspace();
   const accountsInTask = [...new Map(targets.map((target) => [target.accountId, target])).values()];
   const manyTargets = targets.length > 1;
   const manyAccounts = accountsInTask.length > 1;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button variant="ghost" size="icon" aria-label={`操作 ${titleOf(task.body)}`}>
-            <MoreHorizontal />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" className="history-record-menu">
-        {targets.flatMap((target) => {
-          const items = [];
-          if (target.url)
-            items.push(
-              <DropdownMenuItem
-                key={`${target.id}-open`}
-                onClick={() => void run(() => window.desktop.openPost(target.url!))}
-              >
-                <ExternalLink />
-                {actionLabel("查看", target.name, manyTargets)}
-              </DropdownMenuItem>,
-            );
-          if (target.status === "failed")
-            items.push(
-              <DropdownMenuItem
-                key={`${target.id}-retry`}
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    await window.desktop.retry(target.id);
-                    await reload();
-                  })
-                }
-              >
-                <RotateCcw />
-                {actionLabel("重试", target.name, manyTargets)}
-              </DropdownMenuItem>,
-            );
-          if (target.status === "pending" || target.status === "awaiting_user")
-            items.push(
-              <DropdownMenuItem
-                key={`${target.id}-resume`}
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    await window.desktop.resume(target.id);
-                    await reload();
-                  })
-                }
-              >
-                <Play />
-                {actionLabel("继续", target.name, manyTargets)}
-              </DropdownMenuItem>,
-            );
-          return items;
-        })}
-        {accountsInTask.map((target) => (
-          <DropdownMenuItem
+    <div className="history-record-actions">
+      {targets.flatMap((target) => {
+        const items = [];
+        if (target.url)
+          items.push(
+            <ActionIconButton
+              key={`${target.id}-open`}
+              label={actionLabel("打开", target.name, manyTargets)}
+              onClick={() => void run(() => window.desktop.openPost(target.url!))}
+            >
+              <ExternalLink />
+            </ActionIconButton>,
+          );
+        if (["failed", "submitted", "verified", "unknown"].includes(target.status))
+          items.push(
+            <ActionIconButton
+              key={`${target.id}-republish`}
+              label={actionLabel("重新发布", target.name, manyTargets)}
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await window.desktop.republish(target.id);
+                  await reload();
+                })
+              }
+            >
+              <RefreshCw />
+            </ActionIconButton>,
+          );
+        if (target.status === "pending" || target.status === "awaiting_user")
+          items.push(
+            <ActionIconButton
+              key={`${target.id}-resume`}
+              label={actionLabel("继续", target.name, manyTargets)}
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await window.desktop.resume(target.id);
+                  await reload();
+                })
+              }
+            >
+              <Play />
+            </ActionIconButton>,
+          );
+        return items;
+      })}
+      {accountsInTask.map((target) => {
+        const name =
+          accounts.find((account) => account.id === target.accountId)?.name ?? target.name;
+        return (
+          <ActionIconButton
             key={`${target.accountId}-browser`}
+            label={actionLabel("打开账号", name, manyAccounts)}
             disabled={busy}
-            onClick={() =>
-              void run(() =>
-                openBrowser({
-                  id: target.accountId,
-                  name:
-                    accounts.find((account) => account.id === target.accountId)?.name ??
-                    target.name,
-                }),
-              )
-            }
+            onClick={() => void run(() => openBrowser({ id: target.accountId, name }))}
           >
-            <ExternalLink />
-            {actionLabel(
-              "打开",
-              accounts.find((account) => account.id === target.accountId)?.name ?? target.name,
-              manyAccounts,
-            )}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+            <Monitor />
+          </ActionIconButton>
+        );
+      })}
+    </div>
   );
 }
 
 function DraftPane() {
-  const { body, images, contentKind, title, setPage } = useWorkspace();
+  const { body, images, contentKind, title, openPublish, run, reload } = useWorkspace();
   if (!body.trim() && !images.length)
     return (
       <Empty className="m-auto py-16">
@@ -649,7 +673,7 @@ function DraftPane() {
             <FileText />
           </EmptyMedia>
           <EmptyTitle>草稿箱是空的</EmptyTitle>
-          <EmptyDescription>在内容发布里保存的草稿会出现在这里。</EmptyDescription>
+          <EmptyDescription>在发布页保存的草稿会出现在这里。</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -669,7 +693,13 @@ function DraftPane() {
       <p className="text-muted-foreground">
         {images.length ? `${images.length} 张图片 · ` : ""}尚未发布
       </p>
-      <Button variant="outline" onClick={() => setPage("compose")}>
+      <Button
+        variant="outline"
+        onClick={() => {
+          openPublish(contentKind);
+          void run(reload);
+        }}
+      >
         继续编辑
       </Button>
     </div>

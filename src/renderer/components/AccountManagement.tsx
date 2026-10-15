@@ -34,6 +34,7 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Empty,
+  EmptyContent,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
@@ -78,7 +79,8 @@ const loginLabels = {
 type Props = {
   accounts: AccountInfo[];
   busy: boolean;
-  onAuthorize(): void;
+  /** Pass a platform id to skip the picker when the sidebar already filters one. */
+  onAuthorize(platformId?: PlatformId): void;
   onOpen(account: AccountInfo): void;
   onRefresh(ids: string[]): void;
   onDelete(account: AccountInfo): void;
@@ -109,6 +111,8 @@ export function AccountManagement({
   const allSelected = filtered.length > 0 && filtered.every((a) => chosen.includes(a.id));
   const toggle = (id: string, checked: boolean) =>
     setSelected((old) => (checked ? [...new Set([...old, id])] : old.filter((x) => x !== id)));
+  const selectedPlatform = platform !== "all" ? (platform as PlatformId) : undefined;
+  const startAuthorize = () => onAuthorize(selectedPlatform);
   const identity = (account: AccountInfo) => (
     <div className="account-identity">
       <Avatar className="size-10">
@@ -346,9 +350,10 @@ export function AccountManagement({
                 <RefreshCw />
                 批量检查{chosen.length ? ` (${chosen.length})` : ""}
               </Button>
-              <Button disabled={busy} aria-label="添加账号" onClick={onAuthorize}>
+              <Button disabled={busy} aria-label="添加账号" onClick={startAuthorize}>
                 <Plus />
                 授权账号
+                {selectedPlatform ? ` · ${platformInfo[selectedPlatform].label}` : ""}
               </Button>
             </div>
           </div>
@@ -364,10 +369,19 @@ export function AccountManagement({
                   </EmptyTitle>
                   <EmptyDescription>
                     {accounts.length
-                      ? "试试其他名称或登录状态。"
-                      : "点击右上角授权账号，每个账号使用独立的浏览器会话。"}
+                      ? selectedPlatform
+                        ? `当前筛选「${platformInfo[selectedPlatform].label}」下没有账号，可直接授权该平台。`
+                        : "试试其他名称或登录状态，或授权一个新账号。"
+                      : "每个账号使用独立的浏览器会话；授权后即可在本机发布。"}
                   </EmptyDescription>
                 </EmptyHeader>
+                <EmptyContent>
+                  <Button disabled={busy} onClick={startAuthorize}>
+                    <Plus />
+                    授权账号
+                    {selectedPlatform ? ` · ${platformInfo[selectedPlatform].label}` : ""}
+                  </Button>
+                </EmptyContent>
               </Empty>
             ) : view === "list" ? (
               <Table>

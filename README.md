@@ -50,45 +50,40 @@
 
 #### 已支持发布
 
-|                                                                                            | 平台            | 文章 | 动态 | 视频 |
-| ------------------------------------------------------------------------------------------ | --------------- | ---- | ---- | ---- |
-| <img src="src/renderer/assets/platforms/toutiao.png" width="20" height="20" alt="">        | 头条号          | ✅   | ✅   | ✅   |
-| <img src="src/renderer/assets/platforms/zhihu.png" width="20" height="20" alt="">          | 知乎            | ✅   | ✅   | ✅   |
-| <img src="src/renderer/assets/platforms/douyin.png" width="20" height="20" alt="">         | 抖音            | ✅   | ✅   | ✅   |
-| <img src="src/renderer/assets/platforms/xiaohongshu.png" width="20" height="20" alt="">    | 小红书          | ✅   | ✅   | ✅   |
-| <img src="src/renderer/assets/platforms/weibo.png" width="20" height="20" alt="">          | 微博            | ✅   | ✅   | ✅   |
-| <img src="src/renderer/assets/platforms/baijiahao.png" width="20" height="20" alt="">      | 百家号          | ✅   | ✅   | ✅   |
-| <img src="src/renderer/assets/platforms/facebook.png" width="20" height="20" alt="">       | Facebook        | ✅   | ✅   | ✅   |
-| <img src="src/renderer/assets/platforms/wechat.png" width="20" height="20" alt="">         | 微信公众号      | ✅   | ✅   |      |
-| <img src="src/renderer/assets/platforms/douban.png" width="20" height="20" alt="">         | 豆瓣            | ✅   | ✅   |      |
-| <img src="src/renderer/assets/platforms/zsxq.png" width="20" height="20" alt="">           | 知识星球        | ✅   | ✅   |      |
-| <img src="src/renderer/assets/platforms/bilibili.png" width="20" height="20" alt="">       | 哔哩哔哩        | ✅   |      | ✅   |
-| <img src="src/renderer/assets/platforms/qq.png" width="20" height="20" alt="">             | 企鹅号          | ✅   |      | ✅   |
-| <img src="src/renderer/assets/platforms/jianshu.png" width="20" height="20" alt="">        | 简书            | ✅   |      |      |
-| <img src="src/renderer/assets/platforms/reddit.png" width="20" height="20" alt="">         | Reddit          | ✅   |      |      |
-| <img src="src/renderer/assets/platforms/kuaishou.png" width="20" height="20" alt="">       | 快手            |      | ✅   | ✅   |
-| <img src="src/renderer/assets/platforms/channels.png" width="20" height="20" alt="">       | 视频号          |      | ✅   | ✅   |
-| <img src="src/renderer/assets/platforms/instagram.png" width="20" height="20" alt="">      | Instagram       |      | ✅   | ✅   |
-| <img src="src/renderer/assets/platforms/twitter.png" width="20" height="20" alt="">        | X               |      | ✅   | ✅   |
-| <img src="src/renderer/assets/platforms/threads.png" width="20" height="20" alt="">        | Threads         |      | ✅   |      |
-| <img src="src/renderer/assets/platforms/pinterest.png" width="20" height="20" alt="">      | Pinterest       |      | ✅   |      |
-| <img src="src/renderer/assets/platforms/linkedin.png" width="20" height="20" alt="">       | LinkedIn        |      | ✅   |      |
-| <img src="src/renderer/assets/platforms/googlebusiness.png" width="20" height="20" alt=""> | Google Business |      | ✅   |      |
-| <img src="src/renderer/assets/platforms/youtube.png" width="20" height="20" alt="">        | YouTube         |      |      | ✅   |
-| <img src="src/renderer/assets/platforms/tiktok.png" width="20" height="20" alt="">         | TikTok          |      |      | ✅   |
-| <img src="src/renderer/assets/platforms/hupu.png" width="20" height="20" alt="">           | 虎扑            |      |      | ✅   |
-| <img src="src/renderer/assets/platforms/alipay.png" width="20" height="20" alt="">         | 支付宝生活号    |      |      | ✅   |
-
-音频（仅音频）：
-
-|                                                                                        | 平台       |
-| -------------------------------------------------------------------------------------- | ---------- |
-| <img src="src/renderer/assets/platforms/ximalaya.png" width="20" height="20" alt="">   | 喜马拉雅   |
-| <img src="src/renderer/assets/platforms/xiaoyuzhou.png" width="20" height="20" alt=""> | 小宇宙     |
-| <img src="src/renderer/assets/platforms/music163.png" width="20" height="20" alt="">   | 网易云音乐 |
-| <img src="src/renderer/assets/platforms/qqmusic.png" width="20" height="20" alt="">    | QQ音乐     |
-| <img src="src/renderer/assets/platforms/qingting.png" width="20" height="20" alt="">   | 蜻蜓FM     |
-| <img src="src/renderer/assets/platforms/lizhi.png" width="20" height="20" alt="">      | 荔枝FM     |
+|                                                                                            | 平台            | 文章 | 动态 | 视频 | 音频 |
+| ------------------------------------------------------------------------------------------ | --------------- | ---- | ---- | ---- | ---- |
+| <img src="src/renderer/assets/platforms/toutiao.png" width="20" height="20" alt="">        | 头条号          | ✅   | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/zhihu.png" width="20" height="20" alt="">          | 知乎            | ✅   | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/douyin.png" width="20" height="20" alt="">         | 抖音            | ✅   | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/xiaohongshu.png" width="20" height="20" alt="">    | 小红书          | ✅   | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/weibo.png" width="20" height="20" alt="">          | 微博            | ✅   | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/baijiahao.png" width="20" height="20" alt="">      | 百家号          | ✅   | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/facebook.png" width="20" height="20" alt="">       | Facebook        | ✅   | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/wechat.png" width="20" height="20" alt="">         | 微信公众号      | ✅   | ✅   |      |      |
+| <img src="src/renderer/assets/platforms/douban.png" width="20" height="20" alt="">         | 豆瓣            | ✅   | ✅   |      |      |
+| <img src="src/renderer/assets/platforms/zsxq.png" width="20" height="20" alt="">           | 知识星球        | ✅   | ✅   |      |      |
+| <img src="src/renderer/assets/platforms/bilibili.png" width="20" height="20" alt="">       | 哔哩哔哩        | ✅   |      | ✅   |      |
+| <img src="src/renderer/assets/platforms/qq.png" width="20" height="20" alt="">             | 企鹅号          | ✅   |      | ✅   |      |
+| <img src="src/renderer/assets/platforms/jianshu.png" width="20" height="20" alt="">        | 简书            | ✅   |      |      |      |
+| <img src="src/renderer/assets/platforms/reddit.png" width="20" height="20" alt="">         | Reddit          | ✅   |      |      |      |
+| <img src="src/renderer/assets/platforms/kuaishou.png" width="20" height="20" alt="">       | 快手            |      | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/channels.png" width="20" height="20" alt="">       | 视频号          |      | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/instagram.png" width="20" height="20" alt="">      | Instagram       |      | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/twitter.png" width="20" height="20" alt="">        | X               |      | ✅   | ✅   |      |
+| <img src="src/renderer/assets/platforms/threads.png" width="20" height="20" alt="">        | Threads         |      | ✅   |      |      |
+| <img src="src/renderer/assets/platforms/pinterest.png" width="20" height="20" alt="">      | Pinterest       |      | ✅   |      |      |
+| <img src="src/renderer/assets/platforms/linkedin.png" width="20" height="20" alt="">       | LinkedIn        |      | ✅   |      |      |
+| <img src="src/renderer/assets/platforms/googlebusiness.png" width="20" height="20" alt=""> | Google Business |      | ✅   |      |      |
+| <img src="src/renderer/assets/platforms/youtube.png" width="20" height="20" alt="">        | YouTube         |      |      | ✅   |      |
+| <img src="src/renderer/assets/platforms/tiktok.png" width="20" height="20" alt="">         | TikTok          |      |      | ✅   |      |
+| <img src="src/renderer/assets/platforms/hupu.png" width="20" height="20" alt="">           | 虎扑            |      |      | ✅   |      |
+| <img src="src/renderer/assets/platforms/alipay.png" width="20" height="20" alt="">         | 支付宝生活号    |      |      | ✅   |      |
+| <img src="src/renderer/assets/platforms/ximalaya.png" width="20" height="20" alt="">       | 喜马拉雅        |      |      |      | ✅   |
+| <img src="src/renderer/assets/platforms/xiaoyuzhou.png" width="20" height="20" alt="">     | 小宇宙          |      |      |      | ✅   |
+| <img src="src/renderer/assets/platforms/music163.png" width="20" height="20" alt="">       | 网易云音乐      |      |      |      | ✅   |
+| <img src="src/renderer/assets/platforms/qqmusic.png" width="20" height="20" alt="">        | QQ音乐          |      |      |      | ✅   |
+| <img src="src/renderer/assets/platforms/qingting.png" width="20" height="20" alt="">       | 蜻蜓FM          |      |      |      | ✅   |
+| <img src="src/renderer/assets/platforms/lizhi.png" width="20" height="20" alt="">          | 荔枝FM          |      |      |      | ✅   |
 
 #### 可登录（发布适配中）
 

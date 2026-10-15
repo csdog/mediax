@@ -1,4 +1,5 @@
-import { app, nativeImage, session } from "electron";
+import { app, dialog, nativeImage, session } from "electron";
+import { writeFile } from "node:fs/promises";
 import type { AccountInfo, BrowserBounds, PlatformId, Target } from "../../shared/models";
 import { FacebookAdapter } from "../platforms/facebook/FacebookAdapter";
 import { createPublisher } from "../platforms/registry";
@@ -57,11 +58,122 @@ export class AccountService {
     const a = this.db.addAccount(name, platform);
     return { ...a, login: "unchecked" as const, targets: [] };
   }
-  async open(id: string) {
+  async open(id: string, url?: string) {
     const account = this.db.account(id);
-    await this.browsers.open(id, platformHome[account.platform], { platform: account.platform });
+    const target =
+      typeof url === "string" && url.trim() ? url.trim() : platformHome[account.platform];
+    await this.browsers.open(id, target, { platform: account.platform });
     this.browsers.show(id);
     await this.updateAvatar(id);
+  }
+  /** Open a plain webpage tab (not tied to an account session). */
+  async openWeb(id: string, url: string) {
+    if (!/^web-[a-zA-Z0-9-]{1,80}$/.test(id)) throw new Error("无效网页标签");
+    const target = url.trim();
+    if (!/^https?:\/\//i.test(target)) throw new Error("无效网址");
+    await this.browsers.open(id, target, { partition: `persist:${id}` });
+    this.browsers.show(id);
+  }
+  private browserContents(id: string) {
+    const view = this.browsers.get(id);
+    if (!view || view.webContents.isDestroyed()) throw new Error("标签页已关闭");
+    return view.webContents;
+  }
+  browserNavigation(id: string) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    const contents = this.browserContents(id);
+    const history = contents.navigationHistory;
+    return {
+      url: contents.getURL(),
+      title: contents.getTitle(),
+      canGoBack: history.canGoBack(),
+      canGoForward: history.canGoForward(),
+    };
+  }
+  async navigateBrowser(id: string, url: string) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    const target = url.trim();
+    if (!/^https?:\/\//i.test(target)) throw new Error("无效网址");
+    await this.browserContents(id).loadURL(target);
+    return this.browserNavigation(id);
+  }
+  async goBackBrowser(id: string) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    const contents = this.browserContents(id);
+    if (contents.navigationHistory.canGoBack()) contents.navigationHistory.goBack();
+    return this.browserNavigation(id);
+  }
+  async goForwardBrowser(id: string) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    const contents = this.browserContents(id);
+    if (contents.navigationHistory.canGoForward()) contents.navigationHistory.goForward();
+    return this.browserNavigation(id);
+  }
+  async reloadBrowser(id: string) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    this.browserContents(id).reload();
+    return this.browserNavigation(id);
+  }
+  browserZoom(id: string) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    const factor = this.browserContents(id).getZoomFactor();
+    return { factor, percent: Math.round(factor * 100) };
+  }
+  setBrowserZoom(id: string, factor: number) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    const next = Math.min(3, Math.max(0.25, factor));
+    this.browserContents(id).setZoomFactor(next);
+    return this.browserZoom(id);
+  }
+  printBrowser(id: string) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    this.browserContents(id).print({});
+  }
+  findInBrowser(id: string, text: string, options?: { forward?: boolean; findNext?: boolean }) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    const query = text.trim();
+    if (!query) {
+      this.browserContents(id).stopFindInPage("clearSelection");
+      return { activeMatchOrdinal: 0, matches: 0 };
+    }
+    this.browserContents(id).findInPage(query, {
+      forward: options?.forward !== false,
+      findNext: Boolean(options?.findNext),
+    });
+    return { activeMatchOrdinal: 0, matches: 0 };
+  }
+  stopFindInBrowser(id: string) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    this.browserContents(id).stopFindInPage("clearSelection");
+  }
+  async screenshotBrowser(id: string) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    const contents = this.browserContents(id);
+    const image = await contents.capturePage();
+    if (image.isEmpty()) throw new Error("截图失败");
+    const host = (() => {
+      try {
+        return new URL(contents.getURL()).hostname || "page";
+      } catch {
+        return "page";
+      }
+    })();
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const result = await dialog.showSaveDialog({
+      title: "保存屏幕截图",
+      defaultPath: `${app.getPath("downloads")}/${host}-${stamp}.png`,
+      filters: [{ name: "PNG", extensions: ["png"] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+    await writeFile(result.filePath, image.toPNG());
+    return result.filePath;
+  }
+  async clearBrowserData(id: string) {
+    if (!id.startsWith("web-")) this.db.account(id);
+    const contents = this.browserContents(id);
+    await contents.session.clearStorageData();
+    await contents.session.clearCache();
+    contents.reload();
   }
   private cachedAvatar(id: string) {
     const value = this.db.setting(`avatar:${id}`) as {
@@ -147,16 +259,24 @@ export class AccountService {
     }
   }
   async preview(id: string) {
-    const account = this.db.account(id);
     const view = this.browsers.get(id);
-    if (!view || view.webContents.isDestroyed()) throw new Error("账号标签页已关闭");
+    if (!view || view.webContents.isDestroyed()) throw new Error("标签页已关闭");
     const contents = view.webContents;
     const url = contents.getURL();
-    const fallback = platformHost(account.platform);
+    let hostname = "";
+    try {
+      hostname = url ? new URL(url).hostname : "";
+    } catch {
+      hostname = "";
+    }
+    if (!hostname && !id.startsWith("web-")) {
+      const account = this.db.account(id);
+      hostname = platformHost(account.platform);
+    }
     const screenshot = await contents.capturePage(undefined, { stayHidden: true, stayAwake: true });
     return {
       title: contents.getTitle(),
-      hostname: url ? new URL(url).hostname : fallback,
+      hostname,
       image: screenshot.isEmpty()
         ? null
         : screenshot
@@ -165,11 +285,11 @@ export class AccountService {
     };
   }
   layout(id: string | null, bounds?: BrowserBounds) {
-    if (id !== null) this.db.account(id);
+    if (id !== null && !id.startsWith("web-")) this.db.account(id);
     this.browsers.setLayout(id, bounds);
   }
   close(id: string) {
-    this.db.account(id);
+    if (!id.startsWith("web-")) this.db.account(id);
     this.browsers.close(id);
   }
   async remove(id: string) {

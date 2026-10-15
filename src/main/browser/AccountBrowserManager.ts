@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContentsView } from "electron";
+import { BrowserWindow, WebContentsView, type Session } from "electron";
 import { CdpBridge } from "./CdpBridge";
 import type { BrowserBounds, PlatformId } from "../../shared/models";
 export class AccountBrowserManager {
@@ -11,6 +11,7 @@ export class AccountBrowserManager {
   constructor(
     private host?: BrowserWindow,
     private endpoint?: string,
+    private onSession?: (session: Session) => void,
   ) {
     if (!host) return;
     host.on("resize", () => this.layout());
@@ -92,10 +93,15 @@ export class AccountBrowserManager {
   async open(
     accountId: string,
     url: string,
-    options?: { focus?: boolean; platform?: PlatformId },
+    options?: { focus?: boolean; platform?: PlatformId; partition?: string },
   ): Promise<WebContentsView> {
     const existing = this.views.get(accountId);
     if (existing) {
+      if (!existing.webContents.isDestroyed()) this.onSession?.(existing.webContents.session);
+      if (url && !existing.webContents.isDestroyed()) {
+        const current = existing.webContents.getURL();
+        if (current !== url) await existing.webContents.loadURL(url);
+      }
       if (options?.focus !== false) this.show(accountId);
       return existing;
     }
@@ -104,7 +110,7 @@ export class AccountBrowserManager {
     const win = this.host ?? new BrowserWindow({ width: 900, height: 700, show: false });
     const view = new WebContentsView({
       webPreferences: {
-        partition: `persist:${options?.platform ?? "facebook"}-${accountId}`,
+        partition: options?.partition ?? `persist:${options?.platform ?? "facebook"}-${accountId}`,
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
@@ -121,6 +127,7 @@ export class AccountBrowserManager {
     win.contentView.addChildView(view);
     this.views.set(accountId, view);
     view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    this.onSession?.(view.webContents.session);
     if (this.host) this.layout();
     else {
       const resize = () => {

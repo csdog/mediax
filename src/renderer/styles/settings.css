@@ -73,12 +73,6 @@
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent);
 }
-[data-sonner-toaster] {
-  z-index: 80 !important;
-}
-.app-toast {
-  font-family: inherit;
-}
 .settings-active > :not(.app-toolbar):not(.settings-full-page) {
   display: none !important;
 }
@@ -174,14 +168,25 @@
   font-size: var(--font-size-caption);
 }
 .settings-scroll-area {
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   min-height: 0;
 }
 .settings-page {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   width: 100%;
   max-width: 792px;
   margin: 0 auto;
   padding: 56px 36px;
+}
+.settings-page > .app-error-view {
+  max-width: none;
+  margin: -56px -36px;
+  width: calc(100% + 72px);
+  min-height: 100%;
 }
 .settings-page > h2 {
   font-size: 24px;

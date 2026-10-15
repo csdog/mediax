@@ -4,14 +4,25 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { WorkspaceDialogs } from "@/components/dialogs/WorkspaceDialogs";
 import { WorkspaceToolbar } from "./WorkspaceToolbar";
+import { BrowserChrome } from "./BrowserChrome";
 import { WorkspaceNavigation } from "./WorkspaceNavigation";
 import { NewTabPage } from "@/pages/NewTabPage";
 import { BrowserPage } from "@/pages/BrowserPage";
+import { ComposePage } from "@/pages/ComposePage";
 import { useWorkspace } from "@/app/WorkspaceContext";
 
 export function WorkspaceShell() {
-  const { sidebarOpen, setSidebarOpen, setAvatarMenuOpen, settingsOpen, isNewTab, activeBrowser } =
-    useWorkspace();
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    setAvatarMenuOpen,
+    settingsOpen,
+    isNewTab,
+    isComposeTab,
+    activeBrowser,
+    activeBrowserViewId,
+  } = useWorkspace();
+  const showBrowserChrome = Boolean(activeBrowserViewId) || isNewTab;
   return (
     <TooltipProvider>
       <WorkspaceDialogs />
@@ -28,8 +39,22 @@ export function WorkspaceShell() {
         {settingsOpen && <Outlet />}
         <WorkspaceNavigation />
         <SidebarInset className="min-w-0 bg-background">
-          {!settingsOpen &&
-            (isNewTab ? <NewTabPage /> : activeBrowser ? <BrowserPage /> : <Outlet />)}
+          {!settingsOpen && (
+            <>
+              {showBrowserChrome ? <BrowserChrome /> : null}
+              <div className="workspace-main">
+                {isComposeTab ? (
+                  <ComposePage />
+                ) : isNewTab ? (
+                  <NewTabPage />
+                ) : activeBrowser ? (
+                  <BrowserPage />
+                ) : (
+                  <Outlet />
+                )}
+              </div>
+            </>
+          )}
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>

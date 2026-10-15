@@ -11,6 +11,7 @@ import { registerIpc } from "./ipc";
 import { disposeMediaImportHost } from "./content/mediaImportHost";
 
 import { DesktopShell } from "./desktop/DesktopShell";
+import { DownloadStore } from "./desktop/DownloadStore";
 import { AppUpdater } from "./desktop/AppUpdater";
 import { findDeepLinkArg, registerDeepLinkProtocol } from "./desktop/deepLinks";
 import { findOpenFileArgs } from "./desktop/openFiles";
@@ -234,7 +235,13 @@ async function start(): Promise<void> {
   for (const url of earlyDeepLinks.splice(0)) shell.handleDeepLink(url);
   if (earlyOpenFiles.length) shell.handleOpenFiles(earlyOpenFiles.splice(0));
   const updater = new AppUpdater(win, db);
-  const accounts = new AccountService(db, new AccountBrowserManager(win, endpoint));
+  const downloads = new DownloadStore(() => {
+    if (!win.isDestroyed()) win.webContents.send("mediax:downloads-changed", downloads.list());
+  });
+  const accounts = new AccountService(
+    db,
+    new AccountBrowserManager(win, endpoint, (session) => downloads.watch(session)),
+  );
   accounts.applyBandwidthLimit();
   app.on("will-quit", () => {
     accounts.stopAutoRefresh();
@@ -243,7 +250,7 @@ async function start(): Promise<void> {
       stopControlServer().catch((error) => log.warn("Control API stop failed", error)),
     );
   });
-  registerIpc(db, accounts, win, () => shell.rendererReady(), shell, updater);
+  registerIpc(db, accounts, win, () => shell.rendererReady(), shell, updater, downloads);
   if (maximized) win.maximize();
   app.on("will-quit", () => db.close());
   mark("mediax/willLoadWindow");

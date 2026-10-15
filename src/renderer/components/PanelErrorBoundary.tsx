@@ -25,6 +25,7 @@ export class PanelErrorBoundary extends Component<Props, State> {
     return (
       <AppErrorView
         variant="panel"
+        className="min-h-0 w-full flex-1"
         title={this.props.title ?? "这部分暂时无法显示"}
         description={
           this.props.description ??

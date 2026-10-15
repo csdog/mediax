@@ -7,6 +7,21 @@ const api: DesktopApi = {
   workspaceSession: () => call("workspaceSession"),
   saveWorkspaceSession: (session) => call("saveWorkspaceSession", session),
   previewAccountBrowser: (id) => call("previewAccountBrowser", id),
+  openWebBrowser: (id, url) => call("openWebBrowser", id, url),
+  resolveOmniboxUrl: (input) => call("resolveOmniboxUrl", input),
+  webSearchProvider: () => call("webSearchProvider"),
+  browserNavigation: (id) => call("browserNavigation", id),
+  navigateBrowser: (id, url) => call("navigateBrowser", id, url),
+  goBackBrowser: (id) => call("goBackBrowser", id),
+  goForwardBrowser: (id) => call("goForwardBrowser", id),
+  reloadBrowser: (id) => call("reloadBrowser", id),
+  browserZoom: (id) => call("browserZoom", id),
+  setBrowserZoom: (id, factor) => call("setBrowserZoom", id, factor),
+  printBrowser: (id) => call("printBrowser", id),
+  findInBrowser: (id, query, options) => call("findInBrowser", id, query, options),
+  stopFindInBrowser: (id) => call("stopFindInBrowser", id),
+  screenshotBrowser: (id) => call("screenshotBrowser", id),
+  clearBrowserData: (id) => call("clearBrowserData", id),
   layoutAccountBrowser: (id, bounds) => call("layoutAccountBrowser", id, bounds),
   showTabPreview: (preview) => call("showTabPreview", preview),
   hideTabPreview: () => call("hideTabPreview"),
@@ -61,25 +76,43 @@ const api: DesktopApi = {
   },
   accounts: () => call("accounts"),
   addAccount: (n, platform) => call("addAccount", n, platform),
-  openAccount: (id) => call("openAccount", id),
+  openAccount: (id, url) => call("openAccount", id, url),
   refreshAccount: (id) => call("refreshAccount", id),
   deleteAccount: (id) => call("deleteAccount", id),
   importMarkdown: () => call("importMarkdown"),
   chooseImages: (kind) => call("chooseImages", kind),
   importLocalFiles: (paths, kind) => call("importLocalFiles", paths, kind),
   revealInFolder: (path) => call("revealInFolder", path),
+  openDownloadsFolder: () => call("openDownloadsFolder"),
+  downloads: () => call("downloads"),
+  removeDownload: (id) => call("removeDownload", id),
+  revealDownload: (id) => call("revealDownload", id),
+  copyDownloadUrl: (id) => call("copyDownloadUrl", id),
+  copyDownloadPath: (id) => call("copyDownloadPath", id),
+  onDownloadsChanged: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, items: Parameters<typeof listener>[0]) =>
+      listener(items);
+    ipcRenderer.on("mediax:downloads-changed", receive);
+    return () => {
+      ipcRenderer.removeListener("mediax:downloads-changed", receive);
+    };
+  },
+  openExternalUrl: (url) => call("openExternalUrl", url),
   pathForFile: (file) => webUtils.getPathForFile(file),
   saveDraft: (b, i, kind, title) => call("saveDraft", b, i, kind, title),
   loadDraft: () => call("loadDraft"),
   publish: (kind, title, b, i, t, scheduledAt) =>
     call("publish", kind, title, b, i, t, scheduledAt ?? null),
+  publishBatches: (kind, images, batches, scheduledAt) =>
+    call("publishBatches", kind, images, batches, scheduledAt ?? null),
   history: () => call("history"),
   calendar: (range) => call("calendar", range),
   rescheduleTask: (taskId, scheduledAt) => call("rescheduleTask", taskId, scheduledAt),
-  analyticsSummary: (days) => call("analyticsSummary", days),
+  analyticsSummary: (query) => call("analyticsSummary", query),
   openPost: (url) => call("openPost", url),
   verifyTarget: (id, url) => call("verifyTarget", id, url),
   retry: (id) => call("retry", id),
+  republish: (id) => call("republish", id),
   resume: (id) => call("resume", id),
 };
 contextBridge.exposeInMainWorld("desktop", api);

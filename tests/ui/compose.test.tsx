@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { App } from "../../src/renderer/src";
 // jsdom has no native preload; exercise real logging in Electron integration instead.
 vi.mock("../../src/renderer/lib/logging", () => ({ initializeRendererLogging: vi.fn() }));
@@ -98,6 +98,7 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     checkForUpdates: vi.fn(),
     installUpdate: vi.fn(),
     onUpdateStatus: vi.fn(() => () => undefined),
+    onDownloadsChanged: vi.fn(() => () => undefined),
     profileSettings: vi.fn(async () => profile),
     setProfile: vi.fn(async (next: { name: string; avatar: string | null }) => {
       profile = next;
@@ -246,27 +247,35 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   expect(
     screen.getByRole("tab", { name: "新标签页", exact: true }).getAttribute("aria-selected"),
   ).toBe("true");
+  fireEvent.click(screen.getByRole("tab", { name: "账号管理", exact: true }));
   fireEvent.click(screen.getByRole("button", { name: "添加账号", exact: true }));
-  expect(screen.getByRole("dialog", { name: "添加账号" })).toBeTruthy();
-  expect(screen.getByRole("tab", { name: "全部" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "抖音" }).querySelector("img")).toBeTruthy();
-  expect(screen.getByRole("button", { name: "小红书" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "YouTube" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "TikTok" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "其他账号" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("tab", { name: "新闻" }));
-  expect(screen.getByRole("button", { name: "简书" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "喜马拉雅" })).toBeNull();
-  fireEvent.change(screen.getByLabelText("搜索平台"), { target: { value: "头条" } });
-  expect(screen.getByRole("button", { name: "头条号" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "简书" })).toBeNull();
-  fireEvent.click(screen.getByRole("tab", { name: "全部" }));
-  fireEvent.change(screen.getByLabelText("搜索平台"), { target: { value: "" } });
-  expect(screen.queryByRole("button", { name: "开始授权" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Facebook" }));
+  const addAccountDialog = screen.getByRole("dialog", { name: "添加账号" });
+  expect(addAccountDialog).toBeTruthy();
+  expect(within(addAccountDialog).getByRole("tab", { name: "全部" })).toBeTruthy();
+  expect(
+    within(addAccountDialog).getByRole("button", { name: "抖音" }).querySelector("img"),
+  ).toBeTruthy();
+  expect(within(addAccountDialog).getByRole("button", { name: "小红书" })).toBeTruthy();
+  expect(within(addAccountDialog).getByRole("button", { name: "YouTube" })).toBeTruthy();
+  expect(within(addAccountDialog).getByRole("button", { name: "TikTok" })).toBeTruthy();
+  expect(within(addAccountDialog).getByRole("button", { name: "其他账号" })).toBeTruthy();
+  fireEvent.click(within(addAccountDialog).getByRole("tab", { name: "新闻" }));
+  expect(within(addAccountDialog).getByRole("button", { name: "简书" })).toBeTruthy();
+  expect(within(addAccountDialog).queryByRole("button", { name: "喜马拉雅" })).toBeNull();
+  fireEvent.change(within(addAccountDialog).getByLabelText("搜索平台"), {
+    target: { value: "头条" },
+  });
+  expect(within(addAccountDialog).getByRole("button", { name: "头条号" })).toBeTruthy();
+  expect(within(addAccountDialog).queryByRole("button", { name: "简书" })).toBeNull();
+  fireEvent.click(within(addAccountDialog).getByRole("tab", { name: "全部" }));
+  fireEvent.change(within(addAccountDialog).getByLabelText("搜索平台"), {
+    target: { value: "" },
+  });
+  expect(within(addAccountDialog).queryByRole("button", { name: "开始授权" })).toBeNull();
+  fireEvent.click(within(addAccountDialog).getByRole("button", { name: "Facebook" }));
   await waitFor(() => expect(window.desktop.openAccount).toHaveBeenCalledWith("account-1"));
   expect(window.desktop.addAccount).toHaveBeenCalledWith("Facebook 账号 1", "facebook");
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "添加账号" })).toBeNull());
   expect(screen.getByRole("tab", { name: "Facebook 账号 1" }).getAttribute("aria-selected")).toBe(
     "true",
   );
@@ -318,11 +327,14 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   expect(screen.queryByRole("dialog", { name: "设置", exact: true })).toBeNull();
   expect(screen.getByRole("main", { name: "设置页面" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "返回工作区" }));
-  fireEvent.click(screen.getByRole("button", { name: "内容发布" }));
+  fireEvent.click(screen.getByRole("button", { name: "发布", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "发布图文" }));
+  await waitFor(() => expect(screen.getByRole("heading", { name: "图文发布" })).toBeTruthy());
   await waitFor(() =>
-    expect(screen.getByRole("radio", { name: "图文" }).getAttribute("aria-checked")).toBe("true"),
+    expect(
+      screen.getByRole("tab", { name: "图文发布", exact: true }).getAttribute("aria-selected"),
+    ).toBe("true"),
   );
-  expect(screen.queryByRole("radio", { name: "视频" })).toBeNull();
   await waitFor(() =>
     expect(
       (
@@ -334,11 +346,8 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   );
   fireEvent.click(screen.getByRole("button", { name: "导入 Markdown" }));
   await waitFor(() =>
-    expect((screen.getByLabelText("发布正文") as HTMLTextAreaElement).value).toBe(
-      "Imported article",
-    ),
+    expect((screen.getByLabelText("描述") as HTMLTextAreaElement).value).toBe("Imported article"),
   );
-  expect(screen.getByText("Imported article", { selector: "p" })).toBeTruthy();
   expect(
     (
       screen.getByRole("button", {
@@ -351,7 +360,7 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   await waitFor(() =>
     expect(window.desktop.saveDraft).toHaveBeenCalledWith("Imported article", [], "moment", ""),
   );
-  fireEvent.change(screen.getByLabelText("发布正文"), {
+  fireEvent.change(screen.getByLabelText("描述"), {
     target: { value: "Latest draft from menu" },
   });
   await waitFor(() => expect(commandListener).toBeTypeOf("function"));
@@ -400,6 +409,7 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   vi.mocked(window.desktop.accounts).mockResolvedValue([account, jianshu, ximalaya] as any);
   window.desktop.refreshAccount = vi.fn().mockResolvedValue(account);
   window.desktop.publish = vi.fn().mockResolvedValue("task-confirmed");
+  window.desktop.publishBatches = vi.fn().mockResolvedValue("task-confirmed");
   fireEvent.click(screen.getByRole("button", { name: "账号管理", exact: true }));
   await waitFor(() =>
     expect(screen.getByRole("button", { name: /AcFun/ }).querySelector("img")).toBeTruthy(),
@@ -417,6 +427,8 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     ),
   );
   fireEvent.click(screen.getByRole("button", { name: "关闭 Facebook 账号 1 标签页" }));
+  await waitFor(() => expect(screen.queryByRole("tab", { name: "Facebook 账号 1" })).toBeNull());
+  fireEvent.click(screen.getByRole("tab", { name: "账号管理", exact: true }));
   await waitFor(() =>
     expect(
       (screen.getAllByRole("button", { name: "检查状态" })[0] as HTMLButtonElement).disabled,
@@ -447,20 +459,26 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       (screen.getAllByRole("button", { name: "检查状态" })[0] as HTMLButtonElement).disabled,
     ).toBe(false),
   );
-  fireEvent.click(screen.getByRole("button", { name: "内容发布", exact: true }));
-  expect(((await screen.findByLabelText("发布正文")) as HTMLTextAreaElement).value).toBe(
+  fireEvent.click(screen.getByRole("button", { name: "发布", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "发布图文" }));
+  expect(((await screen.findByLabelText("描述")) as HTMLTextAreaElement).value).toBe(
     "Latest draft from menu",
   );
+  expect(screen.getAllByRole("button", { name: "添加图片" }).length).toBeGreaterThan(0);
+  expect(screen.getByRole("button", { name: /快速填写/ })).toBeTruthy();
+  expect(screen.getByLabelText("标题")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "上传封面" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "打开头像菜单" }));
   expect(screen.getByRole("dialog", { name: "用户菜单" }).textContent).toContain("张三");
   fireEvent.click(screen.getByRole("button", { name: "设置", exact: true }));
   await screen.findByRole("main", { name: "设置页面" });
   await waitFor(() => expect(screen.getByLabelText("个人名称")).toBeTruthy());
   fireEvent.keyDown(window, { key: "Escape" });
-  expect(((await screen.findByLabelText("发布正文")) as HTMLTextAreaElement).value).toBe(
+  expect(((await screen.findByLabelText("描述")) as HTMLTextAreaElement).value).toBe(
     "Latest draft from menu",
   );
-  fireEvent.change(screen.getByLabelText("发布正文"), { target: { value: "" } });
+  fireEvent.change(screen.getByLabelText("描述"), { target: { value: "" } });
+  fireEvent.click(screen.getByRole("button", { name: "新增账号" }));
   await waitFor(() =>
     expect(
       screen.getByRole("checkbox", { name: /Verified Profile/ }).getAttribute("aria-disabled"),
@@ -472,54 +490,77 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       screen.getByRole("checkbox", { name: /Verified Profile/ }).getAttribute("aria-checked"),
     ).toBe("true"),
   );
+  fireEvent.click(screen.getByRole("button", { name: "确认添加" }));
+  await waitFor(() => expect(screen.getByText("Verified Profile")).toBeTruthy());
   expect(
     (screen.getByRole("button", { name: "一键发布", exact: true }) as HTMLButtonElement).disabled,
   ).toBe(true);
-  fireEvent.click(screen.getByRole("radio", { name: "文章" }));
-  expect(screen.getByLabelText("文章标题")).toBeTruthy();
-  expect(screen.getByText("简书主页")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "发布", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "发布文章" }));
+  expect(screen.getByLabelText("标题")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "新增账号" }));
+  await waitFor(() => expect(screen.getByText("简书主页")).toBeTruthy());
   expect(screen.queryByText("喜马拉雅主页")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "取消" }));
   fireEvent.change(screen.getByLabelText("发布正文"), { target: { value: "Confirmed content" } });
-  fireEvent.change(screen.getByLabelText("文章标题"), { target: { value: "确认标题" } });
-  fireEvent.click(screen.getByRole("button", { name: "视频", exact: true }));
-  expect(screen.getByRole("heading", { name: "视频", exact: true })).toBeTruthy();
-  expect(screen.queryByRole("radio", { name: "图文" })).toBeNull();
+  fireEvent.change(screen.getByLabelText("标题"), { target: { value: "确认标题" } });
+  fireEvent.click(screen.getByRole("button", { name: "发布", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "发布视频" }));
+  expect(screen.getByRole("heading", { name: "视频发布" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "添加本地视频" })).toBeTruthy();
   expect(
     (screen.getByRole("button", { name: "一键发布", exact: true }) as HTMLButtonElement).disabled,
   ).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "内容发布", exact: true }));
-  expect(screen.getByRole("radio", { name: "图文" }).getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "发布", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "发布文章" }));
+  expect(screen.getByRole("heading", { name: "文章发布" })).toBeTruthy();
   await waitFor(() =>
     expect((screen.getByLabelText("发布正文") as HTMLTextAreaElement).value).toBe(
       "Confirmed content",
     ),
   );
-  await waitFor(() =>
-    expect(
-      screen.getByRole("checkbox", { name: /Verified Profile/ }).getAttribute("aria-disabled"),
-    ).not.toBe("true"),
-  );
-  fireEvent.click(screen.getByRole("radio", { name: "音频" }));
+  fireEvent.click(screen.getByRole("button", { name: "发布", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "发布音频" }));
+  expect(screen.getByRole("heading", { name: "音频发布" })).toBeTruthy();
   expect(
     (screen.getByRole("button", { name: "一键发布", exact: true }) as HTMLButtonElement).disabled,
   ).toBe(true);
-  fireEvent.click(screen.getByRole("radio", { name: "文章" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: /Verified Profile/ }));
-  fireEvent.click(screen.getByRole("button", { name: "同步到账号", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "发布", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "发布文章" }));
+  await waitFor(() => expect(screen.getByRole("heading", { name: "文章发布" })).toBeTruthy());
+  fireEvent.change(screen.getByLabelText("发布正文"), { target: { value: "Confirmed content" } });
+  fireEvent.change(screen.getByLabelText("标题"), { target: { value: "确认标题" } });
+  // Facebook stays selected across article tabs when still supported
+  if (!screen.queryByText("Verified Profile")) {
+    fireEvent.click(screen.getByRole("button", { name: "新增账号" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("checkbox", { name: /Verified Profile/ }).getAttribute("aria-disabled"),
+      ).not.toBe("true"),
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: /Verified Profile/ }));
+    fireEvent.click(screen.getByRole("button", { name: "确认添加" }));
+    await waitFor(() => expect(screen.getByText("Verified Profile")).toBeTruthy());
+  }
+  await waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: "一键发布", exact: true }) as HTMLButtonElement).disabled,
+    ).toBe(false),
+  );
+  expect(screen.getByRole("button", { name: /快速填写/ })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "一键发布", exact: true }));
   expect(screen.getByRole("dialog", { name: "确认发布" })).toBeTruthy();
-  expect(window.desktop.publish).not.toHaveBeenCalled();
+  expect(window.desktop.publishBatches).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "取消", exact: true }));
-  expect(window.desktop.publish).not.toHaveBeenCalled();
+  expect(window.desktop.publishBatches).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "一键发布", exact: true }));
   fireEvent.click(screen.getByRole("button", { name: "确认发布", exact: true }));
   await waitFor(() =>
-    expect(window.desktop.publish).toHaveBeenCalledWith(
+    expect(window.desktop.publishBatches).toHaveBeenCalledWith(
       "article",
-      "确认标题",
-      "Confirmed content",
       [],
-      [target],
+      [{ title: "确认标题", body: "Confirmed content", targets: [target] }],
+      null,
     ),
   );
   await waitFor(() =>

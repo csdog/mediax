@@ -154,18 +154,16 @@
   background: color-mix(in srgb, var(--emphasis) 12%, transparent);
   color: var(--emphasis);
 }
-.history-record-menu {
-  width: max-content;
-  min-width: 12rem;
-  max-width: 22rem;
+.history-record-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
-.history-record-menu [data-slot="dropdown-menu-item"] {
-  gap: 8px;
-  white-space: nowrap;
-}
-.history-record-menu [data-slot="dropdown-menu-item"].whitespace-normal {
-  white-space: normal;
-  align-items: flex-start;
+.account-grid-item .history-record-actions {
+  justify-content: flex-start;
+  margin-top: 8px;
 }
 .history-draft {
   display: flex;

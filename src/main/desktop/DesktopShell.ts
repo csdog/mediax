@@ -383,13 +383,13 @@ export class DesktopShell {
             },
             {
               id: "desktop.editor",
-              label: "内容发布",
+              label: "发布图文",
               accelerator: this.accel("compose-page"),
               click: () => this.navigate("compose"),
             },
             {
               id: "desktop.video",
-              label: "视频",
+              label: "发布视频",
               accelerator: this.accel("video"),
               click: () => this.navigate("video"),
             },

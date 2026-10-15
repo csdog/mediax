@@ -15,6 +15,7 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
   return (
     <AppErrorView
       variant="full"
+      className="min-h-0 w-full flex-1"
       title="这里暂时走不通了"
       description={
         import.meta.env.DEV
