@@ -112,6 +112,25 @@ export function useWorkspaceController() {
   const isNewTab = activeTab?.kind === "new";
   const isComposeTab = activeTab?.kind === "compose";
   const activeBrowserViewId = !activeBrowser || isNewTab || isComposeTab ? null : activeBrowser;
+  const authorizingAccountId =
+    activeBrowserViewId &&
+    !activeBrowserViewId.startsWith("web-") &&
+    accounts.find((account) => account.id === activeBrowserViewId)?.login !== "logged_in"
+      ? activeBrowserViewId
+      : null;
+  useQuery({
+    queryKey: ["desktop", "refresh-account", authorizingAccountId],
+    enabled: Boolean(authorizingAccountId),
+    queryFn: async () => {
+      const updated = await window.desktop.refreshAccount(authorizingAccountId!);
+      setAccounts((old) => old.map((account) => (account.id === updated.id ? updated : account)));
+      if (updated.login === "logged_in") toast.success(`${updated.name} 已登录`);
+      return updated;
+    },
+    refetchInterval: 1000,
+    refetchIntervalInBackground: true,
+    retry: false,
+  });
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const tabPreview = useTabPreview({ hoveredTab, browserTabs });
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);

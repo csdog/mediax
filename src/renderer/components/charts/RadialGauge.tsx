@@ -25,9 +25,9 @@ export function RadialGauge({
   const offset = c * (1 - clamped / 100);
 
   return (
-    <div className={cn("flex flex-col items-center gap-1.5", className)}>
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
+    <div className={cn("flex min-w-0 flex-col items-center gap-1.5", className)}>
+      <div className="relative max-w-full" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="max-w-full -rotate-90">
           <circle
             cx={size / 2}
             cy={size / 2}

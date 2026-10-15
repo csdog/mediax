@@ -10,6 +10,7 @@ import { NewTabPage } from "@/pages/NewTabPage";
 import { BrowserPage } from "@/pages/BrowserPage";
 import { ComposePage } from "@/pages/ComposePage";
 import { useWorkspace } from "@/app/WorkspaceContext";
+import { useNativeToastOverlay } from "@/hooks/useNativeToastOverlay";
 
 export function WorkspaceShell() {
   const {
@@ -21,8 +22,10 @@ export function WorkspaceShell() {
     isComposeTab,
     activeBrowser,
     activeBrowserViewId,
+    concealBrowser,
   } = useWorkspace();
   const showBrowserChrome = Boolean(activeBrowserViewId) || isNewTab;
+  useNativeToastOverlay(Boolean(activeBrowserViewId) && !concealBrowser && !settingsOpen);
   return (
     <TooltipProvider>
       <WorkspaceDialogs />

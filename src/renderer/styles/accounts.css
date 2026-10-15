@@ -270,7 +270,7 @@
   background: #ff4500;
 }
 .account-login-badge.status-logged_in {
-  background: #e5f6eb;
+  border-color: color-mix(in srgb, #008635 35%, transparent);
   color: #008635;
 }
 .account-login-badge.status-logged_out,
@@ -278,7 +278,7 @@
   color: var(--muted-foreground);
 }
 .account-login-badge.status-needs_verification {
-  background: #fff1e8;
+  border-color: color-mix(in srgb, #b9480d 35%, transparent);
   color: #b9480d;
 }
 .account-targets {
@@ -292,21 +292,6 @@
   margin-left: 8px;
   color: var(--hint);
   font-size: 11px;
-}
-.account-row-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.workspace .account-row-actions [data-slot="button"] {
-  width: 34px;
-  height: 34px;
-  color: var(--muted-foreground);
-}
-.workspace .account-row-actions [data-slot="button"].account-delete,
-.workspace .account-row-actions [data-slot="button"].account-delete:hover,
-.workspace .account-row-actions [data-slot="button"].account-delete svg {
-  color: #e02e2a;
 }
 .account-results-footer {
   display: flex;

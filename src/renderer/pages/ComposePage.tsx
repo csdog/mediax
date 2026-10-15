@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { cn } from "cn";
 import { toast } from "sonner";
 import {
   X,
@@ -39,7 +40,7 @@ import {
   platformHasCustomContent,
   type PlatformContent,
 } from "../../shared/publishBatches";
-import { platformIcons } from "@/assets/platformIcons";
+import { AccountIdentity, PlatformGlyph } from "@/components/AccountIdentity";
 import {
   Dialog,
   DialogContent,
@@ -293,13 +294,23 @@ export function ComposePage() {
             <Plus />
             新增账号
           </Button>
-          <nav className="publish-scope-list" aria-label="内容设置范围">
+          <nav
+            className="mt-4 flex min-h-0 flex-1 flex-col gap-1.5 overflow-auto"
+            aria-label="内容设置范围"
+          >
             <button
               type="button"
-              className={`publish-scope-item ${settingsScope === "batch" ? "is-active" : ""}`}
+              className={cn(
+                "flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border-0 bg-transparent px-3.5 py-3 text-left text-foreground hover:bg-[color-mix(in_oklab,var(--muted)_55%,transparent)]",
+                settingsScope === "batch" &&
+                  "bg-[color-mix(in_oklab,var(--muted)_70%,transparent)]",
+              )}
               onClick={() => setSettingsScope("batch")}
             >
-              <span className="publish-scope-icon" aria-hidden>
+              <span
+                className="mt-0 grid size-8 shrink-0 place-items-center rounded-[10px] bg-[color-mix(in_oklab,var(--muted)_80%,transparent)] text-muted-foreground"
+                aria-hidden
+              >
                 <Layers className="size-5" />
               </span>
               <span className="min-w-0 flex-1 text-left">
@@ -318,41 +329,48 @@ export function ComposePage() {
                 { title, body },
                 platformContent,
               );
+              const pending = synced && selectedTargets.some((item) => sameTarget(item, target));
+              const identityDetail = [
+                target.name,
+                target.kind === "profile" ? "个人主页" : "公共主页",
+                pending ? "待发布" : null,
+              ]
+                .filter(Boolean)
+                .join(" · ");
               return (
                 <div
                   key={targetKey(target)}
-                  className={`publish-scope-row  ${active ? "is-active" : ""}`}
+                  className={cn(
+                    "group relative flex items-stretch gap-0.5 rounded-xl",
+                    active && "bg-[color-mix(in_oklab,var(--muted)_70%,transparent)]",
+                  )}
                 >
                   <button
                     type="button"
-                    className="publish-scope-item"
+                    className="flex w-full min-w-0 cursor-pointer items-center rounded-xl border-0 bg-transparent py-3 pr-8 pl-3.5 text-left text-foreground hover:bg-[color-mix(in_oklab,var(--muted)_55%,transparent)]"
                     onClick={() => setSettingsScope(account.platform)}
                   >
-                    <PlatformMark id={account.platform} />
-                    <span className="min-w-0 flex-1 text-left">
-                      <span className="flex items-center gap-1.5 text-[15px] font-medium">
-                        <span className="truncate">{target.name}</span>
-                        {customized ? (
+                    <AccountIdentity
+                      name={account.name}
+                      platform={account.platform}
+                      avatar={account.avatar}
+                      detail={identityDetail}
+                      titleAdornment={
+                        customized ? (
                           <span
                             className="publish-settings-dot shrink-0"
                             title="已单独设置"
                             aria-label="已单独设置"
                           />
-                        ) : null}
-                      </span>
-                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                        {platformInfo[account.platform].label} · {account.name}
-                        {synced && selectedTargets.some((item) => sameTarget(item, target))
-                          ? " · 待发布"
-                          : ""}
-                      </span>
-                    </span>
+                        ) : null
+                      }
+                    />
                   </button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    className="publish-scope-remove"
+                    className="absolute top-1.5 right-1 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
                     aria-label={`移除 ${target.name}`}
                     disabled={busy}
                     onClick={() => toggleTarget(target, false)}
@@ -487,8 +505,8 @@ export function ComposePage() {
               </div>
             ) : null}
             {settingsScope !== "batch" ? (
-              <div className="publish-scope-banner">
-                <span>
+              <div className="mb-2.5 flex items-center gap-2 text-[length:var(--font-size-caption)] text-[var(--hint)]">
+                <span className="min-w-0 flex-1">
                   正在编辑 {platformInfo[settingsScope].label}
                   {scopeCustomized ? " 的单独内容" : "（未改动时沿用快速填写）"}
                 </span>
@@ -798,17 +816,28 @@ export function ComposePage() {
                 </div>
               ) : null}
             </div>
-            <div className="space-y-2">
+            <ul className="flex flex-col gap-3">
               {selectedTargets.map((target) => {
                 const account = accounts.find((item) => item.id === target.accountId);
+                if (!account) {
+                  return (
+                    <li key={`${target.accountId}:${target.identityId}`} className="text-sm">
+                      {target.name}
+                    </li>
+                  );
+                }
                 return (
-                  <p key={`${target.accountId}:${target.identityId}`} className="text-sm">
-                    {account ? platformInfo[account.platform].label : "账号"} · {target.name} ·{" "}
-                    {account?.name} · {target.kind === "profile" ? "个人主页" : "公共主页"}
-                  </p>
+                  <li key={`${target.accountId}:${target.identityId}`}>
+                    <AccountIdentity
+                      name={account.name}
+                      platform={account.platform}
+                      avatar={account.avatar}
+                      detail={`${target.name} · ${target.kind === "profile" ? "个人主页" : "公共主页"}`}
+                    />
+                  </li>
                 );
               })}
-            </div>
+            </ul>
             <div className="max-h-60 space-y-3 overflow-auto">
               {publishBatches.map((batch, index) => (
                 <div key={index} className="rounded-lg border p-3 text-sm">
@@ -955,7 +984,7 @@ function AccountPicker({
                   className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${platformFilter === id ? "bg-muted" : ""}`}
                   onClick={() => onPlatformFilter(id)}
                 >
-                  <PlatformMark id={id} />
+                  <PlatformGlyph id={id} />
                   {platformInfo[id].label}
                 </button>
               ))}
@@ -1034,34 +1063,28 @@ function TargetChoice({
   disabled: boolean;
   onCheckedChange: (value: boolean) => void;
 }) {
-  const info = platformInfo[account.platform];
+  const identityDetail = [
+    target.name,
+    target.kind === "profile" ? "个人主页" : "公共主页",
+    pending ? "待发布" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <label className="flex items-start gap-2 text-sm">
-      <Checkbox checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
-      <PlatformMark id={account.platform} />
-      <span>
-        {target.name}
-        <span className="block text-xs text-muted-foreground">
-          {info.label} · {account.name} · {target.kind === "profile" ? "个人主页" : "公共主页"}
-          {pending ? " · 待发布" : ""}
-        </span>
-      </span>
+      <Checkbox
+        className="mt-3"
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange}
+      />
+      <AccountIdentity
+        name={account.name}
+        platform={account.platform}
+        avatar={account.avatar}
+        detail={identityDetail}
+      />
     </label>
-  );
-}
-
-function PlatformMark({ id }: { id: PlatformId }) {
-  const icon = platformIcons[id];
-  const info = platformInfo[id];
-  if (icon) return <img src={icon} alt="" className="mt-0.5 size-4 rounded object-cover" />;
-  return (
-    <span
-      className="platform-mark mt-0.5 text-[10px]"
-      style={{ background: info.color, width: 16, height: 16 }}
-      aria-hidden="true"
-    >
-      {info.mark}
-    </span>
   );
 }
 

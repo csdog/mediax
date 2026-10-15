@@ -28,7 +28,7 @@ export function AccountsPage() {
       );
       await reload();
       await openBrowser(account);
-      toast("请在账号浏览器中完成登录，返回后点击「检查状态」。");
+      toast("请在账号浏览器中完成登录，登录后会自动识别。");
     });
   };
 
@@ -47,18 +47,16 @@ export function AccountsPage() {
           setAccountDialogOpen(true);
         }}
         onOpen={(account) => void run(() => openBrowser(account))}
-        onRefresh={(ids) =>
-          void (async () => {
-            try {
-              for (const id of ids) {
-                const updated = await window.desktop.refreshAccount(id);
-                setAccounts((old) => old.map((a) => (a.id === id ? updated : a)));
-              }
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : String(error));
+        onRefresh={async (ids) => {
+          try {
+            for (const id of ids) {
+              const updated = await window.desktop.refreshAccount(id);
+              setAccounts((old) => old.map((a) => (a.id === id ? updated : a)));
             }
-          })()
-        }
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : String(error));
+          }
+        }}
         onDelete={(account) => void run(() => removeAccount(account.id))}
       />
     </DocumentPage>

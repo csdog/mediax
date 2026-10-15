@@ -44,7 +44,7 @@ export function WorkspaceDialogs() {
       await reload();
       close(false);
       await openBrowser(account);
-      setNotice("请在账号浏览器中完成登录，返回后点击「检查状态」。");
+      setNotice("请在账号浏览器中完成登录，登录后会自动识别。");
     });
   };
   const keyword = query.trim().toLowerCase();

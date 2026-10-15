@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
+import { cn } from "cn";
 import {
   CircleHelp,
   Download,
@@ -47,10 +48,15 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
+import {
+  PlatformAvatarGroup,
+  type CalendarPublisher,
+} from "@/components/calendar/PlatformAvatarGroup";
+import { ActionIconButton } from "@/components/workspace/ActionIconButton";
 import { DocumentPage } from "@/components/workspace/DocumentPage";
 import { PublishKindDialog } from "@/components/workspace/PublishKindDialog";
 import { useWorkspace } from "@/app/WorkspaceContext";
-import type { AccountInfo, Status, Task, TaskTarget } from "../../shared/models";
+import type { AccountInfo, PlatformId, Status, Task, TaskTarget } from "../../shared/models";
 
 type Pane = "records" | "drafts" | "review";
 type Tone = "success" | "warning" | "danger" | "muted" | "progress";
@@ -112,6 +118,24 @@ function publisherNames(targets: TaskTarget[], accounts: AccountInfo[]) {
       ),
     ),
   ];
+}
+
+function publishersOf(targets: TaskTarget[], accounts: AccountInfo[]): CalendarPublisher[] {
+  const byAccount = new Map(accounts.map((account) => [account.id, account]));
+  const seen = new Set<string>();
+  const publishers: CalendarPublisher[] = [];
+  for (const target of targets) {
+    if (seen.has(target.accountId)) continue;
+    seen.add(target.accountId);
+    const account = byAccount.get(target.accountId);
+    publishers.push({
+      id: target.accountId,
+      platform: (account?.platform ?? "facebook") as PlatformId,
+      name: account?.name ?? target.name,
+      avatar: account?.avatar,
+    });
+  }
+  return publishers;
 }
 
 function matchesStatus(targets: TaskTarget[], filter: string) {
@@ -203,8 +227,12 @@ export function HistoryPage() {
   };
   return (
     <DocumentPage>
-      <section className="history-page" aria-label="发布记录工作区">
-        <div className="history-tabs" role="tablist" aria-label="发布记录分区">
+      <section className="flex min-h-0 flex-1 flex-col" aria-label="发布记录工作区">
+        <div
+          className="flex h-[52px] shrink-0 items-center gap-[22px] border-b border-border px-6"
+          role="tablist"
+          aria-label="发布记录分区"
+        >
           {(
             [
               ["records", "发布记录"],
@@ -217,20 +245,26 @@ export function HistoryPage() {
               type="button"
               role="tab"
               aria-selected={pane === id}
+              className={cn(
+                "relative h-full cursor-pointer border-0 bg-transparent p-0 text-base",
+                pane === id
+                  ? "font-semibold text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-sm after:bg-foreground"
+                  : "text-muted-foreground",
+              )}
               onClick={() => setPane(id)}
             >
               {label}
               {id === "drafts" && draftCount > 0 && (
-                <span className="history-tab-count">{draftCount}</span>
+                <span className="ml-1.5 text-xs font-normal text-[var(--hint)]">{draftCount}</span>
               )}
             </button>
           ))}
         </div>
         {pane === "records" ? (
-          <div className="history-body">
-            <div className="history-toolbar">
-              <div className="history-filters">
-                <div className="account-search">
+          <div className="flex min-h-0 flex-1 flex-col px-6 pt-4 pb-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 [&_[data-slot=select-trigger]]:h-9 [&_[data-slot=select-trigger]]:w-auto [&_[data-slot=select-trigger]]:min-w-32 [&_[data-slot=select-trigger]]:rounded-[var(--radius-input)] [&_[data-slot=select-trigger]]:bg-card [&_[data-slot=select-trigger]]:text-[length:var(--font-size-caption)] [&_[data-slot=select-trigger]]:shadow-none">
+                <div className="account-search w-[220px]">
                   <Search />
                   <Input
                     aria-label="搜索作品描述或任务标题"
@@ -266,7 +300,7 @@ export function HistoryPage() {
                   onChange={setStatus}
                   options={statusFilters}
                 />
-                <div className="history-mode">
+                <div className="flex items-center gap-0.5">
                   <Filter
                     label="发布模式"
                     value={mode}
@@ -374,6 +408,7 @@ export function HistoryPage() {
                     <TableRow>
                       <TableHead>作品</TableHead>
                       <TableHead>发布人</TableHead>
+                      <TableHead>发布平台</TableHead>
                       <TableHead>发布方式</TableHead>
                       <TableHead>任务概况</TableHead>
                       <TableHead>状态</TableHead>
@@ -391,7 +426,7 @@ export function HistoryPage() {
                 <div className="account-grid">
                   {rows.map((row) => (
                     <article
-                      className="account-grid-item"
+                      className="account-grid-item data-[focused]:bg-accent"
                       key={row.task.id}
                       data-focused={focusedTask === row.task.id || undefined}
                     >
@@ -461,8 +496,8 @@ function Work({ task, cover = task.cover }: { task: Task; cover?: string | null 
           ? ImageIcon
           : FileText;
   return (
-    <div className="history-work">
-      <span className="history-thumb">
+    <div className="flex min-w-[180px] items-center gap-2.5">
+      <span className="grid h-10 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-[var(--hover)] text-[var(--hint)] [&_img]:size-full [&_img]:rounded-md [&_img]:object-cover [&_svg]:size-4">
         {cover ? (
           <img src={cover} alt={`${titleOf(task.body)} 封面`} />
         ) : (
@@ -470,10 +505,10 @@ function Work({ task, cover = task.cover }: { task: Task; cover?: string | null 
         )}
       </span>
       <span className="min-w-0">
-        <span className="history-title" title={task.body}>
+        <span className="block max-w-[220px] truncate font-medium" title={task.body}>
           {titleOf(task.body)}
         </span>
-        <span className="history-kind">
+        <span className="mt-0.5 flex items-center gap-1 text-[length:var(--font-size-caption)] text-[var(--hint)] [&_svg]:size-3">
           <Icon />
           {kindLabel[kind]}
         </span>
@@ -482,13 +517,17 @@ function Work({ task, cover = task.cover }: { task: Task; cover?: string | null 
   );
 }
 
+const statusToneClass: Record<Tone, string> = {
+  success: "border-[#008635]/35 text-[#008635]",
+  warning: "border-[#b9480d]/35 text-[#b9480d]",
+  danger: "border-destructive/40 text-destructive",
+  muted: "text-muted-foreground",
+  progress: "border-[var(--emphasis)]/40 text-[var(--emphasis)]",
+};
+
 function StatusBadge({ state, title }: { state: { label: string; tone: Tone }; title?: string }) {
   return (
-    <Badge
-      variant="secondary"
-      className={`history-status-badge status-${state.tone}`}
-      title={title}
-    >
+    <Badge variant="outline" className={statusToneClass[state.tone]} title={title}>
       {state.label}
     </Badge>
   );
@@ -497,11 +536,13 @@ function StatusBadge({ state, title }: { state: { label: string; tone: Tone }; t
 function RecordFacts({ task, targets }: { task: Task; targets: TaskTarget[] }) {
   const { accounts } = useWorkspace();
   const names = publisherNames(targets, accounts);
+  const publishers = publishersOf(targets, accounts);
   const accountCount = new Set(targets.map((target) => target.accountId)).size;
   const state = summary(targets);
   return (
     <>
-      <span className="history-publisher">{names.join("、") || "未指定"}</span>
+      <span>{names.join("、") || "未指定"}</span>
+      <PlatformAvatarGroup publishers={publishers} size="default" />
       <span>{publishModeLabel(task, targets)}</span>
       <span className="text-muted-foreground">
         {accountCount} 账号 · {targets.length} 任务
@@ -525,6 +566,7 @@ function RecordRow({
 }) {
   const { accounts } = useWorkspace();
   const names = publisherNames(targets, accounts);
+  const publishers = publishersOf(targets, accounts);
   const accountCount = new Set(targets.map((target) => target.accountId)).size;
   const state = summary(targets);
   return (
@@ -533,6 +575,9 @@ function RecordRow({
         <Work task={task} />
       </TableCell>
       <TableCell>{names.join("、") || "未指定"}</TableCell>
+      <TableCell>
+        <PlatformAvatarGroup publishers={publishers} size="default" />
+      </TableCell>
       <TableCell>{publishModeLabel(task, targets)}</TableCell>
       <TableCell className="text-muted-foreground">
         {accountCount} 账号 · {targets.length} 任务
@@ -560,45 +605,13 @@ function actionLabel(verb: string, name: string, many: boolean) {
   return many ? `${verb} ${name}` : verb;
 }
 
-function ActionIconButton({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
-  label: string;
-  disabled?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        delay={400}
-        render={
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label={label}
-            disabled={disabled}
-            onClick={onClick}
-          >
-            {children}
-          </Button>
-        }
-      />
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  );
-}
-
 function RecordActions({ task: _task, targets }: { task: Task; targets: TaskTarget[] }) {
   const { run, busy, openBrowser, accounts, reload } = useWorkspace();
   const accountsInTask = [...new Map(targets.map((target) => [target.accountId, target])).values()];
   const manyTargets = targets.length > 1;
   const manyAccounts = accountsInTask.length > 1;
   return (
-    <div className="history-record-actions">
+    <div className="inline-flex flex-wrap items-center justify-center gap-1 [.account-grid-item_&]:mt-2 [.account-grid-item_&]:justify-start">
       {targets.flatMap((target) => {
         const items = [];
         if (target.url)
@@ -678,7 +691,7 @@ function DraftPane() {
       </Empty>
     );
   return (
-    <div className="history-draft">
+    <div className="m-6 flex items-center gap-4 rounded-[var(--radius-pane)] border border-border p-4">
       <Work
         task={{
           id: "draft",

@@ -56,7 +56,8 @@ html[dir="rtl"],
   margin: 0;
   list-style: none;
   outline: none;
-  z-index: 999999999;
+  /* Inline style on AppToaster also sets this; !important beats dialog/sheet portals. */
+  z-index: 2147483647 !important;
   transition: transform 400ms ease;
 }
 

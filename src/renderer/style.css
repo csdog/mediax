@@ -8,11 +8,10 @@
 @import "./styles/browser.css";
 @import "./styles/accounts.css";
 @import "./styles/settings.css";
-@import "./styles/history.css";
 @import "./styles/calendar.css";
-@import "./styles/sonner.css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
+@import "./styles/sonner.css";
 
 @custom-variant dark (&:is(.dark *));
 

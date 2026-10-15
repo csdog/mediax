@@ -160,6 +160,18 @@ export type TabPreviewOverlay = {
   alt: string;
   placeholder: boolean;
 };
+export type ToastOverlayItem = {
+  type: string;
+  title: string;
+  description?: string;
+};
+export type ToastOverlay = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  toasts: ToastOverlayItem[];
+};
 export type BrowserPreview = { title: string; hostname: string; image: string | null };
 export type BrowserNavigation = {
   url: string;
@@ -221,6 +233,8 @@ export interface DesktopApi {
   layoutAccountBrowser(id: string | null, bounds?: BrowserBounds): Promise<void>;
   showTabPreview?(preview: TabPreviewOverlay): Promise<void>;
   hideTabPreview?(): Promise<void>;
+  showToastOverlay?(overlay: ToastOverlay): Promise<void>;
+  hideToastOverlay?(): Promise<void>;
   closeAccountBrowser(id: string): Promise<void>;
   shortcutSettings(): Promise<ShortcutSettings>;
   setGlobalShortcut(accelerator: string): Promise<ShortcutSettings>;

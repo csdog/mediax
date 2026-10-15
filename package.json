@@ -1,6 +1,6 @@
 {
   "name": "mediax-desktop",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "description": "Local multi-platform publishing workspace for macOS, Windows, and Linux",
   "license": "AGPL-3.0-only",
@@ -38,6 +38,7 @@
     "@hono/node-server": "^2.1.4",
     "@hono/zod-openapi": "^1.6.3",
     "@hookform/resolvers": "^5.9.1",
+    "@number-flow/react": "^0.6.2",
     "@preact/signals": "^2.11.3",
     "@schedule-x/calendar": "^4.9.1",
     "@schedule-x/calendar-controls": "^4.9.1",

@@ -126,13 +126,13 @@ export function AnalyticsPage() {
 
   return (
     <DocumentPage>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto  p-0 ">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
+      <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col gap-4 overflow-auto p-0">
+        <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">数据分析</h1>
             <p className="text-sm text-muted-foreground">本机发布汇总（不抓取平台阅读/点赞）</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <div className="flex rounded-lg bg-card p-0.5 ring-1 ring-border">
               {[7, 30, 90].map((value) => (
                 <Button
@@ -230,7 +230,7 @@ export function AnalyticsPage() {
           <p className="text-sm text-muted-foreground">加载中…</p>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
               <MetricCard
                 icon={SendIcon}
                 label="任务数"
@@ -363,15 +363,15 @@ export function AnalyticsPage() {
               }
             />
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-              <Card className="bg-card shadow-sm">
+            <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+              <Card className="min-w-0 bg-card shadow-sm">
                 <CardHeader className="border-b">
                   <CardTitle>发布完成度</CardTitle>
                   <CardDescription>成功目标占全部目标的比例</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-5">
-                  <div className="flex items-end justify-between gap-3">
-                    <div>
+                  <div className="flex min-w-0 items-end justify-between gap-3">
+                    <div className="min-w-0">
                       <p className="text-3xl font-semibold tracking-tight tabular-nums">
                         {data.totals.verified}
                         <span className="ml-1 text-base font-normal text-muted-foreground">
@@ -380,7 +380,7 @@ export function AnalyticsPage() {
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">已成功验证的目标</p>
                     </div>
-                    <p className="font-mono text-2xl font-semibold tabular-nums text-[color:var(--chart-2)]">
+                    <p className="shrink-0 font-mono text-2xl font-semibold tabular-nums text-[color:var(--chart-2)]">
                       {successPct == null ? "—" : `${successPct}%`}
                     </p>
                   </div>
@@ -396,16 +396,16 @@ export function AnalyticsPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-card shadow-sm">
+              <Card className="min-w-0 bg-card shadow-sm">
                 <CardHeader className="border-b">
                   <CardTitle>账号健康度</CardTitle>
                   <CardDescription>各账号成功率（最多 8 个）</CardDescription>
                 </CardHeader>
-                <CardContent className="pt-5">
+                <CardContent className="min-w-0 pt-5">
                   {!gauges.length ? (
                     <ChartEmpty compact />
                   ) : (
-                    <div className="grid grid-cols-4 gap-x-2 gap-y-4 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4">
+                    <div className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-4 sm:grid-cols-4">
                       {gauges.map((g) => (
                         <RadialGauge
                           key={g.key}
@@ -413,6 +413,7 @@ export function AnalyticsPage() {
                           label={g.label}
                           sublabel={g.sublabel}
                           color={g.color}
+                          className="min-w-0"
                         />
                       ))}
                     </div>
@@ -443,20 +444,20 @@ function AnalyticsSection({
   rank: ReactNode;
 }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-      <Card className="bg-card shadow-sm">
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+      <Card className="min-w-0 bg-card shadow-sm">
         <CardHeader className="border-b">
           <CardTitle>{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
-        <CardContent className="pt-4">{chart}</CardContent>
+        <CardContent className="min-w-0 pt-4">{chart}</CardContent>
       </Card>
-      <Card className="bg-card shadow-sm">
+      <Card className="min-w-0 bg-card shadow-sm">
         <CardHeader className="border-b">
           <CardTitle>{rankTitle}</CardTitle>
           <CardDescription>{rankDescription}</CardDescription>
         </CardHeader>
-        <CardContent className="pt-2">{rank}</CardContent>
+        <CardContent className="min-w-0 pt-2">{rank}</CardContent>
       </Card>
     </div>
   );
@@ -473,8 +474,8 @@ type RankRow = {
 function RankTable({ rows }: { rows: RankRow[] }) {
   const headers = rows[0]?.cols.map((c) => c.label) ?? [];
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[320px] text-left text-sm">
+    <div className="min-w-0 overflow-x-auto">
+      <table className="w-full min-w-[280px] text-left text-sm">
         <thead>
           <tr className="border-b text-xs text-muted-foreground">
             <th className="w-8 py-2 pr-2 font-medium">#</th>
@@ -546,15 +547,15 @@ function MetricCard({
   accent: string;
 }) {
   return (
-    <Card size="sm" className="bg-card shadow-sm">
+    <Card size="sm" className="min-w-0 bg-card shadow-sm">
       <CardHeader>
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start justify-between gap-2">
           <div className="min-w-0">
             <CardDescription>{label}</CardDescription>
             <CardTitle className="mt-1 font-mono text-2xl tracking-tighter tabular-nums">
               {value}
             </CardTitle>
-            {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+            {hint ? <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p> : null}
           </div>
           <div
             className="flex size-9 shrink-0 items-center justify-center rounded-xl shadow-sm"

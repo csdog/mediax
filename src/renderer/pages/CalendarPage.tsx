@@ -520,6 +520,7 @@ function publishersOf(entry: CalendarEntry, accounts: AccountInfo[]): CalendarPu
     const account = byAccount.get(target.accountId);
     const platform = (account?.platform ?? "facebook") as PlatformId;
     publishers.push({
+      id: target.accountId,
       platform,
       name: account?.name ?? target.name,
       avatar: account?.avatar,

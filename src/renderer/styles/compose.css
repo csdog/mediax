@@ -1,8 +1,10 @@
 .editor-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 39%);
+  grid-template-rows: minmax(0, 1fr);
   flex: 1;
   min-height: 0;
+  height: 100%;
 }
 .editor-workspace.publish-flow {
   grid-template-columns: 280px minmax(0, 1fr);
@@ -24,80 +26,6 @@
   min-height: 0;
   flex: 1;
   overflow: auto;
-}
-.publish-scope-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-height: 0;
-  flex: 1;
-  overflow: auto;
-  margin-top: 16px;
-}
-.publish-scope-row {
-  position: relative;
-  display: flex;
-  align-items: stretch;
-  gap: 2px;
-  border-radius: 12px;
-}
-.publish-scope-row.is-active,
-.publish-scope-item.is-active {
-  background: color-mix(in oklab, var(--muted) 70%, transparent);
-}
-.publish-scope-item {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--foreground);
-  text-align: left;
-  cursor: pointer;
-}
-.publish-scope-item:hover {
-  background: color-mix(in oklab, var(--muted) 55%, transparent);
-}
-.publish-scope-row .publish-scope-item {
-  width: 100%;
-  padding-right: 32px;
-}
-.publish-scope-icon {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  margin-top: 0;
-  border-radius: 10px;
-  background: color-mix(in oklab, var(--muted) 80%, transparent);
-  color: var(--muted-foreground);
-  flex-shrink: 0;
-}
-.publish-scope-remove {
-  position: absolute;
-  top: 6px;
-  right: 4px;
-  opacity: 0;
-  color: var(--muted-foreground);
-}
-.publish-scope-row:hover .publish-scope-remove,
-.publish-scope-row:focus-within .publish-scope-remove {
-  opacity: 1;
-}
-.publish-scope-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  font-size: var(--font-size-caption);
-  color: var(--hint);
-}
-.publish-scope-banner > span {
-  flex: 1;
-  min-width: 0;
 }
 .composer-form {
   display: flex;
@@ -475,6 +403,7 @@
   .editor-workspace,
   .editor-workspace.publish-flow {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
     overflow: auto;
   }
   .draft-pane {

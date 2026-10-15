@@ -50,6 +50,22 @@ GitHub Release 的自动 **What's Changed** 只汇总**合并进默认分支的 
 
 界面用 React、TanStack Router/Query、Tailwind 和 shadcn/Base UI。图标只用 Lucide。视觉规范见 `docs/ui-style.md`。
 
+## 样式（Tailwind 优先）
+
+渲染层样式优先用 **Tailwind utility**，不要默认去写一整段裸 CSS。
+
+- **一次用**：在组件 `className` 里直接写 utility（如 `inline-flex items-center justify-center gap-1`）。
+- **要复用**：优先抽小组件，把 class 收在一处；若必须保留 class 钩子（表格列、第三方挂载点等），再用 CSS 里的 `@apply` 组合 utility，例如：
+
+```css
+.account-toolbar-actions {
+  @apply inline-flex flex-wrap items-center gap-2;
+}
+```
+
+- **才写裸 CSS**：现有 token / 窗口外壳 / 非 Tailwind 能表达的选择器或动画（`workspace.css`、`tokens.css` 等）。不要为了「复用」再堆一套平行的手写 class。
+- 改历史页面、表单、列表操作等 UI 时，默认 Tailwind；与现有 CSS 文件混用时，同一块布局不要 Tailwind 和自定义 CSS 各写一半。
+
 ## 发布约束
 
 发布使用应用内 Electron Chromium，经本机 CDP 由 Playwright 操作。不要另开浏览器，也不要注入到用户日常浏览器。
@@ -125,5 +141,7 @@ pnpm run typecheck
 ## 改动习惯
 
 界面改动用 `pnpm run test:ui` 走通受影响的流程。主进程和发布规则用 `pnpm run test:unit`。类型改动再跑 `pnpm run typecheck`。格式用 oxfmt，检查用 oxlint。
+
+**尽量用已有工具和成熟库，不自己手写。** 轮询、请求状态、缓存、路由、表单、日期、样式合并等常见能力，优先用项目已依赖的栈（如 TanStack Query / Router、react-hook-form、date-fns、现有 hooks 与组件）。先查仓库里有没有现成用法，再考虑新依赖；不要为同构问题再造一套 util / 轮询器 / 状态机。只有现有库明显盖不住、或业务特异到库帮不上时，才小范围手写。
 
 除非用户明确要求，不要提交或推送。不要改 git 配置，不要跳过钩子。

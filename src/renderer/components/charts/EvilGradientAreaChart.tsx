@@ -55,7 +55,7 @@ export function EvilGradientAreaChart({
   return (
     <ChartContainer
       config={config}
-      className={cn("aspect-auto w-full", heightClassName, className)}
+      className={cn("aspect-auto w-full min-w-0", heightClassName, className)}
     >
       <AreaChart data={data} margin={{ left: 4, right: 8, top: 12, bottom: 0 }}>
         <defs>

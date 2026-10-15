@@ -23,6 +23,7 @@ import {
   type ContentKind,
   type ImageAsset,
   type TabPreviewOverlay,
+  type ToastOverlay,
   type Target,
 } from "../shared/models";
 import { parseProfile, readProfile } from "../shared/profile";
@@ -46,6 +47,7 @@ import type { DesktopShell } from "./desktop/DesktopShell";
 import type { DownloadStore } from "./desktop/DownloadStore";
 import type { AppUpdater } from "./desktop/AppUpdater";
 import { TabPreviewWindow } from "./desktop/TabPreviewWindow";
+import { ToastOverlayWindow } from "./desktop/ToastOverlayWindow";
 import {
   buildDiagnosticReport,
   exportDiagnosticReport,
@@ -100,6 +102,7 @@ export function registerIpc(
   app.once("will-quit", stopLogging);
   const images = new Map<string, ImageAsset>();
   const tabPreview = new TabPreviewWindow(window);
+  const toastOverlay = new ToastOverlayWindow(window);
   const publishing = new PublishService(db, accounts, join(app.getPath("userData"), "task-assets"));
   publishing.startScheduler();
   app.once("will-quit", () => publishing.stopScheduler());
@@ -355,6 +358,8 @@ export function registerIpc(
   on("closeAccountBrowser", (id) => accounts.close(text(id)));
   on("showTabPreview", (value) => tabPreview.show(previewOverlay(value)));
   on("hideTabPreview", () => tabPreview.hide());
+  on("showToastOverlay", (value) => toastOverlay.show(toastOverlayPayload(value)));
+  on("hideToastOverlay", () => toastOverlay.hide());
   on("refreshAccount", (id) => accounts.refresh(text(id)));
   on("deleteAccount", (id) => accounts.remove(text(id)));
   on("importMarkdown", async () => {
@@ -568,6 +573,37 @@ export function registerIpc(
   on("verifyTarget", (id, url) =>
     publishing.verify(text(id), url === undefined ? undefined : text(url)),
   );
+}
+
+function toastOverlayPayload(value: unknown): ToastOverlay {
+  if (!value || typeof value !== "object") throw new Error("无效通知叠层");
+  const overlay = value as Record<string, unknown>;
+  const number = (item: unknown, name: string) => {
+    if (typeof item !== "number" || !Number.isFinite(item)) throw new Error(`无效通知${name}`);
+    return item;
+  };
+  const width = number(overlay.width, "宽度");
+  const height = number(overlay.height, "高度");
+  if (width < 1 || height < 1 || width > 1200 || height > 800) throw new Error("无效通知尺寸");
+  const items = Array.isArray(overlay.toasts) ? overlay.toasts : [];
+  return {
+    x: number(overlay.x, "位置"),
+    y: number(overlay.y, "位置"),
+    width,
+    height,
+    toasts: items.slice(0, 3).map((item) => {
+      if (!item || typeof item !== "object") throw new Error("无效通知条目");
+      const toast = item as Record<string, unknown>;
+      const title = typeof toast.title === "string" ? toast.title.slice(0, 200) : "";
+      if (!title) throw new Error("无效通知文案");
+      return {
+        type: typeof toast.type === "string" ? toast.type.slice(0, 32) : "default",
+        title,
+        description:
+          typeof toast.description === "string" ? toast.description.slice(0, 200) : undefined,
+      };
+    }),
+  };
 }
 
 function previewOverlay(value: unknown): TabPreviewOverlay {

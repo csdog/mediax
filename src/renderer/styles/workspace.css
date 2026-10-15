@@ -420,6 +420,7 @@ body {
   display: flex;
   flex-direction: column;
   width: 100%;
+  min-width: 0;
   padding: 24px 32px;
   flex: 1;
   min-height: 0;
