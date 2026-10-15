@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { userErrorMessage } from "../../shared/userError";
 import { AccountManagement } from "@/components/AccountManagement";
 import { DocumentPage } from "@/components/workspace/DocumentPage";
 import { useWorkspace } from "@/app/WorkspaceContext";
@@ -68,7 +69,11 @@ export function AccountsPage() {
                   ? toast.success
                   : toast.warning;
               notify(
-                [`${updated.name}：${labels[updated.login]}`, updated.message]
+                [
+                  `${updated.name}：${labels[updated.login]}`,
+                  updated.message &&
+                    userErrorMessage(updated.message, "身份检查未完成，请稍后重试。"),
+                ]
                   .filter(Boolean)
                   .join("，"),
               );
@@ -79,7 +84,7 @@ export function AccountsPage() {
               );
             }
           } catch (error) {
-            toast.error(error instanceof Error ? error.message : String(error));
+            toast.error(userErrorMessage(error, "账号检查未完成，请稍后重试。"));
           }
         }}
         onDelete={(account) => void run(() => removeAccount(account.id))}

@@ -70,3 +70,58 @@ it("leaves the account unchanged while its QR callback is still navigating", asy
     db.close();
   }
 });
+
+it("checks the Channels workspace and persists its login across closing and service recreation", async () => {
+  vi.useFakeTimers();
+  const db = new Database(":memory:");
+  let restored: AccountService | undefined;
+  try {
+    const account = db.addAccount("视频号账号", "channels");
+    db.setSetting(`account-status:${account.id}`, { login: "logged_in", targets: [] });
+    let url = "";
+    let opened = false;
+    const view = {
+      webContents: {
+        isDestroyed: () => false,
+        isLoadingMainFrame: () => false,
+        getURL: () => url,
+        session: { cookies: { get: async () => cookies } },
+      },
+    };
+    const browsers = {
+      get: () => (opened ? view : undefined),
+      open: vi.fn(async (_id: string, target: string) => {
+        url = target;
+        opened = true;
+        return view;
+      }),
+    };
+    const service = new AccountService(db, browsers as unknown as AccountBrowserManager);
+    vi.spyOn(service, "adapter").mockReturnValue({ discover: async () => [] } as ReturnType<
+      AccountService["adapter"]
+    >);
+    expect((await service.refresh(account.id)).login).toBe("logged_in");
+    expect(browsers.open).toHaveBeenCalledWith(
+      account.id,
+      "https://channels.weixin.qq.com/platform",
+      {
+        platform: "channels",
+        focus: false,
+        waitUntil: "dom-ready",
+      },
+    );
+    opened = false;
+    restored = new AccountService(db, browsers as unknown as AccountBrowserManager);
+    expect(restored.list()[0].login).toBe("logged_in");
+    restored.startAutoRefresh();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(restored.list()[0].login).toBe("logged_in");
+    expect((db.setting(`account-status:${account.id}`) as { login: string }).login).toBe(
+      "logged_in",
+    );
+  } finally {
+    restored?.stopAutoRefresh();
+    db.close();
+    vi.useRealTimers();
+  }
+});

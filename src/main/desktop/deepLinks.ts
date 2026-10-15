@@ -2,14 +2,7 @@ import { app } from "electron";
 import { resolve } from "node:path";
 import type { DesktopCommand, DesktopPage } from "../../shared/models";
 
-const pages = new Set<DesktopPage>([
-  "accounts",
-  "compose",
-  "video",
-  "history",
-  "calendar",
-  "analytics",
-]);
+const pages = new Set<DesktopPage>(["accounts", "publish", "history", "calendar", "analytics"]);
 
 /** Prefer registering once early so cold-start open-url / argv deep links work. */
 export function registerDeepLinkProtocol() {
@@ -27,7 +20,7 @@ export function findDeepLinkArg(argv: readonly string[]) {
 
 /**
  * Accepted forms:
- * - mediax://compose
+ * - mediax://publish
  * - mediax://history/<taskId>
  * - mediax://history?taskId=<id>
  * - mediax://settings
@@ -44,7 +37,8 @@ export function parseDeepLink(raw: string): DesktopCommand | null {
     .map((part) => part.trim())
     .filter(Boolean);
   const head = parts[0]?.toLowerCase();
-  if (!head || head === "open") return { action: "navigate", page: "compose" };
+  if (!head || head === "open" || head === "publish")
+    return { action: "navigate", page: "publish" };
   if (head === "settings") return { action: "settings" };
   if (!pages.has(head as DesktopPage)) return null;
   const page = head as DesktopPage;

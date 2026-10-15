@@ -62,7 +62,7 @@ const sessions: Record<PlatformId, Session> = {
   ]),
   bilibili: known("https://passport.bilibili.com/login", "https://www.bilibili.com", ["SESSDATA"]),
   // wxuin identifies a WeChat user even on the logged-out QR login page.
-  channels: known("https://channels.weixin.qq.com", "https://channels.weixin.qq.com", [
+  channels: known("https://channels.weixin.qq.com/platform", "https://channels.weixin.qq.com", [
     "sessionid",
   ]),
   wechat: known("https://mp.weixin.qq.com/", "https://mp.weixin.qq.com", [

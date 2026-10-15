@@ -28,6 +28,7 @@ it("opens a closed account in the background before inspecting its current login
     expect(browsers.open).toHaveBeenCalledWith(account.id, expect.any(String), {
       platform: "facebook",
       focus: false,
+      waitUntil: "dom-ready",
     });
     expect(browsers.show).not.toHaveBeenCalled();
     expect(result.login).toBe("logged_out");

@@ -12,6 +12,7 @@ import { ComposePage } from "@/pages/ComposePage";
 import { HistoryPage } from "@/pages/HistoryPage";
 import { CalendarPage } from "@/pages/CalendarPage";
 import { AnalyticsPage } from "@/pages/AnalyticsPage";
+import { PublishPage } from "@/pages/PublishPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 const rootRoute = createRootRoute({
   component: () => (
@@ -25,6 +26,11 @@ const accountsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/accounts",
   component: AccountsPage,
+});
+const publishRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/publish",
+  component: PublishPage,
 });
 const composeRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -58,6 +64,7 @@ const settingsRoute = createRoute({
 });
 const routeTree = rootRoute.addChildren([
   accountsRoute,
+  publishRoute,
   composeRoute,
   videoRoute,
   historyRoute,

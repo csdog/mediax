@@ -138,7 +138,9 @@ export function registerIpc(
       !value ||
       !Array.isArray(value.tabs) ||
       value.tabs.length > 100 ||
-      !["accounts", "compose", "video", "history", "calendar", "analytics"].includes(value.page)
+      !["accounts", "publish", "compose", "video", "history", "calendar", "analytics"].includes(
+        value.page,
+      )
     )
       throw new Error("无效标签页状态");
     const accountIds = new Set(db.accounts().map((account) => account.id));

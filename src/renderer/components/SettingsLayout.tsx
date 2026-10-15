@@ -418,7 +418,7 @@ export function SettingsLayout({
                   </div>
                   <InfoRow
                     title="深度链接"
-                    description="可用 mediax://compose、history、settings 等打开对应页面。"
+                    description="可用 mediax://publish、history、settings 等打开对应页面。"
                     value="mediax://"
                   />
                 </div>

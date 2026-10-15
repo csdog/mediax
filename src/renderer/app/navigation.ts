@@ -69,9 +69,10 @@ export type DesktopNavItem = {
   selectedIcon: typeof UsersIcon;
 };
 
-/** All desktop pages (routes + titles). Compose/video are opened via the Publish dialog. */
+/** All desktop pages (routes + titles). In-app「发布」opens the dialog; /publish is for links. */
 export const desktopPages: DesktopNavItem[] = [
   { id: "accounts", title: "账号管理", icon: CodexUsersIcon, selectedIcon: UsersFilledIcon },
+  { id: "publish", title: "发布", icon: CodexSendIcon, selectedIcon: SendFilledIcon },
   { id: "compose", title: "内容发布", icon: CodexSendIcon, selectedIcon: SendFilledIcon },
   { id: "video", title: "视频", icon: CodexVideoIcon, selectedIcon: CodexVideoFilledIcon },
   { id: "calendar", title: "内容日历", icon: CodexCalendarIcon, selectedIcon: CalendarFilledIcon },
@@ -84,7 +85,7 @@ export const desktopPages: DesktopNavItem[] = [
   { id: "history", title: "发布记录", icon: CodexHistoryIcon, selectedIcon: HistoryFilledIcon },
 ];
 
-/** Sidebar / activity rail entries — publish entry is the header「发布」dialog, not these pages. */
+/** Sidebar / activity rail entries — 「发布」stays a dialog, not a rail item. */
 export const navigation: DesktopNavItem[] = desktopPages.filter(
-  (item) => item.id !== "compose" && item.id !== "video",
+  (item) => item.id !== "publish" && item.id !== "compose" && item.id !== "video",
 );

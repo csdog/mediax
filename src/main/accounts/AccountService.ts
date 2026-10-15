@@ -63,7 +63,7 @@ export class AccountService {
     const target =
       typeof url === "string" && url.trim() ? url.trim() : platformHome[account.platform];
     const view = await this.browsers.open(id, target, { platform: account.platform });
-    if (view.webContents.isDestroyed()) return;
+    if (!view.webContents || view.webContents.isDestroyed()) return;
     this.browsers.show(id);
     await this.syncStatus(id);
     await this.updateAvatar(id);
@@ -74,7 +74,7 @@ export class AccountService {
     const target = url.trim();
     if (!/^https?:\/\//i.test(target)) throw new Error("无效网址");
     const view = await this.browsers.open(id, target, { partition: `persist:${id}` });
-    if (view.webContents.isDestroyed()) return;
+    if (!view.webContents || view.webContents.isDestroyed()) return;
     this.browsers.show(id);
   }
   private browserContents(id: string) {
@@ -403,6 +403,7 @@ export class AccountService {
             this.browsers.open(id, platformHome[account.platform], {
               platform: account.platform,
               focus: false,
+              waitUntil: "dom-ready",
             }),
             new Promise<never>((_resolve, reject) => {
               timeout = setTimeout(() => {
@@ -410,7 +411,8 @@ export class AccountService {
               }, 15_000);
             }),
           ]);
-          if (view.webContents.isDestroyed()) throw new Error("账号检查已取消，请重新检查");
+          if (!view.webContents || view.webContents.isDestroyed())
+            throw new Error("账号检查已取消，请重新检查");
         } finally {
           clearTimeout(timeout);
         }

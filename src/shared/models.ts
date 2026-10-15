@@ -400,8 +400,16 @@ export type UpdateStatus = {
   canCheck: boolean;
   canInstall: boolean;
 };
-export type DesktopPage = "accounts" | "compose" | "video" | "history" | "calendar" | "analytics";
+export type DesktopPage =
+  | "accounts"
+  | "publish"
+  | "compose"
+  | "video"
+  | "history"
+  | "calendar"
+  | "analytics";
 export type DesktopCommand =
+  | { action: "open-web"; url: string }
   | { action: "tab"; operation: TabAction }
   | { action: "settings" }
   | { action: "navigate"; page: DesktopPage; taskId?: string }

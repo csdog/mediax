@@ -1,8 +1,11 @@
 import "electron-log/preload";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { DesktopApi, DesktopCommand } from "../shared/models";
+import { userErrorMessage } from "../shared/userError";
 const call = (method: string, ...args: unknown[]) =>
-  ipcRenderer.invoke(`mediax:${method}`, ...args);
+  ipcRenderer.invoke(`mediax:${method}`, ...args).catch((error: unknown) => {
+    throw new Error(userErrorMessage(error));
+  });
 const api: DesktopApi = {
   workspaceSession: () => call("workspaceSession"),
   saveWorkspaceSession: (session) => call("saveWorkspaceSession", session),
@@ -118,6 +121,11 @@ const api: DesktopApi = {
   resume: (id) => call("resume", id),
 };
 contextBridge.exposeInMainWorld("desktop", api);
+contextBridge.exposeInMainWorld("trayDrop", {
+  pathForFile: (file: File) => webUtils.getPathForFile(file),
+  setHot: (hot: boolean) => ipcRenderer.send("mediax:tray-drop-hot", hot),
+  dropped: (paths: string[]) => ipcRenderer.send("mediax:tray-drop-files", paths),
+});
 
 // Read-only platform metadata lets CSS provide an opaque fallback outside macOS.
 contextBridge.exposeInMainWorld("desktopPlatform", process.platform);

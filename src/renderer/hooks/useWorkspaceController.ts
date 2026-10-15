@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { userErrorMessage } from "../../shared/userError";
 import type {
   AccountInfo,
   ContentKind,
@@ -87,7 +88,7 @@ export function useWorkspaceController() {
   const busy = operation.isPending;
   useEffect(() => {
     const error = accountsQuery.error ?? historyQuery.error;
-    if (error) toast.error(error.message);
+    if (error) toast.error(userErrorMessage(error));
   }, [accountsQuery.error, historyQuery.error]);
   const [selectedTargets, setSelectedTargets] = useState<Target[]>([]);
   selectKindRef.current = (kind: ContentKind) => {
@@ -268,7 +269,7 @@ export function useWorkspaceController() {
     try {
       await operation.mutateAsync(fn);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      toast.error(userErrorMessage(error));
     }
   };
   useEffect(() => {
@@ -327,7 +328,7 @@ export function useWorkspaceController() {
             if (tab.kind === "web") await window.desktop.openWebBrowser(tab.id, tab.url);
             else await window.desktop.openAccount(tab.id);
           } catch (error) {
-            toast.error(`恢复 ${tab.name} 失败：${String(error)}`);
+            toast.error(`恢复 ${tab.name} 失败：${userErrorMessage(error)}`);
           }
         }
         setActiveBrowser(restored.some((tab) => tab.id === saved.activeId) ? saved.activeId : null);
@@ -364,7 +365,7 @@ export function useWorkspaceController() {
         activeId: activeBrowser,
         page,
       })
-      ?.catch((error) => toast.error(`保存标签页失败：${String(error)}`));
+      ?.catch((error) => toast.error(userErrorMessage(error, "标签页未能保存，请稍后重试。")));
   }, [initialized, browserTabs, activeBrowser, page]);
   useEffect(() => {
     if (!initialized) return;
@@ -374,7 +375,9 @@ export function useWorkspaceController() {
         return;
       }
       if (busy && command.action !== "navigate") return;
-      if (command.action === "tab") {
+      if (command.action === "open-web") {
+        void run(() => openWebBrowser(command.url));
+      } else if (command.action === "tab") {
         if (!settingsOpen && !accountDialogOpen && !publishDialogOpen)
           handleTabCommand(command.operation);
       } else if (command.action === "settings") {

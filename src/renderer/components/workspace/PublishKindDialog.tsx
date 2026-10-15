@@ -21,6 +21,58 @@ function platformsForKind(kind: ContentKind): PlatformId[] {
   return platforms.filter((id) => supportedKinds(id).includes(kind));
 }
 
+export function PublishKindPicker({ onSelect }: { onSelect: (kind: ContentKind) => void }) {
+  const [hovered, setHovered] = useState<ContentKind | null>(null);
+  const platformMap = useMemo(() => {
+    const map = {} as Record<ContentKind, PlatformId[]>;
+    for (const kind of optionOrder) map[kind] = platformsForKind(kind);
+    return map;
+  }, []);
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {optionOrder.map((kind) => {
+        const option = publishKindMeta[kind];
+        const Icon = option.icon;
+        const list = platformMap[kind];
+        const preview = list.slice(0, PREVIEW_COUNT);
+        const overflow = Math.max(0, list.length - preview.length);
+        const selected = hovered === kind;
+        return (
+          <button
+            key={kind}
+            type="button"
+            aria-label={option.action}
+            onMouseEnter={() => setHovered(kind)}
+            onMouseLeave={() => setHovered((current) => (current === kind ? null : current))}
+            onFocus={() => setHovered(kind)}
+            onBlur={() => setHovered((current) => (current === kind ? null : current))}
+            className={`flex flex-col items-center gap-3 rounded-2xl border bg-card px-3 py-5 text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              selected
+                ? "border-violet-300 shadow-[0_0_0_3px_rgba(167,139,250,0.22)]"
+                : "border-border/70 hover:border-violet-200 hover:bg-muted/30"
+            }`}
+            onClick={() => onSelect(kind)}
+          >
+            <span
+              className="flex size-14 items-center justify-center rounded-2xl text-white shadow-sm"
+              style={{ background: option.gradient }}
+              aria-hidden
+            >
+              <Icon className="size-7" strokeWidth={1.75} />
+            </span>
+            <span className="space-y-1">
+              <span className="block text-sm font-semibold tracking-tight">{option.title}</span>
+              <span className="block text-xs text-muted-foreground">支持平台 ({list.length})</span>
+            </span>
+            <PlatformPreview platforms={preview} overflow={overflow} all={list} stopPropagation />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function PublishKindDialog({
   open,
   onOpenChange,
@@ -30,13 +82,6 @@ export function PublishKindDialog({
   onOpenChange: (open: boolean) => void;
   onSelect: (kind: ContentKind) => void;
 }) {
-  const [hovered, setHovered] = useState<ContentKind | null>(null);
-  const platformMap = useMemo(() => {
-    const map = {} as Record<ContentKind, PlatformId[]>;
-    for (const kind of optionOrder) map[kind] = platformsForKind(kind);
-    return map;
-  }, []);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-5 sm:max-w-3xl">
@@ -46,56 +91,12 @@ export function PublishKindDialog({
             选择视频、图文、文章或音频后进入对应编辑页
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {optionOrder.map((kind) => {
-            const option = publishKindMeta[kind];
-            const Icon = option.icon;
-            const list = platformMap[kind];
-            const preview = list.slice(0, PREVIEW_COUNT);
-            const overflow = Math.max(0, list.length - preview.length);
-            const selected = hovered === kind;
-            return (
-              <button
-                key={kind}
-                type="button"
-                aria-label={option.action}
-                onMouseEnter={() => setHovered(kind)}
-                onMouseLeave={() => setHovered((current) => (current === kind ? null : current))}
-                onFocus={() => setHovered(kind)}
-                onBlur={() => setHovered((current) => (current === kind ? null : current))}
-                className={`flex flex-col items-center gap-3 rounded-2xl border bg-card px-3 py-5 text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  selected
-                    ? "border-violet-300 shadow-[0_0_0_3px_rgba(167,139,250,0.22)]"
-                    : "border-border/70 hover:border-violet-200 hover:bg-muted/30"
-                }`}
-                onClick={() => {
-                  onSelect(kind);
-                  onOpenChange(false);
-                }}
-              >
-                <span
-                  className="flex size-14 items-center justify-center rounded-2xl text-white shadow-sm"
-                  style={{ background: option.gradient }}
-                  aria-hidden
-                >
-                  <Icon className="size-7" strokeWidth={1.75} />
-                </span>
-                <span className="space-y-1">
-                  <span className="block text-sm font-semibold tracking-tight">{option.title}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    支持平台 ({list.length})
-                  </span>
-                </span>
-                <PlatformPreview
-                  platforms={preview}
-                  overflow={overflow}
-                  all={list}
-                  stopPropagation
-                />
-              </button>
-            );
-          })}
-        </div>
+        <PublishKindPicker
+          onSelect={(kind) => {
+            onSelect(kind);
+            onOpenChange(false);
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

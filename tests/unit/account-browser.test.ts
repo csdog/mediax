@@ -2,6 +2,9 @@ import { beforeEach, expect, it, vi } from "vitest";
 import type { BrowserWindow } from "electron";
 import { AccountBrowserManager } from "../../src/main/browser/AccountBrowserManager";
 import { platforms } from "../../src/shared/models";
+vi.mock("../../src/main/browser/contextMenu", () => ({
+  installBrowserContextMenu: vi.fn(async () => {}),
+}));
 
 const state = vi.hoisted(() => ({ destroyed: false }));
 const view = vi.hoisted(() => ({
@@ -15,6 +18,8 @@ const view = vi.hoisted(() => ({
       "Mozilla/5.0 MediaX/0.3.5 Chrome/152.0.7977.130 Electron/44.7.0 Safari/537.36",
     setUserAgent: vi.fn(),
     on: vi.fn(),
+    once: vi.fn(),
+    removeListener: vi.fn(),
     loadURL: vi.fn(),
     setBackgroundThrottling: vi.fn(),
     setWindowOpenHandler: vi.fn(),
@@ -78,6 +83,63 @@ it("still reports navigation failures while the tab remains open", async () => {
   await expect(browsers.open("account-1", "https://mp.toutiao.com/auth/page/login")).rejects.toBe(
     failure,
   );
+});
+
+it("can inspect a ready document while slow subresources keep the full load pending", async () => {
+  let domReady!: () => void;
+  let finishLoad!: () => void;
+  view.webContents.once.mockImplementationOnce((_event, listener) => {
+    domReady = listener;
+  });
+  view.webContents.loadURL.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finishLoad = resolve;
+      }),
+  );
+  const opening = manager().open("account-1", "https://mp.toutiao.com/auth/page/login", {
+    focus: false,
+    platform: "toutiao",
+    waitUntil: "dom-ready",
+  });
+  domReady();
+  await expect(opening).resolves.toBe(view);
+  expect(view.webContents.removeListener).toHaveBeenCalledWith("dom-ready", domReady);
+  finishLoad();
+});
+
+it("reports real document failures before DOM readiness and removes the listener", async () => {
+  view.webContents.loadURL.mockRejectedValueOnce(new Error("ERR_CONNECTION_REFUSED"));
+  await expect(
+    manager().open("account-1", "https://mp.toutiao.com/auth/page/login", {
+      focus: false,
+      waitUntil: "dom-ready",
+    }),
+  ).rejects.toThrow("ERR_CONNECTION_REFUSED");
+  expect(view.webContents.removeListener).toHaveBeenCalledWith("dom-ready", expect.any(Function));
+});
+
+it("handles Electron clearing a closed view's webContents during navigation", async () => {
+  const contents = view.webContents;
+  let rejectLoad!: (error: Error) => void;
+  contents.loadURL.mockImplementationOnce(
+    () =>
+      new Promise((_, reject) => {
+        rejectLoad = reject;
+      }),
+  );
+  const browsers = manager();
+  const opening = browsers.open("account-1", "https://mp.toutiao.com/auth/page/login", {
+    focus: false,
+  });
+  browsers.close("account-1");
+  Object.defineProperty(view, "webContents", { configurable: true, value: undefined });
+  try {
+    rejectLoad(new Error("ERR_ABORTED"));
+    await expect(opening).resolves.toBe(view);
+  } finally {
+    Object.defineProperty(view, "webContents", { configurable: true, value: contents });
+  }
 });
 
 it.each([...platforms, undefined])(
