@@ -21,15 +21,17 @@ pnpm run fmt
 
 对用户可见的功能、重命名、安装包行为或默认配置有实质变化时，**同一批提交里**要抬 `package.json` 的 `version`（semver：破坏性/大改 → minor 或 major；小修 → patch）。不要只推代码、事后再补版本。
 
+**只要 `package.json` 的 `version` 相对上一已发布版本有增加，合并进 `main` 后必须立刻打并推送同号 `v*` 标签**（如 `0.3.1` → `v0.3.1`）。禁止出现「版本号已抬、tag 未打」；不要等用户再提醒发版。
+
 ### 走 PR，再打 tag
 
 GitHub Release 的自动 **What's Changed** 只汇总**合并进默认分支的 PR**，不列出直推 `main` 的 commit。因此：
 
 1. 在功能分支上开发并提交（含需要的 version bump）。
 2. 开 PR → 审查 → **merge 进 `main`**（不要把发版相关改动只直推 `main`）。
-3. 在已合并的 `main` 上打并推送 `v*` 标签（与 `package.json` 一致，如 `v0.2.0`），触发 GitHub Actions 打安装包并发 Release。
+3. **同一轮操作内**在已合并的 `main` 上打并推送 `v*` 标签（与 `package.json` 一致，如 `v0.3.1`），触发 GitHub Actions 打安装包并发 Release。
 
-仅 `git push` 主分支不会发版；仅打 tag 但中间没有合并 PR 时，Release 往往只有 Full Changelog 链接、没有 What's Changed。用户要求「提交并推送」且属于发版范围时：默认走 PR 合并后再打 tag；用户明确说「直推 / 不要 PR」时才直推，并自行写清 release 正文（或接受无 What's Changed）。
+仅 `git push` 主分支不会发版；仅打 tag 但中间没有合并 PR 时，Release 往往只有 Full Changelog 链接、没有 What's Changed。用户要求「提交并推送」且属于发版范围时：默认走 PR 合并后再打 tag；用户明确说「直推 / 不要 PR」时才直推，并自行写清 release 正文（或接受无 What's Changed）。无论走 PR 还是直推，**version bump 后都必须打 tag**。
 
 显示名是 **MediaX**；协议、包名、数据目录等标识符用小写 `mediax`（见 `src/shared/product.ts`）。
 
