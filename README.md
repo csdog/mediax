@@ -8,7 +8,7 @@
 
 ![release](https://img.shields.io/github/v/release/csdog/mediax?style=flat-square&label=release)![build](https://img.shields.io/github/actions/workflow/status/csdog/mediax/build.yml?style=flat-square&label=build)![desktop platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-111827?style=flat-square)![publish platforms](https://img.shields.io/badge/publish-32%20platforms-2563eb?style=flat-square)![login platforms](https://img.shields.io/badge/login-56%20platforms-0f766e?style=flat-square)![Electron](https://img.shields.io/badge/Electron-44-47848f?style=flat-square&logo=electron&logoColor=white)![TypeScript](https://img.shields.io/badge/TypeScript-7-3178c6?style=flat-square&logo=typescript&logoColor=white)![React](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=black)
 
-[支持的平台](#支持的平台) · [特性](#特性) · [主要功能](#主要功能) · [快速开始](#快速开始) · [Agent 面](#agent-面) · [开发](docs/DEVELOPMENT.md) · [TODO](docs/TODO.md) · [Contributing](CONTRIBUTING.md)
+[支持的平台](#支持的平台) · [特性](#特性) · [主要功能](#主要功能) · [快速开始](#快速开始) · [Agent 面](#agent-面) · [资助](#资助) · [开发](docs/DEVELOPMENT.md) · [TODO](docs/TODO.md) · [Contributing](CONTRIBUTING.md)
 
 ---
 
@@ -153,6 +153,14 @@
 | 依赖   | 桌面已有本机排期/日历；Agent 业务命令仍待接到控制面                                                                                  |
 
 细节与阻塞关系见 [docs/TODO.md](docs/TODO.md)。人怎么提 PR 见 [CONTRIBUTING.md](CONTRIBUTING.md)；[AGENTS.md](AGENTS.md) 是给写本仓代码的 Agent 看的约定，不是上述产品 Agent 面。
+
+## 资助
+
+本项目由下列组织资助开发。
+
+|                                                                                                | 资助方                  | 简介                                                                                                                       | 链接                                                                                                                                                                                                                                                                                                                                                  |
+| :--------------------------------------------------------------------------------------------: | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="https://www.angryecho.com/apple-touch-icon.png" width="40" height="40" alt="吐槽网"> | **吐槽网（AngryEcho）** | 以兴趣为核心的实时社区：帖子即讨论室，点赞与互动实时同步；从兴趣热点到圈内新鲜事，随时加入讨论，在多元观点中看见事件全貌。 | <a href="https://www.angryecho.com"><img src="https://img.shields.io/badge/官网-angryecho.com-111827?style=flat-square&logo=googlechrome&logoColor=white" alt="官网"></a> <a href="https://www.angryecho.com/c/angryecho"><img src="https://img.shields.io/badge/社区-angryecho-ea580c?style=flat-square&logo=reddit&logoColor=white" alt="社区"></a> |
 
 ## Star History
 
