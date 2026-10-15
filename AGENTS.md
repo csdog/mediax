@@ -43,7 +43,7 @@ GitHub Release 的自动 **What's Changed** 只汇总**合并进默认分支的 
 - `src/main/platforms/web/`：文章、动态和音频的浏览器编辑流程。已有视频平台的成功路径留在各自适配器里。
 - `src/main/publish/`：发布前校验、复制素材、可配置并行队列。
 - `src/main/storage/`：Drizzle schema 与 SQLite。
-- `src/main/control/`：Agent 本机控制面（Hono + OpenAPI）。`Eventually` 阶段监听 `127.0.0.1`，写 `~/.mediax/control.json`（或 `MEDIAX_HOME`）；`GET /health` 需 bearer；`GET /doc` 为 OpenAPI。可用 `MEDIAX_CONTROL_DISABLE=1` / `MEDIAX_CONTROL_PORT`。
+- `src/main/control/`：Agent 本机控制面（Hono + OpenAPI）。`Eventually` 阶段监听 `127.0.0.1`，写 `~/.mediax/agent/control.json`（根目录可用 `MEDIAX_HOME` 覆盖）；`GET /health` 需 bearer；`GET /doc` 为 OpenAPI。可用 `MEDIAX_CONTROL_DISABLE=1` / `MEDIAX_CONTROL_PORT`。
 - `src/renderer/pages/ComposePage.tsx`：文章、动态、视频、音频创作页。
 
 界面用 React、TanStack Router/Query、Tailwind 和 shadcn/Base UI。图标只用 Lucide。视觉规范见 `docs/ui-style.md`。
