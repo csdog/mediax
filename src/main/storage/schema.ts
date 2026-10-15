@@ -29,6 +29,8 @@ export const tasks = sqliteTable("tasks", {
   body: text("body").notNull(),
   images: text("images", { mode: "json" }).$type<string[]>().notNull(),
   createdAt: text("createdAt").notNull(),
+  /** ISO time when the task should enter the publish queue; null = immediate. */
+  scheduledAt: text("scheduledAt"),
 });
 
 export const targets = sqliteTable("targets", {

@@ -22,8 +22,8 @@
 
 首版不做定时发布；以下能力记为后续产品方向（参考 [Postiz](https://github.com/gitroomhq/postiz-app) 一类工具，实现时需评估官方 API vs 本机 RPA 的取舍）。
 
-- [ ] **多平台排期发布**：写一次内容，按日历安排发到 X、LinkedIn、Instagram、Facebook、TikTok、YouTube、Threads、Bluesky、Mastodon、Discord 等（优先官方 OAuth / API；国内无开放 API 的平台仍走本机会话）。
-- [ ] **内容日历**：按天 / 周查看排期，拖拽改时间，跨账号统一管理。
-- [ ] **数据分析**：账号与作品维度的阅读、互动等汇总（各平台数据源与权限单独接入）。
+- [x] **多平台排期发布（本机）**：创作页可选定时；`scheduled` → 到点入队；**需应用保持运行**（非官方 OAuth 云排期）。
+- [x] **内容日历**：周视图查看排期/已发，已排期可改期（`mediax://calendar`）。
+- [x] **数据分析（本机汇总）**：按平台/账号的发布量与成功率等；**不抓**站外阅读/点赞（`mediax://analytics`）。
 - [ ] **自动化接入**：Public API、n8n / Make、SDK。
-- [ ] **Agent 面**（独立仓 [`csdog/mediax-agent`](https://github.com/csdog/mediax-agent)）：CLI（`mediax` / 别名 `mx`）+ Skill，MCP 为同一套能力的薄封装；经本机 loopback HTTP + token 连接桌面。选型：桌面主进程 **Hono + OpenAPI/Swagger**；CLI **Bun compile** + **`@openapi-codegen/typescript`**。业务发布/排期命令仍 **blocked by** 上方「多平台排期发布」与「内容日历」。桌面已提供控制面骨架：`GET /health`、`GET /doc`、写入 `~/.mediax/control.json`（供 agent `doctor`）。
+- [ ] **Agent 面**（独立仓 [`csdog/mediax-agent`](https://github.com/csdog/mediax-agent)）：CLI + Skill；桌面控制面已有 `/health`+`/doc`；排期/发布业务 API 仍待接到控制面。

@@ -8,6 +8,18 @@ export const historyOptions = queryOptions({
   queryKey: ["desktop", "history"],
   queryFn: () => window.desktop.history(),
 });
+export function calendarOptions(from: string, to: string) {
+  return queryOptions({
+    queryKey: ["desktop", "calendar", from, to],
+    queryFn: () => window.desktop.calendar({ from, to }),
+  });
+}
+export function analyticsOptions(days: number) {
+  return queryOptions({
+    queryKey: ["desktop", "analytics", days],
+    queryFn: () => window.desktop.analyticsSummary(days),
+  });
+}
 export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {

@@ -1,0 +1,208 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --cursor-default: url("../assets/cursor.svg") 4 2, default;
+  --font-size-caption: 12px;
+  --font-size-control: 13px;
+  --font-size-tab: 13px;
+  --font-size-body: 16px;
+  --font-size-brand: 13px;
+  --font-size-heading: 18px;
+  --line-height-caption: 16px;
+  --line-height-control: 18px;
+  --line-height-body: 24px;
+  --line-height-heading: 24px;
+  --surface-under: #f9f9f9;
+  --chrome: rgb(237 237 237 / 28%);
+  --page-surface: rgb(249 249 249 / 85%);
+  --border-subtle: rgb(13 13 13 / 5%);
+  --surface-stroke: var(--border-subtle);
+  --hover: #f3f3f3;
+  --selected: #ededed;
+  --hint: #8f8f8f;
+  --emphasis: #0285ff;
+  --emphasis-soft: #e6f3ff;
+  --radius-pane: 24px;
+  --radius-navigation: 12px;
+  --radius-input: 14px;
+  --radius-popover: 20px;
+  --radius-dialog: 24px;
+  --radius-composer: 28px;
+  --toolbar-height: 44px;
+  --rail-width: 44px;
+  --frame-inset: 8px;
+  --motion-duration: 150ms;
+  --radius: 0.75rem;
+  --background: #ffffff;
+  --foreground: #0d0d0d;
+  --scrollbar-color: color-mix(in oklab, var(--foreground) 30%, transparent);
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+  --primary: #0d0d0d;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f3f3;
+  --secondary-foreground: var(--foreground);
+  --muted: #f3f3f3;
+  --muted-foreground: #5d5d5d;
+  --accent: #f3f3f3;
+  --accent-foreground: var(--foreground);
+  --destructive: #e02e2a;
+  --border: rgb(13 13 13 / 10%);
+  --input: rgb(13 13 13 / 16%);
+  --ring: #0285ff;
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: rgb(255 255 255 / 65%);
+  --sidebar-foreground: #0d0d0d;
+  --sidebar-primary: #0d0d0d;
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: #ededed;
+  --sidebar-accent-foreground: #0d0d0d;
+  --sidebar-border: rgb(13 13 13 / 10%);
+  --sidebar-ring: var(--ring);
+}
+.dark {
+  --surface-under: #000000;
+  --chrome: rgb(255 255 255 / 6%);
+  --page-surface: rgb(28 28 28 / 90%);
+  --hover: #2c2c2c;
+  --selected: #3a3a3a;
+  --hint: #a0a0a0;
+  --emphasis: #339cff;
+  --emphasis-soft: rgb(51 156 255 / 18%);
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border-subtle: rgb(255 255 255 / 5%);
+  --surface-stroke: var(--border-subtle);
+  --border: rgb(255 255 255 / 8%);
+  --input: rgb(255 255 255 / 8%);
+  --ring: #339cff;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: rgb(32 32 32 / 72%);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.922 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: rgb(255 255 255 / 8%);
+  --sidebar-ring: #339cff;
+}
+@theme inline {
+  --font-sans:
+    -apple-system-body, ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica,
+    "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 18px;
+  --text-base: 16px;
+  --text-base--line-height: 24px;
+  --text-lg: 18px;
+  --text-lg--line-height: 24px;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+@layer base {
+  html,
+  button,
+  input:where([type="button"], [type="reset"], [type="submit"]) {
+    cursor: var(--cursor-default);
+  }
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-color) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-color);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  .no-scrollbar,
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar,
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  body {
+    @apply bg-background text-foreground font-sans border-border;
+    margin: 0;
+  }
+}
+
+@layer utilities {
+  .cursor-default {
+    cursor: var(--cursor-default);
+  }
+}

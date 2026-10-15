@@ -1,10 +1,11 @@
 import { powerSaveBlocker } from "electron";
 import type { Database } from "../storage/Database";
 
-/** Prevent app suspension while publish targets are still active. */
+/** Prevent display sleep / app suspension while publish or scheduled targets are active. */
 export class TaskPowerSave {
   private unsubscribe: () => void;
-  private blocker: number | null = null;
+  private displayBlocker: number | null = null;
+  private appBlocker: number | null = null;
   constructor(
     private db: Database,
     private enabled: () => boolean,
@@ -15,22 +16,35 @@ export class TaskPowerSave {
   sync() {
     const active = this.db
       .targets()
-      .some((target) => ["pending", "running", "awaiting_user"].includes(target.status));
+      .some((target) =>
+        ["scheduled", "pending", "running", "awaiting_user"].includes(target.status),
+      );
     const want = this.enabled() && active;
-    if (want && this.blocker == null) {
-      this.blocker = powerSaveBlocker.start("prevent-app-suspension");
+    if (want) {
+      if (this.displayBlocker == null)
+        this.displayBlocker = powerSaveBlocker.start("prevent-display-sleep");
+      if (this.appBlocker == null)
+        this.appBlocker = powerSaveBlocker.start("prevent-app-suspension");
       return;
     }
-    if (!want && this.blocker != null) {
-      powerSaveBlocker.stop(this.blocker);
-      this.blocker = null;
+    if (this.displayBlocker != null) {
+      powerSaveBlocker.stop(this.displayBlocker);
+      this.displayBlocker = null;
+    }
+    if (this.appBlocker != null) {
+      powerSaveBlocker.stop(this.appBlocker);
+      this.appBlocker = null;
     }
   }
   dispose() {
     this.unsubscribe();
-    if (this.blocker != null) {
-      powerSaveBlocker.stop(this.blocker);
-      this.blocker = null;
+    if (this.displayBlocker != null) {
+      powerSaveBlocker.stop(this.displayBlocker);
+      this.displayBlocker = null;
+    }
+    if (this.appBlocker != null) {
+      powerSaveBlocker.stop(this.appBlocker);
+      this.appBlocker = null;
     }
   }
 }

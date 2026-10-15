@@ -22,6 +22,13 @@
       "when": 1792000000000,
       "tag": "0002_task_content_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792100000000,
+      "tag": "0003_task_scheduled_at",
+      "breakpoints": true
     }
   ]
 }

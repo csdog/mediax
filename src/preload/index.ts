@@ -71,8 +71,12 @@ const api: DesktopApi = {
   pathForFile: (file) => webUtils.getPathForFile(file),
   saveDraft: (b, i, kind, title) => call("saveDraft", b, i, kind, title),
   loadDraft: () => call("loadDraft"),
-  publish: (kind, title, b, i, t) => call("publish", kind, title, b, i, t),
+  publish: (kind, title, b, i, t, scheduledAt) =>
+    call("publish", kind, title, b, i, t, scheduledAt ?? null),
   history: () => call("history"),
+  calendar: (range) => call("calendar", range),
+  rescheduleTask: (taskId, scheduledAt) => call("rescheduleTask", taskId, scheduledAt),
+  analyticsSummary: (days) => call("analyticsSummary", days),
   openPost: (url) => call("openPost", url),
   verifyTarget: (id, url) => call("verifyTarget", id, url),
   retry: (id) => call("retry", id),

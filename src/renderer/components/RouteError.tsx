@@ -1,18 +1,39 @@
 import type { ErrorComponentProps } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { AppErrorView, errorMessage, errorStack } from "@/components/AppErrorView";
 
 export function RouteError({ error, reset }: ErrorComponentProps) {
-  const detail = error instanceof Error ? error.message : String(error ?? "");
+  const navigate = useNavigate();
+  const detail = errorMessage(error);
+  const stack = errorStack(error);
+
+  if (detail || stack) {
+    console.error("Route error", detail, stack || error);
+  }
+
   return (
-    <div className="route-error" role="alert">
-      <h2>页面出了点问题</h2>
-      <p>可以重试，或返回继续使用其他功能。详细信息已写入本地日志。</p>
-      {import.meta.env.DEV && detail ? <p className="route-error-detail">{detail}</p> : null}
-      <div className="route-error-actions">
-        <Button type="button" onClick={reset}>
-          重试
+    <AppErrorView
+      variant="full"
+      title="这里暂时走不通了"
+      description={
+        import.meta.env.DEV
+          ? "开发模式下会附带技术详情，方便定位。"
+          : "可以重试当前页面，或先回到账号继续其他工作。详情已写入本地日志。"
+      }
+      error={error}
+      onRetry={reset}
+      secondaryAction={
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            void navigate({ to: "/accounts" });
+          }}
+        >
+          返回账号
         </Button>
-      </div>
-    </div>
+      }
+    />
   );
 }
