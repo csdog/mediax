@@ -505,11 +505,40 @@ export function ComposePage() {
               </div>
             ) : null}
             {settingsScope !== "batch" ? (
-              <div className="mb-2.5 flex items-center gap-2 text-[length:var(--font-size-caption)] text-[var(--hint)]">
-                <span className="min-w-0 flex-1">
-                  正在编辑 {platformInfo[settingsScope].label}
-                  {scopeCustomized ? " 的单独内容" : "（未改动时沿用快速填写）"}
-                </span>
+              <div className="mb-2.5 flex items-start gap-2">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  {selectedTargets.map((target) => {
+                    const account = accounts.find((item) => item.id === target.accountId);
+                    if (!account || account.platform !== settingsScope) return null;
+                    const pending =
+                      synced && selectedTargets.some((item) => sameTarget(item, target));
+                    const identityDetail = [
+                      target.name,
+                      target.kind === "profile" ? "个人主页" : "公共主页",
+                      pending ? "待发布" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+                    return (
+                      <AccountIdentity
+                        key={targetKey(target)}
+                        name={account.name}
+                        platform={account.platform}
+                        avatar={account.avatar}
+                        detail={identityDetail}
+                        titleAdornment={
+                          scopeCustomized ? (
+                            <span
+                              className="publish-settings-dot shrink-0"
+                              title="已单独设置"
+                              aria-label="已单独设置"
+                            />
+                          ) : null
+                        }
+                      />
+                    );
+                  })}
+                </div>
                 {scopeCustomized ? (
                   <Button
                     type="button"

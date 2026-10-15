@@ -84,8 +84,8 @@ body {
   display: flex;
   align-items: center;
   height: var(--browser-chrome-height);
-  padding: 0 12px;
-  gap: 8px;
+  padding: 8px;
+  gap: 6px;
   color: var(--muted-foreground);
 }
 .workspace-main {
@@ -148,6 +148,15 @@ body {
   gap: 2px;
   flex-shrink: 0;
 }
+.browser-chrome .toolbar-navigation {
+  gap: 6px;
+}
+.browser-chrome .toolbar-navigation [data-slot="button"],
+.browser-chrome-actions [data-slot="button"] {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
 .toolbar-navigation button,
 .toolbar-navigation .toolbar-nav-button {
   color: var(--hint);
@@ -162,24 +171,30 @@ body {
 .toolbar-navigation button:disabled {
   opacity: 0.4;
 }
-.workspace .browser-chrome-actions [data-slot="button"] svg {
+.workspace .browser-chrome [data-slot="button"] svg {
   width: 16px;
   height: 16px;
 }
 .toolbar-omnibox {
   flex: 1;
   min-width: 0;
-  height: 32px;
+  height: 28px;
   display: flex;
   align-items: center;
-  padding: 0 12px;
-  border-radius: 999px;
+  padding: 0 10px;
+  border-radius: 10px;
   background: color-mix(in srgb, var(--foreground) 5%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 8%, transparent);
+  box-shadow: none;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.toolbar-omnibox:hover {
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 .toolbar-omnibox:focus-within {
   background: var(--card);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--emphasis) 45%, transparent);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 .toolbar-omnibox input {
   width: 100%;
@@ -190,6 +205,10 @@ body {
   color: var(--foreground);
   font-size: var(--font-size-control);
   line-height: var(--line-height-caption);
+  text-align: center;
+}
+.toolbar-omnibox.is-editing input {
+  text-align: start;
 }
 .toolbar-omnibox input::placeholder {
   color: var(--hint);
@@ -198,11 +217,7 @@ body {
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  gap: 1px;
-  padding: 2px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--foreground) 4%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 7%, transparent);
+  gap: 6px;
 }
 .browser-chrome-panel-header {
   display: flex;

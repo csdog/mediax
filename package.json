@@ -1,6 +1,6 @@
 {
   "name": "mediax-desktop",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "private": true,
   "description": "Local multi-platform publishing workspace for macOS, Windows, and Linux",
   "license": "AGPL-3.0-only",

@@ -181,7 +181,7 @@ export function BrowserChrome() {
             disabled={!navigation.data?.canGoBack}
             onClick={() => void run(() => goBackBrowser())}
           >
-            <CodexArrowLeftIcon className="size-5" />
+            <CodexArrowLeftIcon className="size-4" />
           </Button>
           <Button
             variant="ghost"
@@ -191,7 +191,7 @@ export function BrowserChrome() {
             disabled={!navigation.data?.canGoForward}
             onClick={() => void run(() => goForwardBrowser())}
           >
-            <CodexArrowLeftIcon className="size-5 -scale-x-100" />
+            <CodexArrowLeftIcon className="size-4 -scale-x-100" />
           </Button>
           <Button
             variant="ghost"
@@ -201,10 +201,13 @@ export function BrowserChrome() {
             disabled={!pageReady}
             onClick={() => void run(() => reloadBrowser())}
           >
-            <RotateCw className="size-5" />
+            <RotateCw className="size-4" />
           </Button>
         </div>
-        <form className="toolbar-omnibox" onSubmit={onSubmitAddress}>
+        <form
+          className={editingAddress ? "toolbar-omnibox is-editing" : "toolbar-omnibox"}
+          onSubmit={onSubmitAddress}
+        >
           <input
             ref={inputRef}
             name="url"
@@ -237,7 +240,7 @@ export function BrowserChrome() {
                     render={
                       <Button
                         variant="ghost"
-                        size="icon-xs"
+                        size="icon"
                         className="toolbar-nav-button"
                         aria-label="扩展"
                       >
@@ -266,7 +269,7 @@ export function BrowserChrome() {
                     render={
                       <Button
                         variant="ghost"
-                        size="icon-xs"
+                        size="icon"
                         className="toolbar-nav-button"
                         aria-label="下载"
                       >
@@ -376,7 +379,7 @@ export function BrowserChrome() {
                     render={
                       <Button
                         variant="ghost"
-                        size="icon-xs"
+                        size="icon"
                         className="toolbar-nav-button"
                         aria-label="浏览器选项"
                       >
