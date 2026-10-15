@@ -100,9 +100,19 @@ export type CalendarEntry = {
   targets: TaskTarget[];
   when: string;
 };
+/** Analytics window: last N days, or inclusive calendar range (`YYYY-MM-DD`). */
+export type AnalyticsQuery = {
+  days?: number;
+  /** Inclusive start day (`YYYY-MM-DD`). Takes precedence over `days` when set with `to`. */
+  from?: string;
+  /** Inclusive end day (`YYYY-MM-DD`). Defaults to today when only `from` is set. */
+  to?: string;
+};
+
 export type AnalyticsSummary = {
   days: number;
   since: string;
+  until: string;
   totals: {
     tasks: number;
     targets: number;
@@ -150,9 +160,51 @@ export type TabPreviewOverlay = {
   alt: string;
   placeholder: boolean;
 };
+export type ToastOverlayItem = {
+  icon?: string;
+  type: string;
+  title: string;
+  description?: string;
+};
+export type ToastOverlay = {
+  theme?: "light" | "dark";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  toasts: ToastOverlayItem[];
+};
 export type BrowserPreview = { title: string; hostname: string; image: string | null };
+export type BrowserNavigation = {
+  url: string;
+  title: string;
+  canGoBack: boolean;
+  canGoForward: boolean;
+};
+export type WebSearchProvider = {
+  id: string;
+  name: string;
+  source?: "browser" | "system" | "fallback";
+};
+export type BrowserDownloadState = "progressing" | "completed" | "cancelled" | "interrupted";
+export type BrowserDownload = {
+  id: string;
+  filename: string;
+  url: string;
+  path: string;
+  state: BrowserDownloadState;
+  receivedBytes: number;
+  totalBytes: number;
+  startedAt: number;
+  endedAt?: number;
+};
 export type WorkspaceSession = {
-  tabs: { id: string; kind?: "new" }[];
+  tabs: {
+    id: string;
+    kind?: "new" | "compose" | "web";
+    contentKind?: ContentKind;
+    url?: string;
+  }[];
   activeId: string | null;
   page: DesktopPage;
 };
@@ -161,9 +213,30 @@ export interface DesktopApi {
   workspaceSession(): Promise<WorkspaceSession | null>;
   saveWorkspaceSession(session: WorkspaceSession): Promise<void>;
   previewAccountBrowser(id: string): Promise<BrowserPreview>;
+  openWebBrowser(id: string, url: string): Promise<void>;
+  resolveOmniboxUrl(input: string): Promise<string | null>;
+  webSearchProvider(): Promise<WebSearchProvider>;
+  browserNavigation(id: string): Promise<BrowserNavigation>;
+  navigateBrowser(id: string, url: string): Promise<BrowserNavigation>;
+  goBackBrowser(id: string): Promise<BrowserNavigation>;
+  goForwardBrowser(id: string): Promise<BrowserNavigation>;
+  reloadBrowser(id: string): Promise<BrowserNavigation>;
+  browserZoom(id: string): Promise<{ factor: number; percent: number }>;
+  setBrowserZoom(id: string, factor: number): Promise<{ factor: number; percent: number }>;
+  printBrowser(id: string): Promise<void>;
+  findInBrowser(
+    id: string,
+    query: string,
+    options?: { forward?: boolean; findNext?: boolean },
+  ): Promise<{ activeMatchOrdinal: number; matches: number }>;
+  stopFindInBrowser(id: string): Promise<void>;
+  screenshotBrowser(id: string): Promise<string | null>;
+  clearBrowserData(id: string): Promise<void>;
   layoutAccountBrowser(id: string | null, bounds?: BrowserBounds): Promise<void>;
   showTabPreview?(preview: TabPreviewOverlay): Promise<void>;
   hideTabPreview?(): Promise<void>;
+  showToastOverlay?(overlay: ToastOverlay): Promise<void>;
+  hideToastOverlay?(): Promise<void>;
   closeAccountBrowser(id: string): Promise<void>;
   shortcutSettings(): Promise<ShortcutSettings>;
   setGlobalShortcut(accelerator: string): Promise<ShortcutSettings>;
@@ -258,7 +331,7 @@ export interface DesktopApi {
   onCommand(listener: (command: DesktopCommand) => void): () => void;
   accounts(): Promise<AccountInfo[]>;
   addAccount(name: string, platform: PlatformId): Promise<AccountInfo>;
-  openAccount(id: string): Promise<void>;
+  openAccount(id: string, url?: string): Promise<void>;
   refreshAccount(id: string): Promise<AccountInfo>;
   deleteAccount(id: string): Promise<void>;
   importMarkdown(): Promise<string | null>;
@@ -268,6 +341,14 @@ export interface DesktopApi {
     kind: ContentKind,
   ): Promise<{ markdown: string | null; assets: ImageAsset[]; warnings: string[] }>;
   revealInFolder(path: string): Promise<void>;
+  openDownloadsFolder(): Promise<void>;
+  downloads(): Promise<BrowserDownload[]>;
+  removeDownload(id: string): Promise<void>;
+  revealDownload(id: string): Promise<void>;
+  copyDownloadUrl(id: string): Promise<void>;
+  copyDownloadPath(id: string): Promise<void>;
+  onDownloadsChanged(listener: (items: BrowserDownload[]) => void): () => void;
+  openExternalUrl(url: string): Promise<void>;
   pathForFile?(file: File): string;
   saveDraft(body: string, images: ImageAsset[], kind: ContentKind, title: string): Promise<void>;
   loadDraft(): Promise<{
@@ -284,13 +365,21 @@ export interface DesktopApi {
     targets: Target[],
     scheduledAt?: string | null,
   ): Promise<string>;
+  /** Create one or more tasks with different title/body groups in a single submit. */
+  publishBatches(
+    kind: ContentKind,
+    images: string[],
+    batches: Array<{ title: string | null; body: string; targets: Target[] }>,
+    scheduledAt?: string | null,
+  ): Promise<string>;
   history(): Promise<{ tasks: Task[]; targets: TaskTarget[] }>;
   calendar(range: { from: string; to: string }): Promise<CalendarEntry[]>;
   rescheduleTask(taskId: string, scheduledAt: string): Promise<Task>;
-  analyticsSummary(days?: number): Promise<AnalyticsSummary>;
+  analyticsSummary(query?: number | AnalyticsQuery): Promise<AnalyticsSummary>;
   openPost(url: string): Promise<void>;
   verifyTarget(id: string, url?: string): Promise<void>;
   retry(id: string): Promise<void>;
+  republish(id: string): Promise<void>;
   resume(id: string): Promise<void>;
 }
 
@@ -311,8 +400,16 @@ export type UpdateStatus = {
   canCheck: boolean;
   canInstall: boolean;
 };
-export type DesktopPage = "accounts" | "compose" | "video" | "history" | "calendar" | "analytics";
+export type DesktopPage =
+  | "accounts"
+  | "publish"
+  | "compose"
+  | "video"
+  | "history"
+  | "calendar"
+  | "analytics";
 export type DesktopCommand =
+  | { action: "open-web"; url: string }
   | { action: "tab"; operation: TabAction }
   | { action: "settings" }
   | { action: "navigate"; page: DesktopPage; taskId?: string }

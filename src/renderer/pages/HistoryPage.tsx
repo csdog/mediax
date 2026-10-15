@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import { userErrorMessage } from "../../shared/userError";
+import { useMutation } from "@tanstack/react-query";
+import { cn } from "cn";
 import {
   CircleHelp,
   Download,
@@ -9,10 +12,10 @@ import {
   Video,
   LayoutGrid,
   List,
-  MoreHorizontal,
+  Monitor,
   Play,
   Plus,
-  RotateCcw,
+  RefreshCw,
   Search,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -47,9 +50,15 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
+import {
+  PlatformAvatarGroup,
+  type CalendarPublisher,
+} from "@/components/calendar/PlatformAvatarGroup";
+import { ActionIconButton } from "@/components/workspace/ActionIconButton";
 import { DocumentPage } from "@/components/workspace/DocumentPage";
+import { PublishKindDialog } from "@/components/workspace/PublishKindDialog";
 import { useWorkspace } from "@/app/WorkspaceContext";
-import type { AccountInfo, Status, Task, TaskTarget } from "../../shared/models";
+import type { AccountInfo, PlatformId, Status, Task, TaskTarget } from "../../shared/models";
 
 type Pane = "records" | "drafts" | "review";
 type Tone = "success" | "warning" | "danger" | "muted" | "progress";
@@ -113,6 +122,24 @@ function publisherNames(targets: TaskTarget[], accounts: AccountInfo[]) {
   ];
 }
 
+function publishersOf(targets: TaskTarget[], accounts: AccountInfo[]): CalendarPublisher[] {
+  const byAccount = new Map(accounts.map((account) => [account.id, account]));
+  const seen = new Set<string>();
+  const publishers: CalendarPublisher[] = [];
+  for (const target of targets) {
+    if (seen.has(target.accountId)) continue;
+    seen.add(target.accountId);
+    const account = byAccount.get(target.accountId);
+    publishers.push({
+      id: target.accountId,
+      platform: (account?.platform ?? "facebook") as PlatformId,
+      name: account?.name ?? target.name,
+      avatar: account?.avatar,
+    });
+  }
+  return publishers;
+}
+
 function matchesStatus(targets: TaskTarget[], filter: string) {
   if (filter === "all") return true;
   const state = summary(targets);
@@ -128,7 +155,7 @@ function matchesStatus(targets: TaskTarget[], filter: string) {
 }
 
 export function HistoryPage() {
-  const { records, focusedTask, run, busy, accounts, reload, setPage, body, images } =
+  const { records, focusedTask, run, busy, accounts, reload, openPublish, body, images } =
     useWorkspace();
   const [pane, setPane] = useState<Pane>("records");
   const [query, setQuery] = useState("");
@@ -137,6 +164,7 @@ export function HistoryPage() {
   const [status, setStatus] = useState("all");
   const [mode, setMode] = useState("all");
   const [view, setView] = useState<"list" | "grid">("list");
+  const [publishKindOpen, setPublishKindOpen] = useState(false);
   const draftCount = body.trim() || images.length ? 1 : 0;
   const publishers = useMemo(() => {
     const names = new Map<string, string>();
@@ -201,8 +229,12 @@ export function HistoryPage() {
   };
   return (
     <DocumentPage>
-      <section className="history-page" aria-label="发布记录工作区">
-        <div className="history-tabs" role="tablist" aria-label="发布记录分区">
+      <section className="flex min-h-0 flex-1 flex-col" aria-label="发布记录工作区">
+        <div
+          className="flex h-[52px] shrink-0 items-center gap-[22px] border-b border-border px-6"
+          role="tablist"
+          aria-label="发布记录分区"
+        >
           {(
             [
               ["records", "发布记录"],
@@ -215,20 +247,26 @@ export function HistoryPage() {
               type="button"
               role="tab"
               aria-selected={pane === id}
+              className={cn(
+                "relative h-full cursor-pointer border-0 bg-transparent p-0 text-base",
+                pane === id
+                  ? "font-semibold text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-sm after:bg-foreground"
+                  : "text-muted-foreground",
+              )}
               onClick={() => setPane(id)}
             >
               {label}
               {id === "drafts" && draftCount > 0 && (
-                <span className="history-tab-count">{draftCount}</span>
+                <span className="ml-1.5 text-xs font-normal text-[var(--hint)]">{draftCount}</span>
               )}
             </button>
           ))}
         </div>
         {pane === "records" ? (
-          <div className="history-body">
-            <div className="history-toolbar">
-              <div className="history-filters">
-                <div className="account-search">
+          <div className="flex min-h-0 flex-1 flex-col px-6 pt-4 pb-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 [&_[data-slot=select-trigger]]:h-9 [&_[data-slot=select-trigger]]:w-auto [&_[data-slot=select-trigger]]:min-w-32 [&_[data-slot=select-trigger]]:rounded-[var(--radius-input)] [&_[data-slot=select-trigger]]:bg-card [&_[data-slot=select-trigger]]:text-[length:var(--font-size-caption)] [&_[data-slot=select-trigger]]:shadow-none">
+                <div className="account-search w-[220px]">
                   <Search />
                   <Input
                     aria-label="搜索作品描述或任务标题"
@@ -264,7 +302,7 @@ export function HistoryPage() {
                   onChange={setStatus}
                   options={statusFilters}
                 />
-                <div className="history-mode">
+                <div className="flex items-center gap-0.5">
                   <Filter
                     label="发布模式"
                     value={mode}
@@ -333,12 +371,20 @@ export function HistoryPage() {
                   <Download />
                   导出
                 </Button>
-                <Button onClick={() => setPage("compose")}>
+                <Button onClick={() => setPublishKindOpen(true)}>
                   <Plus />
                   新增发布
                 </Button>
               </div>
             </div>
+            <PublishKindDialog
+              open={publishKindOpen}
+              onOpenChange={setPublishKindOpen}
+              onSelect={(next) => {
+                openPublish(next);
+                void run(reload);
+              }}
+            />
             <div
               className={`account-list-surface ${view === "grid" ? "account-grid-surface" : ""}`}
             >
@@ -364,11 +410,12 @@ export function HistoryPage() {
                     <TableRow>
                       <TableHead>作品</TableHead>
                       <TableHead>发布人</TableHead>
+                      <TableHead>发布平台</TableHead>
                       <TableHead>发布方式</TableHead>
                       <TableHead>任务概况</TableHead>
                       <TableHead>状态</TableHead>
                       <TableHead>创建时间</TableHead>
-                      <TableHead>操作</TableHead>
+                      <TableHead className="text-center">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -381,13 +428,13 @@ export function HistoryPage() {
                 <div className="account-grid">
                   {rows.map((row) => (
                     <article
-                      className="account-grid-item"
+                      className="account-grid-item data-[focused]:bg-accent"
                       key={row.task.id}
                       data-focused={focusedTask === row.task.id || undefined}
                     >
                       <Work task={row.task} />
                       <RecordFacts {...row} />
-                      <RecordMenu {...row} />
+                      <RecordActions {...row} />
                     </article>
                   ))}
                 </div>
@@ -451,8 +498,8 @@ function Work({ task, cover = task.cover }: { task: Task; cover?: string | null 
           ? ImageIcon
           : FileText;
   return (
-    <div className="history-work">
-      <span className="history-thumb">
+    <div className="flex min-w-[180px] items-center gap-2.5">
+      <span className="grid h-10 w-14 shrink-0 place-items-center overflow-hidden rounded-md bg-[var(--hover)] text-[var(--hint)] [&_img]:size-full [&_img]:rounded-md [&_img]:object-cover [&_svg]:size-4">
         {cover ? (
           <img src={cover} alt={`${titleOf(task.body)} 封面`} />
         ) : (
@@ -460,10 +507,10 @@ function Work({ task, cover = task.cover }: { task: Task; cover?: string | null 
         )}
       </span>
       <span className="min-w-0">
-        <span className="history-title" title={task.body}>
+        <span className="block max-w-[220px] truncate font-medium" title={task.body}>
           {titleOf(task.body)}
         </span>
-        <span className="history-kind">
+        <span className="mt-0.5 flex items-center gap-1 text-[length:var(--font-size-caption)] text-[var(--hint)] [&_svg]:size-3">
           <Icon />
           {kindLabel[kind]}
         </span>
@@ -472,13 +519,17 @@ function Work({ task, cover = task.cover }: { task: Task; cover?: string | null 
   );
 }
 
+const statusToneClass: Record<Tone, string> = {
+  success: "border-[#008635]/35 text-[#008635]",
+  warning: "border-[#b9480d]/35 text-[#b9480d]",
+  danger: "border-destructive/40 text-destructive",
+  muted: "text-muted-foreground",
+  progress: "border-[var(--emphasis)]/40 text-[var(--emphasis)]",
+};
+
 function StatusBadge({ state, title }: { state: { label: string; tone: Tone }; title?: string }) {
   return (
-    <Badge
-      variant="secondary"
-      className={`history-status-badge status-${state.tone}`}
-      title={title}
-    >
+    <Badge variant="outline" className={statusToneClass[state.tone]} title={title}>
       {state.label}
     </Badge>
   );
@@ -487,11 +538,13 @@ function StatusBadge({ state, title }: { state: { label: string; tone: Tone }; t
 function RecordFacts({ task, targets }: { task: Task; targets: TaskTarget[] }) {
   const { accounts } = useWorkspace();
   const names = publisherNames(targets, accounts);
+  const publishers = publishersOf(targets, accounts);
   const accountCount = new Set(targets.map((target) => target.accountId)).size;
   const state = summary(targets);
   return (
     <>
-      <span className="history-publisher">{names.join("、") || "未指定"}</span>
+      <span>{names.join("、") || "未指定"}</span>
+      <PlatformAvatarGroup publishers={publishers} size="default" />
       <span>{publishModeLabel(task, targets)}</span>
       <span className="text-muted-foreground">
         {accountCount} 账号 · {targets.length} 任务
@@ -515,6 +568,7 @@ function RecordRow({
 }) {
   const { accounts } = useWorkspace();
   const names = publisherNames(targets, accounts);
+  const publishers = publishersOf(targets, accounts);
   const accountCount = new Set(targets.map((target) => target.accountId)).size;
   const state = summary(targets);
   return (
@@ -523,6 +577,9 @@ function RecordRow({
         <Work task={task} />
       </TableCell>
       <TableCell>{names.join("、") || "未指定"}</TableCell>
+      <TableCell>
+        <PlatformAvatarGroup publishers={publishers} size="default" />
+      </TableCell>
       <TableCell>{publishModeLabel(task, targets)}</TableCell>
       <TableCell className="text-muted-foreground">
         {accountCount} 账号 · {targets.length} 任务
@@ -533,14 +590,15 @@ function RecordRow({
           title={targets
             .map((target) => target.error)
             .filter((error): error is string => Boolean(error))
+            .map((error) => userErrorMessage(error, "发布未完成，请打开账号确认后重试。"))
             .join("\n")}
         />
       </TableCell>
       <TableCell className="text-muted-foreground">
         {task.scheduledAt ? stamp(task.scheduledAt) : stamp(task.createdAt)}
       </TableCell>
-      <TableCell>
-        <RecordMenu task={task} targets={targets} />
+      <TableCell className="text-center">
+        <RecordActions task={task} targets={targets} />
       </TableCell>
     </TableRow>
   );
@@ -550,97 +608,90 @@ function actionLabel(verb: string, name: string, many: boolean) {
   return many ? `${verb} ${name}` : verb;
 }
 
-function RecordMenu({ task, targets }: { task: Task; targets: TaskTarget[] }) {
+function RecordActions({ task: _task, targets }: { task: Task; targets: TaskTarget[] }) {
   const { run, busy, openBrowser, accounts, reload } = useWorkspace();
+  const republish = useMutation({
+    mutationFn: async (id: string) => {
+      await window.desktop.republish(id);
+      await reload();
+    },
+  });
   const accountsInTask = [...new Map(targets.map((target) => [target.accountId, target])).values()];
   const manyTargets = targets.length > 1;
   const manyAccounts = accountsInTask.length > 1;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button variant="ghost" size="icon" aria-label={`操作 ${titleOf(task.body)}`}>
-            <MoreHorizontal />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" className="history-record-menu">
-        {targets.flatMap((target) => {
-          const items = [];
-          if (target.url)
-            items.push(
-              <DropdownMenuItem
-                key={`${target.id}-open`}
-                onClick={() => void run(() => window.desktop.openPost(target.url!))}
-              >
-                <ExternalLink />
-                {actionLabel("查看", target.name, manyTargets)}
-              </DropdownMenuItem>,
-            );
-          if (target.status === "failed")
-            items.push(
-              <DropdownMenuItem
-                key={`${target.id}-retry`}
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    await window.desktop.retry(target.id);
-                    await reload();
-                  })
-                }
-              >
-                <RotateCcw />
-                {actionLabel("重试", target.name, manyTargets)}
-              </DropdownMenuItem>,
-            );
-          if (target.status === "pending" || target.status === "awaiting_user")
-            items.push(
-              <DropdownMenuItem
-                key={`${target.id}-resume`}
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    await window.desktop.resume(target.id);
-                    await reload();
-                  })
-                }
-              >
-                <Play />
-                {actionLabel("继续", target.name, manyTargets)}
-              </DropdownMenuItem>,
-            );
-          return items;
-        })}
-        {accountsInTask.map((target) => (
-          <DropdownMenuItem
+    <div className="inline-flex flex-wrap items-center justify-center gap-1 [.account-grid-item_&]:mt-2 [.account-grid-item_&]:justify-start">
+      {targets.flatMap((target) => {
+        const items = [];
+        if (target.url)
+          items.push(
+            <ActionIconButton
+              key={`${target.id}-open`}
+              label={actionLabel("打开", target.name, manyTargets)}
+              onClick={() => void run(() => window.desktop.openPost(target.url!))}
+            >
+              <ExternalLink />
+            </ActionIconButton>,
+          );
+        if (["failed", "submitted", "verified", "unknown"].includes(target.status))
+          items.push(
+            <ActionIconButton
+              key={`${target.id}-republish`}
+              label={actionLabel(
+                republish.isPending && republish.variables === target.id
+                  ? "正在重新发布…"
+                  : "重新发布",
+                target.name,
+                manyTargets,
+              )}
+              disabled={busy || republish.isPending}
+              onClick={() => void run(() => republish.mutateAsync(target.id))}
+            >
+              <RefreshCw
+                className={cn(
+                  republish.isPending && republish.variables === target.id && "animate-spin",
+                )}
+              />
+            </ActionIconButton>,
+          );
+        if (target.status === "pending" || target.status === "awaiting_user")
+          items.push(
+            <ActionIconButton
+              key={`${target.id}-resume`}
+              label={actionLabel("继续", target.name, manyTargets)}
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await window.desktop.resume(target.id);
+                  await reload();
+                })
+              }
+            >
+              <Play />
+            </ActionIconButton>,
+          );
+        return items;
+      })}
+      {accountsInTask.map((target) => {
+        const name =
+          accounts.find((account) => account.id === target.accountId)?.name ?? target.name;
+        return (
+          <ActionIconButton
             key={`${target.accountId}-browser`}
+            label={actionLabel("打开账号", name, manyAccounts)}
             disabled={busy}
-            onClick={() =>
-              void run(() =>
-                openBrowser({
-                  id: target.accountId,
-                  name:
-                    accounts.find((account) => account.id === target.accountId)?.name ??
-                    target.name,
-                }),
-              )
-            }
+            onClick={() => void run(() => openBrowser({ id: target.accountId, name }))}
           >
-            <ExternalLink />
-            {actionLabel(
-              "打开",
-              accounts.find((account) => account.id === target.accountId)?.name ?? target.name,
-              manyAccounts,
-            )}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+            <Monitor />
+          </ActionIconButton>
+        );
+      })}
+    </div>
   );
 }
 
 function DraftPane() {
-  const { body, images, contentKind, title, setPage } = useWorkspace();
+  const { body, images, contentKind, title, openPublish, run, reload } = useWorkspace();
   if (!body.trim() && !images.length)
     return (
       <Empty className="m-auto py-16">
@@ -649,12 +700,12 @@ function DraftPane() {
             <FileText />
           </EmptyMedia>
           <EmptyTitle>草稿箱是空的</EmptyTitle>
-          <EmptyDescription>在内容发布里保存的草稿会出现在这里。</EmptyDescription>
+          <EmptyDescription>在发布页保存的草稿会出现在这里。</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
   return (
-    <div className="history-draft">
+    <div className="m-6 flex items-center gap-4 rounded-[var(--radius-pane)] border border-border p-4">
       <Work
         task={{
           id: "draft",
@@ -669,7 +720,13 @@ function DraftPane() {
       <p className="text-muted-foreground">
         {images.length ? `${images.length} 张图片 · ` : ""}尚未发布
       </p>
-      <Button variant="outline" onClick={() => setPage("compose")}>
+      <Button
+        variant="outline"
+        onClick={() => {
+          openPublish(contentKind);
+          void run(reload);
+        }}
+      >
         继续编辑
       </Button>
     </div>

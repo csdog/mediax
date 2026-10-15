@@ -1,3 +1,4 @@
+import { userErrorMessage } from "../../shared/userError";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { defaultShortcutMap } from "../../shared/shortcutCatalog";
@@ -20,7 +21,7 @@ export function useShortcutSettings() {
     }
   }, [settings.data]);
   useEffect(() => {
-    if (settings.error) setShortcutMessage(settings.error.message);
+    if (settings.error) setShortcutMessage(userErrorMessage(settings.error));
   }, [settings.error]);
   const save = useMutation({
     mutationKey: ["desktop", "save-shortcut"],
@@ -37,7 +38,7 @@ export function useShortcutSettings() {
     onError: (error) => {
       const previous = client.getQueryData<ShortcutSettings>(shortcutKey);
       if (previous?.shortcuts) setShortcuts(previous.shortcuts);
-      setShortcutMessage(error.message);
+      setShortcutMessage(userErrorMessage(error));
     },
   });
   const reset = useMutation({
@@ -52,7 +53,7 @@ export function useShortcutSettings() {
     onError: (error) => {
       const previous = client.getQueryData<ShortcutSettings>(shortcutKey);
       if (previous?.shortcuts) setShortcuts(previous.shortcuts);
-      setShortcutMessage(error.message);
+      setShortcutMessage(userErrorMessage(error));
     },
   });
   const saveAccelerator = async (id: string, accelerator: string) => {

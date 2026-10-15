@@ -9,6 +9,7 @@ import { inferContentKind } from "../../shared/content";
 import {
   isPlatform,
   type Account,
+  type AnalyticsQuery,
   type AnalyticsSummary,
   type CalendarEntry,
   type ContentKind,
@@ -310,13 +311,14 @@ export class Database {
     }
     return entries.sort((a, b) => a.when.localeCompare(b.when));
   }
-  analyticsSummary(days = 30): AnalyticsSummary {
-    const span = Math.min(90, Math.max(1, Math.floor(days)));
-    const sinceDate = new Date();
-    sinceDate.setHours(0, 0, 0, 0);
-    sinceDate.setDate(sinceDate.getDate() - (span - 1));
+  analyticsSummary(query: number | AnalyticsQuery = 30): AnalyticsSummary {
+    const { sinceDate, untilDate, span } = resolveAnalyticsWindow(query);
     const since = sinceDate.toISOString();
-    const tasks = this.tasks().filter((task) => (task.scheduledAt ?? task.createdAt) >= since);
+    const until = untilDate.toISOString();
+    const tasks = this.tasks().filter((task) => {
+      const when = task.scheduledAt ?? task.createdAt;
+      return when >= since && when <= until;
+    });
     const taskIds = new Set(tasks.map((t) => t.id));
     const allTargets = this.targets().filter((t) => taskIds.has(t.taskId));
     const accounts = this.accounts();
@@ -395,6 +397,7 @@ export class Database {
     return {
       days: span,
       since,
+      until,
       totals,
       successRate,
       byPlatform: [...byPlatformMap.values()].sort((a, b) => b.targets - a.targets),
@@ -483,6 +486,14 @@ export class Database {
     if (row?.status !== "failed") throw new Error("仅明确失败项允许重试");
     this.transition(id, "pending");
   }
+  /** Re-queue a finished target (failed / submitted / verified / unknown) for another publish. */
+  republish(id: string) {
+    const row = this.orm.select().from(schema.targets).where(eq(schema.targets.id, id)).get();
+    if (!row) throw new Error("发布目标不存在");
+    if (!["failed", "submitted", "verified", "unknown"].includes(row.status))
+      throw new Error("仅已结束的发布项可重新发布");
+    this.transition(id, "pending", null, null);
+  }
   close() {
     this.targetListeners.clear();
     this.db.close();
@@ -495,4 +506,81 @@ function normalizeScheduledAt(value: string | null | undefined): string | null {
   if (Number.isNaN(date.getTime())) throw new Error("定时时间无效");
   if (date.getTime() <= Date.now() + 15_000) throw new Error("定时时间须晚于当前至少约 15 秒");
   return date.toISOString();
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_ANALYTICS_SPAN = 366;
+
+function startOfLocalDay(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function endOfLocalDay(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
+}
+
+function parseDayInput(value: string, label: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) throw new Error(`${label} 须为 YYYY-MM-DD`);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    throw new Error(`${label} 无效`);
+  }
+  return date;
+}
+
+function resolveAnalyticsWindow(query: number | AnalyticsQuery): {
+  sinceDate: Date;
+  untilDate: Date;
+  span: number;
+} {
+  if (typeof query === "number") {
+    const span = Math.min(90, Math.max(1, Math.floor(query)));
+    const untilDate = endOfLocalDay(new Date());
+    const sinceDate = startOfLocalDay(new Date());
+    sinceDate.setDate(sinceDate.getDate() - (span - 1));
+    return { sinceDate, untilDate, span };
+  }
+
+  const fromRaw = query.from?.trim();
+  const toRaw = query.to?.trim();
+  if (fromRaw) {
+    const fromDay = parseDayInput(fromRaw, "开始日期");
+    const toDay = toRaw ? parseDayInput(toRaw, "结束日期") : startOfLocalDay(new Date());
+    let sinceDate = startOfLocalDay(fromDay);
+    let untilDate = endOfLocalDay(toDay);
+    if (sinceDate.getTime() > untilDate.getTime()) {
+      const swap = sinceDate;
+      sinceDate = startOfLocalDay(toDay);
+      untilDate = endOfLocalDay(fromDay);
+    }
+    const span =
+      Math.floor((startOfLocalDay(untilDate).getTime() - sinceDate.getTime()) / DAY_MS) + 1;
+    if (span > MAX_ANALYTICS_SPAN) throw new Error(`自定义范围最多 ${MAX_ANALYTICS_SPAN} 天`);
+    return { sinceDate, untilDate, span: Math.max(1, span) };
+  }
+
+  const span = Math.min(
+    MAX_ANALYTICS_SPAN,
+    Math.max(
+      1,
+      Math.floor(typeof query.days === "number" && Number.isFinite(query.days) ? query.days : 30),
+    ),
+  );
+  const untilDate = endOfLocalDay(new Date());
+  const sinceDate = startOfLocalDay(new Date());
+  sinceDate.setDate(sinceDate.getDate() - (span - 1));
+  return { sinceDate, untilDate, span };
 }

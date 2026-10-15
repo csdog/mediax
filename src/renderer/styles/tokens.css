@@ -29,7 +29,11 @@
   --radius-dialog: 24px;
   --radius-composer: 28px;
   --toolbar-height: 44px;
-  --rail-width: 44px;
+  --browser-chrome-height: 48px;
+  /* Codex electron sidebar-rail: uniform xl (2.5rem) + px-2. */
+  --rail-button-size: 2.5rem;
+  --rail-padding-x: 8px;
+  --rail-width: calc(var(--rail-button-size) + var(--rail-padding-x) * 2);
   --frame-inset: 8px;
   --motion-duration: 150ms;
   --radius: 0.75rem;

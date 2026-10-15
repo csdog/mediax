@@ -56,6 +56,20 @@ describe("schedule + analytics", () => {
     expect(summary.totals.verified).toBe(1);
     expect(summary.successRate).toBe(1);
     expect(summary.byPlatform[0]?.platform).toBe("weibo");
+    expect(summary.until).toBeTruthy();
+
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const from = new Date(today);
+    from.setDate(today.getDate() - 2);
+    const custom = db.analyticsSummary({
+      from: dayKey(from),
+      to: dayKey(today),
+    });
+    expect(custom.days).toBe(3);
+    expect(custom.totals.tasks).toBe(1);
     db.close();
   });
 

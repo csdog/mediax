@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { userErrorMessage } from "../../shared/userError";
 import type {
   AccountInfo,
   ContentKind,
@@ -18,8 +19,16 @@ import { useAccountBrowserLayout } from "./useAccountBrowserLayout";
 import { usePublishSettings } from "./usePublishSettings";
 import { preferredPageForFiles, supportedKinds } from "../../shared/content";
 import { applyLocalFiles } from "@/lib/importLocalFiles";
-import { navigation } from "@/app/navigation";
+import { desktopPages } from "@/app/navigation";
 import { accountsOptions, historyOptions } from "@/app/queries";
+import { publishKindMeta } from "@/lib/publishKindMeta";
+
+type BrowserTab =
+  | { id: string; name: string; kind?: undefined }
+  | { id: string; name: string; kind: "new" }
+  | { id: string; name: string; kind: "compose"; contentKind: ContentKind }
+  | { id: string; name: string; kind: "web"; url: string };
+
 const emptyAccounts: AccountInfo[] = [];
 const emptyRecords: { tasks: Task[]; targets: TaskTarget[] } = { tasks: [], targets: [] };
 export function useWorkspaceController() {
@@ -28,13 +37,14 @@ export function useWorkspaceController() {
   const navigate = useNavigate();
   const [lastPage, setLastPage] = useState<DesktopPage>("accounts");
   const settingsOpen = pathname === "/settings";
-  const routePage = navigation.find((item) => pathname === `/${item.id}`)?.id;
+  const routePage = desktopPages.find((item) => pathname === `/${item.id}`)?.id;
   const page = routePage ?? lastPage;
   const selectKindRef = useRef<(kind: ContentKind) => void>(() => {});
-  const setPage = (next: DesktopPage) => {
+  const setPage = (next: DesktopPage, opts?: { kind?: ContentKind }) => {
     setLastPage(next);
-    if (next === "compose") selectKindRef.current("moment");
-    if (next === "video") selectKindRef.current("video");
+    if (opts?.kind) selectKindRef.current(opts.kind);
+    else if (next === "compose") selectKindRef.current("moment");
+    else if (next === "video") selectKindRef.current("video");
     void navigate({ to: `/${next}` });
   };
   const setSettingsOpen = (open: boolean) => {
@@ -70,12 +80,15 @@ export function useWorkspaceController() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [images, setImages] = useState<ImageAsset[]>([]);
-  const [notice, setNotice] = useState("");
+  const setNotice = useCallback((message: string) => {
+    if (!message) return;
+    toast(message);
+  }, []);
   const operation = useMutation({ mutationFn: (fn: () => Promise<unknown>) => fn(), retry: false });
   const busy = operation.isPending;
   useEffect(() => {
     const error = accountsQuery.error ?? historyQuery.error;
-    if (error) setNotice(error.message);
+    if (error) toast.error(userErrorMessage(error));
   }, [accountsQuery.error, historyQuery.error]);
   const [selectedTargets, setSelectedTargets] = useState<Target[]>([]);
   selectKindRef.current = (kind: ContentKind) => {
@@ -93,11 +106,32 @@ export function useWorkspaceController() {
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [platform, setPlatform] = useState<PlatformId | null>(null);
-  const [browserTabs, setBrowserTabs] = useState<{ id: string; name: string; kind?: "new" }[]>([]);
-  const closedTabs = useRef<{ id: string; name: string; kind?: "new" }[]>([]);
+  const [browserTabs, setBrowserTabs] = useState<BrowserTab[]>([]);
+  const closedTabs = useRef<BrowserTab[]>([]);
   const [activeBrowser, setActiveBrowser] = useState<string | null>(null);
-  const isNewTab = browserTabs.some((tab) => tab.id === activeBrowser && tab.kind === "new");
-  const activeAccountId = isNewTab ? null : activeBrowser;
+  const activeTab = browserTabs.find((tab) => tab.id === activeBrowser);
+  const isNewTab = activeTab?.kind === "new";
+  const isComposeTab = activeTab?.kind === "compose";
+  const activeBrowserViewId = !activeBrowser || isNewTab || isComposeTab ? null : activeBrowser;
+  const authorizingAccountId =
+    activeBrowserViewId &&
+    !activeBrowserViewId.startsWith("web-") &&
+    accounts.find((account) => account.id === activeBrowserViewId)?.login !== "logged_in"
+      ? activeBrowserViewId
+      : null;
+  useQuery({
+    queryKey: ["desktop", "refresh-account", authorizingAccountId],
+    enabled: Boolean(authorizingAccountId),
+    queryFn: async () => {
+      const updated = await window.desktop.refreshAccount(authorizingAccountId!);
+      setAccounts((old) => old.map((account) => (account.id === updated.id ? updated : account)));
+      if (updated.login === "logged_in") toast.success(`${updated.name} 已登录`);
+      return updated;
+    },
+    refetchInterval: 1000,
+    refetchIntervalInBackground: true,
+    retry: false,
+  });
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const tabPreview = useTabPreview({ hoveredTab, browserTabs });
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
@@ -105,11 +139,27 @@ export function useWorkspaceController() {
   const openSettings = () => setSettingsOpen(true);
   const [focusedTask, setFocusedTask] = useState<string | undefined>();
   const [composeScheduleAt, setComposeScheduleAt] = useState<Date | null>(null);
+  const openPublish = (kind: ContentKind) => {
+    selectKindRef.current(kind);
+    const tab: BrowserTab = {
+      id: `compose-${crypto.randomUUID()}`,
+      name: publishKindMeta[kind].title,
+      kind: "compose",
+      contentKind: kind,
+    };
+    setHoveredTab(null);
+    setBrowserTabs((tabs) => [...tabs, tab]);
+    setActiveBrowser(tab.id);
+  };
   const openComposeSchedule = (at: Date) => {
     setComposeScheduleAt(at);
-    setPage("compose");
+    openPublish("moment");
   };
   const clearComposeSchedule = () => setComposeScheduleAt(null);
+  useEffect(() => {
+    if (activeTab?.kind !== "compose") return;
+    selectKindRef.current(activeTab.contentKind);
+  }, [activeTab]);
   const removeAccount = async (id: string) => {
     setBrowserTabs((tabs) => tabs.filter((tab) => tab.id !== id));
     setActiveBrowser((current) => (current === id ? null : current));
@@ -118,15 +168,80 @@ export function useWorkspaceController() {
     setAccounts((old) => old.filter((account) => account.id !== id));
     await queryClient.fetchQuery(historyOptions);
   };
-  const openBrowser = async (account: { id: string; name: string }) => {
+  const openBrowser = async (account: { id: string; name: string }, url?: string) => {
     setHoveredTab(null);
     setBrowserTabs((tabs) => {
       const remaining = isNewTab ? tabs.filter((tab) => tab.id !== activeBrowser) : tabs;
-      return remaining.some((tab) => tab.id === account.id) ? remaining : [...remaining, account];
+      return remaining.some((tab) => tab.id === account.id)
+        ? remaining
+        : [...remaining, { id: account.id, name: account.name }];
     });
     setActiveBrowser(account.id);
-    await window.desktop.openAccount(account.id);
+    await (url !== undefined
+      ? window.desktop.openAccount(account.id, url)
+      : window.desktop.openAccount(account.id));
     await queryClient.fetchQuery({ ...accountsOptions, staleTime: 0 });
+  };
+  const openWebBrowser = async (
+    url: string,
+    existing?: { id: string; name: string; url: string },
+  ) => {
+    setHoveredTab(null);
+    const id = existing?.id ?? `web-${crypto.randomUUID()}`;
+    let name = existing?.name ?? url;
+    try {
+      name = existing?.name ?? new URL(url).hostname;
+    } catch {
+      name = existing?.name ?? url;
+    }
+    const tab: BrowserTab = { id, name, kind: "web", url };
+    setBrowserTabs((tabs) => {
+      const remaining = isNewTab ? tabs.filter((item) => item.id !== activeBrowser) : tabs;
+      return remaining.some((item) => item.id === id)
+        ? remaining.map((item) => (item.id === id ? tab : item))
+        : [...remaining, tab];
+    });
+    setActiveBrowser(id);
+    await window.desktop.openWebBrowser(id, url);
+  };
+  const syncWebTab = (id: string, nav: { url: string; title: string }) => {
+    setBrowserTabs((tabs) =>
+      tabs.map((tab) => {
+        if (tab.id !== id || tab.kind !== "web") return tab;
+        let name = nav.title.trim() || tab.name;
+        try {
+          if (!nav.title.trim()) name = new URL(nav.url).hostname;
+        } catch {
+          /* keep */
+        }
+        return { ...tab, url: nav.url, name };
+      }),
+    );
+  };
+  const submitOmnibox = async (input: string) => {
+    const url = await window.desktop.resolveOmniboxUrl(input);
+    if (!url) throw new Error("请输入搜索内容或网址");
+    if (activeBrowserViewId) {
+      const nav = await window.desktop.navigateBrowser(activeBrowserViewId, url);
+      syncWebTab(activeBrowserViewId, nav);
+      return;
+    }
+    await openWebBrowser(url);
+  };
+  const goBackBrowser = async () => {
+    if (!activeBrowserViewId) return;
+    const nav = await window.desktop.goBackBrowser(activeBrowserViewId);
+    syncWebTab(activeBrowserViewId, nav);
+  };
+  const goForwardBrowser = async () => {
+    if (!activeBrowserViewId) return;
+    const nav = await window.desktop.goForwardBrowser(activeBrowserViewId);
+    syncWebTab(activeBrowserViewId, nav);
+  };
+  const reloadBrowser = async () => {
+    if (!activeBrowserViewId) return;
+    const nav = await window.desktop.reloadBrowser(activeBrowserViewId);
+    syncWebTab(activeBrowserViewId, nav);
   };
   const {
     publishSettings,
@@ -139,7 +254,7 @@ export function useWorkspaceController() {
     silentPublish &&
     records.targets.some((target) => ["pending", "running", "submitted"].includes(target.status));
   const { browserPane } = useAccountBrowserLayout({
-    activeBrowser,
+    activeBrowser: activeBrowserViewId,
     settingsOpen,
     concealBrowser,
     setNotice,
@@ -151,11 +266,10 @@ export function useWorkspaceController() {
     ]);
   };
   const run = async (fn: () => Promise<unknown>) => {
-    setNotice("");
     try {
       await operation.mutateAsync(fn);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : String(error));
+      toast.error(userErrorMessage(error));
     }
   };
   useEffect(() => {
@@ -177,19 +291,44 @@ export function useWorkspaceController() {
       await queryClient.fetchQuery(historyOptions);
       const saved = await window.desktop.workspaceSession?.();
       if (saved && Array.isArray(saved.tabs)) {
-        const restored = saved.tabs.flatMap((tab) => {
-          if (tab.kind === "new") return [{ ...tab, name: "新标签页" }];
+        const restored: BrowserTab[] = saved.tabs.flatMap((tab) => {
+          if (tab.kind === "new") return [{ id: tab.id, name: "新标签页", kind: "new" as const }];
+          if (tab.kind === "web" && typeof tab.url === "string") {
+            let name = tab.url;
+            try {
+              name = new URL(tab.url).hostname;
+            } catch {
+              name = tab.url;
+            }
+            return [{ id: tab.id, name, kind: "web" as const, url: tab.url }];
+          }
+          if (
+            tab.kind === "compose" &&
+            (tab.contentKind === "article" ||
+              tab.contentKind === "moment" ||
+              tab.contentKind === "video" ||
+              tab.contentKind === "audio")
+          )
+            return [
+              {
+                id: tab.id,
+                name: publishKindMeta[tab.contentKind].title,
+                kind: "compose" as const,
+                contentKind: tab.contentKind,
+              },
+            ];
           const account = loadedAccounts.find((a) => a.id === tab.id);
           return account ? [{ id: account.id, name: account.name }] : [];
         });
         setBrowserTabs(restored);
         setPage(saved.page);
         for (const tab of restored) {
-          if (tab.kind === "new") continue;
+          if (tab.kind === "new" || tab.kind === "compose") continue;
           try {
-            await window.desktop.openAccount(tab.id);
+            if (tab.kind === "web") await window.desktop.openWebBrowser(tab.id, tab.url);
+            else await window.desktop.openAccount(tab.id);
           } catch (error) {
-            setNotice(`恢复 ${tab.name} 失败：${String(error)}`);
+            toast.error(`恢复 ${tab.name} 失败：${userErrorMessage(error)}`);
           }
         }
         setActiveBrowser(restored.some((tab) => tab.id === saved.activeId) ? saved.activeId : null);
@@ -216,29 +355,40 @@ export function useWorkspaceController() {
     if (!initialized) return;
     void window.desktop
       .saveWorkspaceSession?.({
-        tabs: browserTabs.map(({ id, kind }) => (kind === "new" ? { id, kind } : { id })),
+        tabs: browserTabs.map((tab) => {
+          if (tab.kind === "new") return { id: tab.id, kind: "new" as const };
+          if (tab.kind === "compose")
+            return { id: tab.id, kind: "compose" as const, contentKind: tab.contentKind };
+          if (tab.kind === "web") return { id: tab.id, kind: "web" as const, url: tab.url };
+          return { id: tab.id };
+        }),
         activeId: activeBrowser,
         page,
       })
-      ?.catch((error) => setNotice(`保存标签页失败：${String(error)}`));
+      ?.catch((error) => toast.error(userErrorMessage(error, "标签页未能保存，请稍后重试。")));
   }, [initialized, browserTabs, activeBrowser, page]);
   useEffect(() => {
     if (!initialized) return;
     return window.desktop.onCommand?.((command) => {
       if (command.action === "toast") {
-        toast(command.title, { description: command.body, duration: 7000 });
-        setNotice(`${command.title}：${command.body}`);
+        toast([command.title, command.body].filter(Boolean).join("："), { duration: 7000 });
         return;
       }
       if (busy && command.action !== "navigate") return;
-      if (command.action === "tab") {
+      if (command.action === "open-web") {
+        void run(() => openWebBrowser(command.url));
+      } else if (command.action === "tab") {
         if (!settingsOpen && !accountDialogOpen && !publishDialogOpen)
           handleTabCommand(command.operation);
       } else if (command.action === "settings") {
         void openSettings();
       } else if (command.action === "navigate") {
-        setActiveBrowser(null);
-        setPage(command.page);
+        if (command.page === "compose") openPublish("moment");
+        else if (command.page === "video") openPublish("video");
+        else {
+          setActiveBrowser(null);
+          setPage(command.page);
+        }
         setFocusedTask(command.taskId);
         void run(reload);
         if (command.page === "compose" || command.page === "video")
@@ -246,22 +396,23 @@ export function useWorkspaceController() {
       } else if (command.action === "save-draft") {
         void run(async () => {
           await window.desktop.saveDraft(body, images, contentKind, title);
-          setNotice("草稿已保存到本机");
+          toast.success("草稿已保存到本机");
         });
       } else if (command.action === "import-markdown") {
-        setActiveBrowser(null);
-        setPage("compose");
+        openPublish(contentKind === "video" || contentKind === "audio" ? "moment" : contentKind);
         void run(async () => {
           const text = await window.desktop.importMarkdown();
           if (text !== null) setBody(text);
         });
       } else if (command.action === "open-files") {
         setSettingsOpen(false);
-        setActiveBrowser(null);
-        const nextPage = preferredPageForFiles(command.paths);
-        const nextKind = nextPage === "video" && contentKind !== "audio" ? "video" : contentKind;
-        setPage(nextPage);
-        if (nextKind !== contentKind) setContentKind(nextKind);
+        const nextKind =
+          preferredPageForFiles(command.paths) === "video" && contentKind !== "audio"
+            ? "video"
+            : contentKind === "video" || contentKind === "audio"
+              ? contentKind
+              : "moment";
+        openPublish(nextKind);
         void run(async () => {
           const result = await applyLocalFiles(command.paths, nextKind, images);
           if (result.markdown != null) setBody(result.markdown);
@@ -286,17 +437,18 @@ export function useWorkspaceController() {
   ]);
   const closeBrowserTab = async (id: string) => {
     setHoveredTab(null);
-    if (browserTabs.find((tab) => tab.id === id)?.kind !== "new")
+    const tab = browserTabs.find((item) => item.id === id);
+    if (tab && tab.kind !== "new" && tab.kind !== "compose")
       await window.desktop.closeAccountBrowser(id);
-    const index = browserTabs.findIndex((tab) => tab.id === id);
+    const index = browserTabs.findIndex((item) => item.id === id);
     const closed = browserTabs[index];
     if (closed) closedTabs.current = [...closedTabs.current.slice(-19), closed];
-    setBrowserTabs((tabs) => tabs.filter((tab) => tab.id !== id));
+    setBrowserTabs((tabs) => tabs.filter((item) => item.id !== id));
     if (activeBrowser === id)
       setActiveBrowser(browserTabs[index + 1]?.id ?? browserTabs[index - 1]?.id ?? null);
   };
   const newBrowserTab = () => {
-    const tab = { id: `new-${crypto.randomUUID()}`, name: "新标签页", kind: "new" as const };
+    const tab: BrowserTab = { id: `new-${crypto.randomUUID()}`, name: "新标签页", kind: "new" };
     setHoveredTab(null);
     setBrowserTabs((tabs) => [...tabs, tab]);
     setActiveBrowser(tab.id);
@@ -312,16 +464,18 @@ export function useWorkspaceController() {
     } else if (operation === "reopen") {
       const tab = closedTabs.current.pop();
       if (!tab) return;
-      if (tab.kind === "new") {
+      if (tab.kind === "new" || tab.kind === "compose") {
         setBrowserTabs((tabs) => [...tabs, tab]);
         setActiveBrowser(tab.id);
-      } else if (accounts.some((a) => a.id === tab.id)) void run(() => openBrowser(tab));
+      } else if (tab.kind === "web") void run(() => openWebBrowser(tab.url, tab));
+      else if (accounts.some((a) => a.id === tab.id)) void run(() => openBrowser(tab));
     }
   };
-  const pageTitle = navigation.find((item) => item.id === page)!.title;
+  const pageTitle = desktopPages.find((item) => item.id === page)?.title ?? "MediaX";
   return {
     page,
     setPage,
+    openPublish,
     accounts,
     setAccounts,
     name,
@@ -334,7 +488,6 @@ export function useWorkspaceController() {
     setBody,
     images,
     setImages,
-    notice,
     setNotice,
     busy,
     records,
@@ -356,6 +509,8 @@ export function useWorkspaceController() {
     setPublishBandwidthLimitKbps,
     concealBrowser,
     isNewTab,
+    isComposeTab,
+    activeBrowserViewId,
     hoveredTab,
     setHoveredTab,
     tabPreview,
@@ -373,6 +528,11 @@ export function useWorkspaceController() {
     openComposeSchedule,
     clearComposeSchedule,
     openBrowser,
+    openWebBrowser,
+    submitOmnibox,
+    goBackBrowser,
+    goForwardBrowser,
+    reloadBrowser,
     removeAccount,
     reload,
     run,

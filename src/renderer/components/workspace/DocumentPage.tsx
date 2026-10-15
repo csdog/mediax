@@ -1,20 +1,17 @@
 import type { ReactNode } from "react";
-import { CircleHelp } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "cn";
 import { useWorkspace } from "@/app/WorkspaceContext";
 export function DocumentPage({ children }: { children: ReactNode }) {
-  const { page, pageTitle, notice } = useWorkspace();
+  const { page, pageTitle } = useWorkspace();
   return (
     <main
-      className={`document-content ${page === "compose" || page === "video" ? "compose-content" : page === "accounts" ? "accounts-content" : page === "history" ? "history-content" : ""}`}
+      className={cn(
+        "document-content",
+        (page === "compose" || page === "video") && "compose-content",
+        page === "accounts" && "accounts-content",
+      )}
     >
       <h1 className="sr-only">{pageTitle}</h1>
-      {notice && (
-        <Alert role="status">
-          <CircleHelp />
-          <AlertDescription>{notice}</AlertDescription>
-        </Alert>
-      )}
       {children}
     </main>
   );

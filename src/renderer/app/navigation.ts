@@ -10,6 +10,7 @@ import {
 } from "@/components/workspace/CodexNavigationIcons";
 import { UsersIcon, createLucideIcon } from "lucide-react";
 import type { DesktopPage } from "../../shared/models";
+
 // Filled counterparts keep the same subject and silhouette as the outline icons.
 const UsersFilledIcon = createLucideIcon("UsersFilled", [
   [
@@ -61,13 +62,17 @@ const HistoryFilledIcon = createLucideIcon("HistoryFilled", [
   ],
 ]);
 
-export const navigation: {
+export type DesktopNavItem = {
   id: DesktopPage;
   title: string;
   icon: typeof UsersIcon;
   selectedIcon: typeof UsersIcon;
-}[] = [
+};
+
+/** All desktop pages (routes + titles). In-app「发布」opens the dialog; /publish is for links. */
+export const desktopPages: DesktopNavItem[] = [
   { id: "accounts", title: "账号管理", icon: CodexUsersIcon, selectedIcon: UsersFilledIcon },
+  { id: "publish", title: "发布", icon: CodexSendIcon, selectedIcon: SendFilledIcon },
   { id: "compose", title: "内容发布", icon: CodexSendIcon, selectedIcon: SendFilledIcon },
   { id: "video", title: "视频", icon: CodexVideoIcon, selectedIcon: CodexVideoFilledIcon },
   { id: "calendar", title: "内容日历", icon: CodexCalendarIcon, selectedIcon: CalendarFilledIcon },
@@ -79,3 +84,8 @@ export const navigation: {
   },
   { id: "history", title: "发布记录", icon: CodexHistoryIcon, selectedIcon: HistoryFilledIcon },
 ];
+
+/** Sidebar / activity rail entries — 「发布」stays a dialog, not a rail item. */
+export const navigation: DesktopNavItem[] = desktopPages.filter(
+  (item) => item.id !== "publish" && item.id !== "compose" && item.id !== "video",
+);

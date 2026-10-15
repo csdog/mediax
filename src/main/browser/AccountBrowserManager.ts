@@ -1,5 +1,7 @@
-import { BrowserWindow, WebContentsView } from "electron";
+import { BrowserWindow, WebContentsView, type Session } from "electron";
 import { CdpBridge } from "./CdpBridge";
+import { installBrowserContextMenu } from "./contextMenu";
+import { log } from "../logging";
 import type { BrowserBounds, PlatformId } from "../../shared/models";
 export class AccountBrowserManager {
   private windows = new Map<string, BrowserWindow>();
@@ -11,6 +13,7 @@ export class AccountBrowserManager {
   constructor(
     private host?: BrowserWindow,
     private endpoint?: string,
+    private onSession?: (session: Session) => void,
   ) {
     if (!host) return;
     host.on("resize", () => this.layout());
@@ -89,14 +92,46 @@ export class AccountBrowserManager {
     if (win && !win.isDestroyed()) win.destroy();
     if (this.activeId === id) this.activeId = null;
   }
+  private async loadURL(view: WebContentsView, url: string, waitUntil?: "dom-ready") {
+    const contents = view.webContents;
+    let onReady: (() => void) | undefined;
+    try {
+      const ready =
+        waitUntil === "dom-ready"
+          ? new Promise<void>((resolve) => {
+              onReady = resolve;
+              contents.once("dom-ready", onReady);
+            })
+          : undefined;
+      const loaded = contents.loadURL(url);
+      // Refresh needs the document, not every QR image/third-party resource's load event.
+      await (ready ? Promise.race([ready, loaded]) : loaded);
+    } catch (error) {
+      // Closing a loading tab cancels navigation (sometimes ERR_FAILED, not ERR_ABORTED).
+      if (!contents.isDestroyed()) throw error;
+    } finally {
+      if (onReady && !contents.isDestroyed()) contents.removeListener("dom-ready", onReady);
+    }
+  }
   async open(
     accountId: string,
     url: string,
-    options?: { focus?: boolean; platform?: PlatformId },
+    options?: {
+      focus?: boolean;
+      platform?: PlatformId;
+      partition?: string;
+      waitUntil?: "dom-ready";
+    },
   ): Promise<WebContentsView> {
     const existing = this.views.get(accountId);
     if (existing) {
-      if (options?.focus !== false) this.show(accountId);
+      if (!existing.webContents.isDestroyed()) this.onSession?.(existing.webContents.session);
+      if (url && !existing.webContents.isDestroyed()) {
+        const current = existing.webContents.getURL();
+        if (current !== url) await this.loadURL(existing, url, options?.waitUntil);
+      }
+      if (existing.webContents && !existing.webContents.isDestroyed() && options?.focus !== false)
+        this.show(accountId);
       return existing;
     }
     if (!/^[a-zA-Z0-9-]+$/.test(accountId)) throw new Error("Invalid account ID");
@@ -104,11 +139,11 @@ export class AccountBrowserManager {
     const win = this.host ?? new BrowserWindow({ width: 900, height: 700, show: false });
     const view = new WebContentsView({
       webPreferences: {
-        partition: `persist:${options?.platform ?? "facebook"}-${accountId}`,
+        partition: options?.partition ?? `persist:${options?.platform ?? "facebook"}-${accountId}`,
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
-        spellcheck: false,
+        spellcheck: true,
         // Same as workbench: force V8 code cache for account web UIs.
         v8CacheOptions: "bypassHeatCheck",
       },
@@ -118,9 +153,42 @@ export class AccountBrowserManager {
     view.setBounds({ x: 0, y: 44, width: 1000, height: 700 });
     view.setVisible(!this.host);
     view.webContents.setBackgroundThrottling(false);
+    void installBrowserContextMenu(view.webContents, (url) => {
+      if (this.host && !this.host.isDestroyed())
+        this.host.webContents.send("mediax:command", { action: "open-web", url });
+      else if (!view.webContents?.isDestroyed()) void view.webContents.loadURL(url);
+    }).catch((error) => log.warn("Browser context menu failed", { error: String(error) }));
+    // Keep the bundled Chromium version, but omit desktop-shell product tokens.
+    // Some platforms (including Channels) redirect Electron UAs before session validation.
+    view.webContents.setUserAgent(
+      view.webContents.getUserAgent().replace(/\s(?:Electron|MediaX)\/\S+/gi, ""),
+    );
+    if (options?.platform === "channels") {
+      const trace = (phase: string, url: string, status?: number) => {
+        try {
+          const page = new URL(url);
+          // OAuth codes/state live in the query/hash; never log either.
+          log.info("Channels navigation", {
+            phase,
+            path: `${page.origin}${page.pathname}`,
+            status,
+          });
+        } catch {
+          /* Ignore blank or non-URL navigation events. */
+        }
+      };
+      view.webContents.on("did-start-navigation", (_event, url, _inPlace, mainFrame) => {
+        if (mainFrame) trace("start", url);
+      });
+      view.webContents.on("did-redirect-navigation", (_event, url, _inPlace, mainFrame) => {
+        if (mainFrame) trace("redirect", url);
+      });
+      view.webContents.on("did-navigate", (_event, url, status) => trace("loaded", url, status));
+    }
     win.contentView.addChildView(view);
     this.views.set(accountId, view);
     view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    this.onSession?.(view.webContents.session);
     if (this.host) this.layout();
     else {
       const resize = () => {
@@ -132,7 +200,7 @@ export class AccountBrowserManager {
       this.windows.set(accountId, win);
       win.on("closed", () => this.close(accountId));
     }
-    await view.webContents.loadURL(url);
+    await this.loadURL(view, url, options?.waitUntil);
     return view;
   }
 }

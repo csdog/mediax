@@ -64,7 +64,7 @@ export const shortcutCatalog: ShortcutEntry[] = [
   {
     id: "compose",
     title: "编辑内容",
-    description: "进入内容发布页并开始创作。",
+    description: "进入发布页并开始创作。",
     accelerator: "CommandOrControl+N",
     scope: "app",
   },
@@ -91,14 +91,14 @@ export const shortcutCatalog: ShortcutEntry[] = [
   },
   {
     id: "compose-page",
-    title: "内容发布",
-    description: "打开内容发布页。",
+    title: "发布图文",
+    description: "打开图文 / 文章发布页。",
     accelerator: "CommandOrControl+2",
     scope: "app",
   },
   {
     id: "video",
-    title: "视频",
+    title: "发布视频",
     description: "打开视频发布页。",
     accelerator: "CommandOrControl+3",
     scope: "app",

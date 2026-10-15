@@ -353,7 +353,7 @@ export function CalendarPage() {
     const at = addScheduleAt.getTime() < min.getTime() ? min : addScheduleAt;
     setAddScheduleOpen(false);
     if (!accounts.length) {
-      toast("请先添加账号", { description: "账号管理中登录后即可排期发布。" });
+      toast("请先在账号管理中添加并登录账号，再排期发布。");
       setPage("accounts");
       return;
     }
@@ -364,13 +364,9 @@ export function CalendarPage() {
     <DocumentPage>
       <PanelErrorBoundary
         title="内容日历暂时无法显示"
-        description={
-          import.meta.env.DEV
-            ? "开发模式下会显示技术详情；常见原因是日历控件尚未就绪。"
-            : "请重试；若仍失败，可先使用创作或其他页面。详细信息已写入本地日志。"
-        }
+        description="请重试；若仍失败，可先使用创作或其他页面。详细信息已写入本地日志。"
       >
-        <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+        <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto px-8 py-6">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">内容日历</h1>
             <p className="text-sm text-muted-foreground">
@@ -520,6 +516,7 @@ function publishersOf(entry: CalendarEntry, accounts: AccountInfo[]): CalendarPu
     const account = byAccount.get(target.accountId);
     const platform = (account?.platform ?? "facebook") as PlatformId;
     publishers.push({
+      id: target.accountId,
       platform,
       name: account?.name ?? target.name,
       avatar: account?.avatar,

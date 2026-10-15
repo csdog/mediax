@@ -1,4 +1,5 @@
 import type { PlatformId } from "../../shared/models";
+import { isChannelsPlatformUrl } from "./channels/session";
 
 type Session = {
   home: string;
@@ -60,9 +61,9 @@ const sessions: Record<PlatformId, Session> = {
     "access-token-creator.xiaohongshu.com",
   ]),
   bilibili: known("https://passport.bilibili.com/login", "https://www.bilibili.com", ["SESSDATA"]),
-  channels: known("https://channels.weixin.qq.com", "https://channels.weixin.qq.com", [
+  // wxuin identifies a WeChat user even on the logged-out QR login page.
+  channels: known("https://channels.weixin.qq.com/platform", "https://channels.weixin.qq.com", [
     "sessionid",
-    "wxuin",
   ]),
   wechat: known("https://mp.weixin.qq.com/", "https://mp.weixin.qq.com", [
     "slave_sid",
@@ -140,7 +141,8 @@ export function partitionName(platform: PlatformId, id: string) {
   return `persist:${platform}-${id}`;
 }
 
-export function hasPlatformSession(platform: PlatformId, cookies: { name: string }[]) {
+export function hasPlatformSession(platform: PlatformId, cookies: { name: string }[], url = "") {
+  if (platform === "channels" && url && !isChannelsPlatformUrl(url)) return false;
   const names = sessions[platform].cookies;
   return cookies.some((cookie) => names.includes(cookie.name));
 }
@@ -165,8 +167,12 @@ export function urlLooksLoggedIn(platform: PlatformId, url: string) {
 
 // Facebook keeps the stable c_user id. Other session cookies rotate,
 // so a logged-in account uses a fixed owner and does not drop saved identities.
-export function sessionOwner(platform: PlatformId, cookies: { name: string; value: string }[]) {
-  if (!hasPlatformSession(platform, cookies)) return null;
+export function sessionOwner(
+  platform: PlatformId,
+  cookies: { name: string; value: string }[],
+  url = "",
+) {
+  if (!hasPlatformSession(platform, cookies, url)) return null;
   if (platform === "facebook")
     return cookies.find((cookie) => cookie.name === "c_user")?.value ?? null;
   return platform;

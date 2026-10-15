@@ -1,12 +1,14 @@
 import {
-  CodexArrowLeftIcon,
   CodexSidebarIcon,
   CodexSidebarHiddenIcon,
+  CodexArrowLeftIcon,
 } from "./CodexNavigationIcons";
 import { FolderOpen, X, Monitor, Plus } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useWorkspace } from "@/app/WorkspaceContext";
 import { useNativeTabPreview } from "@/hooks/useNativeTabPreview";
 
@@ -15,6 +17,7 @@ export function WorkspaceToolbar() {
     settingsOpen,
     setSettingsOpen,
     activeBrowser,
+    activeBrowserViewId,
     setActiveBrowser,
     browserTabs,
     setHoveredTab,
@@ -28,42 +31,87 @@ export function WorkspaceToolbar() {
     run,
     closeBrowserTab,
     newBrowserTab,
+    goBackBrowser,
+    goForwardBrowser,
   } = useWorkspace();
   const { state: sidebarState, toggleSidebar } = useSidebar();
+  const navigation = useQuery({
+    queryKey: ["desktop", "browser-navigation", activeBrowserViewId],
+    enabled: Boolean(activeBrowserViewId) && !settingsOpen,
+    queryFn: () => window.desktop.browserNavigation(activeBrowserViewId!),
+    refetchInterval: activeBrowserViewId && !settingsOpen ? 1000 : false,
+  });
+  const canGoBack = settingsOpen || Boolean(navigation.data?.canGoBack);
+  const canGoForward = !settingsOpen && Boolean(navigation.data?.canGoForward);
   const nativePreview = typeof window.desktop.showTabPreview === "function";
   useNativeTabPreview(nativePreview ? hoveredTab : null);
   return (
     <div className="app-toolbar window-drag">
-      <div className="toolbar-navigation">
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="toolbar-nav-button"
-          aria-label="后退"
-          disabled={!settingsOpen}
-          onClick={() => setSettingsOpen(false)}
-        >
-          <CodexArrowLeftIcon />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="toolbar-nav-button"
-          aria-label="前进"
-          disabled
-        >
-          <CodexArrowLeftIcon className="-scale-x-100" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="toolbar-nav-button"
-          aria-label="切换侧栏"
-          data-slot="sidebar-trigger"
-          onClick={toggleSidebar}
-        >
-          {sidebarState === "collapsed" ? <CodexSidebarHiddenIcon /> : <CodexSidebarIcon />}
-        </Button>
+      <div className="toolbar-navigation window-no-drag">
+        <Tooltip>
+          <TooltipTrigger
+            delay={400}
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="toolbar-nav-button"
+                aria-label="后退"
+                disabled={!canGoBack}
+                onClick={() => {
+                  if (settingsOpen) {
+                    setSettingsOpen(false);
+                    return;
+                  }
+                  void run(() => goBackBrowser());
+                }}
+              >
+                <CodexArrowLeftIcon className="size-5" />
+              </Button>
+            }
+          />
+          <TooltipContent>后退</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            delay={400}
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="toolbar-nav-button"
+                aria-label="前进"
+                disabled={!canGoForward}
+                onClick={() => void run(() => goForwardBrowser())}
+              >
+                <CodexArrowLeftIcon className="size-5 -scale-x-100" />
+              </Button>
+            }
+          />
+          <TooltipContent>前进</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            delay={400}
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="toolbar-nav-button"
+                aria-label="切换侧栏"
+                data-slot="sidebar-trigger"
+                onClick={toggleSidebar}
+              >
+                {sidebarState === "collapsed" ? (
+                  <CodexSidebarHiddenIcon className="size-5" />
+                ) : (
+                  <CodexSidebarIcon className="size-5" />
+                )}
+              </Button>
+            }
+          />
+          <TooltipContent>{sidebarState === "collapsed" ? "显示侧栏" : "隐藏侧栏"}</TooltipContent>
+        </Tooltip>
       </div>
       <div className="tab-strip">
         <div
@@ -184,25 +232,36 @@ export function WorkspaceToolbar() {
                 align="start"
                 sideOffset={8}
                 className={`w-72 overflow-hidden p-0${nativePreview ? " tab-preview-source" : ""}`}
-                aria-label={`${tab.name} 页面预览`}
+                aria-label={
+                  tabPreview?.id === tab.id && tabPreview.data?.title
+                    ? `${tabPreview.data.title} 页面预览`
+                    : "页面预览"
+                }
                 data-preview-tab={tab.id}
               >
                 <div className="space-y-1 px-3 py-2.5">
-                  <p className="truncate text-sm font-medium">{tab.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-sm font-medium">
                     {tabPreview?.id === tab.id
-                      ? tabPreview.data?.title || tabPreview.error || "Facebook"
-                      : "正在获取预览…"}
+                      ? tabPreview.data?.title ||
+                        tabPreview.error ||
+                        (tab.kind === "web" || tab.kind === "new" || tab.kind === "compose"
+                          ? tab.name
+                          : "页面预览")
+                      : tab.kind === "new" || tab.kind === "compose"
+                        ? tab.name
+                        : "正在获取预览…"}
                   </p>
-                  {tabPreview?.id === tab.id && tabPreview.data?.hostname && (
-                    <p className="text-xs text-muted-foreground">{tabPreview.data.hostname}</p>
-                  )}
+                  {tabPreview?.id === tab.id && tabPreview.data?.hostname ? (
+                    <p className="truncate text-xs text-muted-foreground">
+                      {tabPreview.data.hostname}
+                    </p>
+                  ) : null}
                 </div>
                 {tabPreview?.id === tab.id && tabPreview.data?.image ? (
                   <img
                     className="tab-preview-image"
                     src={tabPreview.data.image}
-                    alt={`${tab.name} 页面缩略图`}
+                    alt={tabPreview.data.title ? `${tabPreview.data.title} 缩略图` : "页面缩略图"}
                   />
                 ) : (
                   <div className="tab-preview-placeholder">

@@ -15,12 +15,9 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
   return (
     <AppErrorView
       variant="full"
+      className="min-h-0 w-full flex-1"
       title="这里暂时走不通了"
-      description={
-        import.meta.env.DEV
-          ? "开发模式下会附带技术详情，方便定位。"
-          : "可以重试当前页面，或先回到账号继续其他工作。详情已写入本地日志。"
-      }
+      description={"可以重试当前页面，或先回到账号继续其他工作。详情已写入本地日志。"}
       error={error}
       onRetry={reset}
       secondaryAction={

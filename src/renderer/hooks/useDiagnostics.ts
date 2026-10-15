@@ -1,3 +1,4 @@
+import { userErrorMessage } from "../../shared/userError";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -20,7 +21,7 @@ export function useDiagnostics() {
       setMessage(path ? `已导出到 ${path}` : "已取消导出");
     },
     onError: (error) => {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(userErrorMessage(error));
     },
   });
   return {

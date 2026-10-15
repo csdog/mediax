@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, Menu, nativeImage, Tray } from "electron";
+import { app, BrowserWindow, globalShortcut, Menu, nativeImage, Tray, webContents } from "electron";
 import { join } from "node:path";
 import type { Database } from "../storage/Database";
 import type { DesktopCommand, DesktopPage, ShortcutSettings } from "../../shared/models";
@@ -16,11 +16,13 @@ import { TaskDockStatus } from "./TaskDockStatus";
 import { TaskNotifications } from "./TaskNotifications";
 import { TaskPowerSave } from "./TaskPowerSave";
 import { presentNotification } from "./presentNotification";
+import { TrayDropWindow } from "./TrayDropWindow";
 import { readNotificationSettings } from "../../shared/notificationSettings";
 import { readDesktopBehavior } from "../../shared/desktopBehavior";
 
 export class DesktopShell {
   private tray: Tray;
+  private trayDrop: TrayDropWindow;
   private shortcuts = defaultShortcutMap();
   private globalRegistered = false;
   private globalError: string | undefined;
@@ -43,14 +45,16 @@ export class DesktopShell {
     this.tray.setToolTip("MediaX · 本地发布工具");
     this.tray.setContextMenu(Menu.buildFromTemplate(this.quickActions(true)));
     this.tray.on("double-click", () => this.show());
+    this.trayDrop = new TrayDropWindow(this.tray, (paths) => this.handleOpenFiles(paths));
     if (process.platform === "darwin") {
       if (!app.isPackaged) app.dock?.setIcon(iconPath);
       app.dock?.setMenu(Menu.buildFromTemplate(this.quickActions(false)));
     }
     const attachShortcuts = (contents: Electron.WebContents) => {
       contents.on("before-input-event", (event, input) => {
+        if (!this.window.isFocused()) return;
         const operation = tabShortcut(input, this.shortcuts);
-        if (!operation || !this.window.isFocused()) return;
+        if (!operation) return;
         event.preventDefault();
         this.dispatch(
           operation === "settings" ? { action: "settings" } : { action: "tab", operation },
@@ -125,6 +129,7 @@ export class DesktopShell {
       this.taskNotifications.dispose();
       this.taskDockStatus.dispose();
       this.taskPowerSave.dispose();
+      this.trayDrop.dispose();
       this.tray.destroy();
     });
   }
@@ -269,8 +274,9 @@ export class DesktopShell {
     return [
       { label: "打开主窗口", click: () => this.show() },
       { label: "账号管理", click: () => this.navigate("accounts") },
-      { label: "编辑内容", click: () => this.navigate("compose") },
-      { label: "视频", click: () => this.navigate("video") },
+      { label: "发布", click: () => this.navigate("publish") },
+      { label: "内容日历", click: () => this.navigate("calendar") },
+      { label: "数据分析", click: () => this.navigate("analytics") },
       { label: "发布记录", click: () => this.navigate("history") },
       { type: "separator" },
       { label: "设置…", click: () => this.dispatch({ action: "settings" }) },
@@ -383,13 +389,13 @@ export class DesktopShell {
             },
             {
               id: "desktop.editor",
-              label: "内容发布",
+              label: "发布图文",
               accelerator: this.accel("compose-page"),
               click: () => this.navigate("compose"),
             },
             {
               id: "desktop.video",
-              label: "视频",
+              label: "发布视频",
               accelerator: this.accel("video"),
               click: () => this.navigate("video"),
             },
@@ -405,6 +411,22 @@ export class DesktopShell {
               ? [
                   { role: "reload" as const, label: "重新加载" },
                   { role: "toggleDevTools" as const, label: "开发者工具" },
+                  {
+                    label: "切换开发者工具（F12）",
+                    accelerator: "F12",
+                    visible: false,
+                    acceleratorWorksWhenHidden: true,
+                    click: () => {
+                      const focused = webContents.getFocusedWebContents();
+                      // DevTools receives focus on open; toggle its inspected page, not itself.
+                      const inspected =
+                        focused &&
+                        webContents
+                          .getAllWebContents()
+                          .find((contents) => contents.devToolsWebContents === focused);
+                      (inspected || focused || this.window.webContents).toggleDevTools();
+                    },
+                  },
                 ]
               : []),
           ],

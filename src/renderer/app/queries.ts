@@ -1,4 +1,6 @@
 import { queryOptions, QueryClient } from "@tanstack/react-query";
+import type { AnalyticsQuery } from "../../shared/models";
+
 export const accountsOptions = queryOptions({
   queryKey: ["desktop", "accounts"],
   queryFn: () => window.desktop.accounts(),
@@ -14,10 +16,15 @@ export function calendarOptions(from: string, to: string) {
     queryFn: () => window.desktop.calendar({ from, to }),
   });
 }
-export function analyticsOptions(days: number) {
+
+export function analyticsOptions(query: number | AnalyticsQuery) {
+  const key =
+    typeof query === "number"
+      ? ["desktop", "analytics", "days", query]
+      : ["desktop", "analytics", "range", query.from ?? "", query.to ?? "", query.days ?? ""];
   return queryOptions({
-    queryKey: ["desktop", "analytics", days],
-    queryFn: () => window.desktop.analyticsSummary(days),
+    queryKey: key,
+    queryFn: () => window.desktop.analyticsSummary(query),
   });
 }
 export function createQueryClient() {

@@ -60,9 +60,9 @@
   height: 20px;
 }
 .activity-rail [data-slot="button"] {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: var(--rail-button-size);
+  height: var(--rail-button-size);
+  border-radius: 10px;
 }
 .activity-rail [data-slot="button"].rounded-full {
   border-radius: 999px;
@@ -163,18 +163,14 @@ body {
 }
 .workspace [data-slot="card-description"],
 .workspace [data-slot="empty-description"],
-.composer-caption,
 .composer-count,
-.preview-caption,
-.preview-meta p,
 .target-placeholder,
 .publish-inspector > p {
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
 }
 .draft-intro > p:last-of-type,
-.workspace .composer [data-slot="textarea"],
-.preview-body {
+.workspace .composer [data-slot="textarea"] {
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
   font-weight: 400;
@@ -184,8 +180,6 @@ body {
   line-height: var(--line-height-heading);
   font-weight: 500;
 }
-.preview-toolbar,
-.preview-meta,
 .publish-inspector h2 {
   font-size: var(--font-size-control);
   line-height: 20px;
@@ -198,15 +192,18 @@ body {
 .app-error-view {
   position: relative;
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  height: 100%;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: auto;
 }
 .app-error-view--full {
-  min-height: min(560px, calc(100vh - 96px));
   padding: 56px 28px 64px;
   background:
     radial-gradient(
@@ -222,9 +219,14 @@ body {
     var(--page-surface);
 }
 .app-error-view--panel {
-  align-items: flex-start;
-  padding: 28px 12px;
-  min-height: 200px;
+  padding: 40px 28px;
+  background:
+    radial-gradient(
+      ellipse 70% 55% at 50% 18%,
+      color-mix(in srgb, var(--emphasis) 8%, transparent),
+      transparent 70%
+    ),
+    var(--page-surface, var(--background));
 }
 .app-error-view__glow {
   position: absolute;
@@ -253,11 +255,8 @@ body {
   animation: app-error-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .app-error-view--panel .app-error-view__stage {
-  align-items: flex-start;
-  max-width: 36rem;
-  text-align: left;
-  gap: 16px;
-  animation: none;
+  max-width: 28rem;
+  gap: 18px;
 }
 .app-error-view__mark {
   display: grid;
@@ -270,18 +269,9 @@ body {
     0 0 0 1px var(--border-subtle),
     0 18px 40px color-mix(in srgb, var(--foreground) 6%, transparent);
 }
-.app-error-view--panel .app-error-view__mark {
-  width: 48px;
-  height: 48px;
-  box-shadow: 0 0 0 1px var(--border-subtle);
-}
 .app-error-view__mark svg {
   width: 40px;
   height: 40px;
-}
-.app-error-view--panel .app-error-view__mark svg {
-  width: 28px;
-  height: 28px;
 }
 .app-error-view__mark-ring {
   stroke: color-mix(in srgb, var(--emphasis) 35%, var(--border));
@@ -317,26 +307,13 @@ body {
   line-height: 1.15;
   color: var(--foreground);
 }
-.app-error-view--panel .app-error-view__title {
-  font-size: 1.25rem;
-  letter-spacing: -0.02em;
-}
 .app-error-view__desc,
 .app-error-view__prod-hint {
-  margin: 0;
+  margin: 0 auto;
   color: var(--muted-foreground);
   font-size: var(--font-size-body);
   line-height: 1.55;
   max-width: 26rem;
-}
-.app-error-view--full .app-error-view__desc,
-.app-error-view--full .app-error-view__prod-hint {
-  margin-inline: auto;
-}
-.app-error-view--panel .app-error-view__desc,
-.app-error-view--panel .app-error-view__prod-hint {
-  font-size: var(--font-size-control);
-  max-width: none;
 }
 .app-error-view__dev {
   display: flex;
@@ -381,9 +358,6 @@ body {
   justify-content: center;
   gap: 10px;
   margin-top: 4px;
-}
-.app-error-view--panel .app-error-view__actions {
-  justify-content: flex-start;
 }
 @keyframes app-error-rise {
   from {
@@ -440,10 +414,4 @@ body {
 .theme-mode-option:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent);
-}
-[data-sonner-toaster] {
-  z-index: 80 !important;
-}
-.app-toast {
-  font-family: inherit;
 }

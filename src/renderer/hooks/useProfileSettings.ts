@@ -1,3 +1,4 @@
+import { userErrorMessage } from "../../shared/userError";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { defaultProfile, type ProfileSettings } from "../../shared/profile";
@@ -27,7 +28,7 @@ export function useProfileSettings() {
       const avatar = await window.desktop.chooseAvatar();
       if (avatar) await save.mutateAsync({ avatar });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(userErrorMessage(error));
     }
   };
   return {
@@ -42,7 +43,6 @@ export function useProfileSettings() {
       save.mutate({ avatar: null });
     },
     profileError:
-      message ||
-      (save.error instanceof Error ? save.error.message : save.isError ? "保存失败" : ""),
+      message || (save.isError ? userErrorMessage(save.error, "保存失败，请稍后重试。") : ""),
   };
 }

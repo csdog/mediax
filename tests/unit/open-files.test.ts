@@ -16,7 +16,7 @@ describe("open files", () => {
       findOpenFileArgs([
         "/app/Electron",
         "--some-flag",
-        "mediax://compose",
+        "mediax://publish",
         md,
         png,
         join(dir, "missing.md"),

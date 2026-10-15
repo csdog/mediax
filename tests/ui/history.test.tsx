@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import "./setup";
 import React from "react";
 import { it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
@@ -80,6 +81,7 @@ it("lists publish records with filters from the reference layout", async () => {
     })),
     importLocalFiles: vi.fn().mockResolvedValue({ markdown: null, assets: [], warnings: [] }),
     revealInFolder: vi.fn(),
+    openPost: vi.fn().mockResolvedValue(undefined),
     pathForFile: vi.fn(),
     diagnostics: vi.fn().mockResolvedValue({
       generatedAt: "2026-10-13T00:00:00.000Z",
@@ -186,10 +188,42 @@ it("lists publish records with filters from the reference layout", async () => {
   expect(screen.getByText("成功")).toBeTruthy();
   expect(screen.getByText("1 账号 · 1 任务")).toBeTruthy();
   expect(screen.getByRole("button", { name: "新增发布" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "操作 吐槽网上线 Skill：让发布更稳" }));
-  const openPost = await screen.findByRole("menuitem", { name: "查看" });
+  const openPost = screen.getByRole("button", { name: "打开", exact: true });
   expect(openPost.querySelector("svg")).toBeTruthy();
-  const openAccount = screen.getByRole("menuitem", { name: "打开" });
+  fireEvent.click(openPost);
+  await waitFor(() =>
+    expect(window.desktop.openPost).toHaveBeenCalledWith("https://www.facebook.com/demo/posts/1"),
+  );
+  let finishRepublish!: () => void;
+  window.desktop.republish = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finishRepublish = resolve;
+      }),
+  );
+  await waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: "重新发布", exact: true }) as HTMLButtonElement).disabled,
+    ).toBe(false),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "重新发布", exact: true }));
+  const republishing = await screen.findByRole("button", { name: "正在重新发布…", exact: true });
+  expect((republishing as HTMLButtonElement).disabled).toBe(true);
+  expect(republishing.querySelector("svg")?.classList.contains("animate-spin")).toBe(true);
+  expect(window.desktop.republish).toHaveBeenCalledExactlyOnceWith("target-1");
+  finishRepublish();
+  await waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: "重新发布", exact: true }) as HTMLButtonElement).disabled,
+    ).toBe(false),
+  );
+  expect(
+    screen
+      .getByRole("button", { name: "重新发布", exact: true })
+      .querySelector("svg")
+      ?.classList.contains("animate-spin"),
+  ).toBe(false);
+  const openAccount = screen.getByRole("button", { name: "打开账号", exact: true });
   expect(openAccount.querySelector("svg")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("搜索作品描述或任务标题"), {
     target: { value: "不存在的标题" },

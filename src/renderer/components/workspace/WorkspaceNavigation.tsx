@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Download, Settings, ChevronDown, LoaderCircle, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -18,6 +19,7 @@ import {
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
 import { CodexComposeIcon } from "./CodexNavigationIcons";
+import { PublishKindDialog } from "./PublishKindDialog";
 import { navigation as nav } from "@/app/navigation";
 import { useWorkspace } from "@/app/WorkspaceContext";
 import type { UpdateStatus } from "../../../shared/models";
@@ -37,6 +39,7 @@ export function WorkspaceNavigation() {
   const {
     page,
     setPage,
+    openPublish,
     setActiveBrowser,
     run,
     reload,
@@ -47,6 +50,7 @@ export function WorkspaceNavigation() {
   } = useWorkspace();
   const { profile } = useProfileSettings();
   const { status: updateStatus, busy: updateBusy, installUpdate } = useAppUpdate();
+  const [publishKindOpen, setPublishKindOpen] = useState(false);
   const showUpdatePrompt =
     updateStatus.availableVersion != null &&
     (updateStatus.state === "available" ||
@@ -58,6 +62,14 @@ export function WorkspaceNavigation() {
   };
   return (
     <>
+      <PublishKindDialog
+        open={publishKindOpen}
+        onOpenChange={setPublishKindOpen}
+        onSelect={(kind) => {
+          openPublish(kind);
+          void run(reload);
+        }}
+      />
       <aside className="activity-rail" aria-label="快捷导航">
         <div className="flex flex-col gap-2">
           {nav.map((n) => {
@@ -197,14 +209,10 @@ export function WorkspaceNavigation() {
           <Button
             variant="ghost"
             className="justify-start px-2 font-normal"
-            onClick={() => {
-              setActiveBrowser(null);
-              setPage("compose");
-              void run(reload);
-            }}
+            onClick={() => setPublishKindOpen(true)}
           >
             <CodexComposeIcon className="size-4" />
-            新建内容
+            发布
           </Button>
         </SidebarHeader>
         <SidebarContent>

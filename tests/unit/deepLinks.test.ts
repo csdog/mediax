@@ -2,11 +2,13 @@ import { expect, it } from "vitest";
 import { findDeepLinkArg, parseDeepLink } from "../../src/main/desktop/deepLinks";
 
 it("parses mediax deep links into desktop commands", () => {
-  expect(parseDeepLink("mediax://compose")).toEqual({
+  expect(parseDeepLink("mediax://publish")).toEqual({
     action: "navigate",
-    page: "compose",
+    page: "publish",
     taskId: undefined,
   });
+  expect(parseDeepLink("mediax://compose")).toBeNull();
+  expect(parseDeepLink("mediax://video")).toBeNull();
   expect(parseDeepLink("mediax://accounts/")).toEqual({
     action: "navigate",
     page: "accounts",
@@ -38,6 +40,6 @@ it("parses mediax deep links into desktop commands", () => {
 });
 
 it("finds a deep link among process argv", () => {
-  expect(findDeepLinkArg(["/app", "mediax://video", "--flag"])).toBe("mediax://video");
+  expect(findDeepLinkArg(["/app", "mediax://publish", "--flag"])).toBe("mediax://publish");
   expect(findDeepLinkArg(["/app", "--flag"])).toBeUndefined();
 });

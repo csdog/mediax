@@ -1,4 +1,12 @@
-import { ipcMain, dialog, BrowserWindow, app, nativeImage, shell as electronShell } from "electron";
+import {
+  ipcMain,
+  dialog,
+  BrowserWindow,
+  app,
+  clipboard,
+  nativeImage,
+  shell as electronShell,
+} from "electron";
 import { log } from "./logging";
 import { readFile, stat } from "node:fs/promises";
 import { extname, basename, join } from "node:path";
@@ -15,6 +23,8 @@ import {
   type ContentKind,
   type ImageAsset,
   type TabPreviewOverlay,
+  type ToastOverlay,
+  type Target,
 } from "../shared/models";
 import { parseProfile, readProfile } from "../shared/profile";
 import {
@@ -34,8 +44,10 @@ import {
 } from "../shared/desktopBehavior";
 import { readAutoUpdateEnabled } from "../shared/autoUpdateSettings";
 import type { DesktopShell } from "./desktop/DesktopShell";
+import type { DownloadStore } from "./desktop/DownloadStore";
 import type { AppUpdater } from "./desktop/AppUpdater";
 import { TabPreviewWindow } from "./desktop/TabPreviewWindow";
+import { ToastOverlayWindow } from "./desktop/ToastOverlayWindow";
 import {
   buildDiagnosticReport,
   exportDiagnosticReport,
@@ -47,6 +59,8 @@ import {
 import { clearStorageCategory, collectStorageUsage } from "./desktop/storageUsage";
 import { isStorageCleanupId, storageCleanupActions } from "../shared/storageUsage";
 import { readThemePreference, saveThemePreference } from "./desktop/themePreference";
+import { systemSearchProvider, systemSearchUrl } from "./desktop/webSearch";
+import { resolveOmniboxUrl } from "../shared/omnibox";
 import { parseThemePreference } from "../shared/themePreference";
 import { getOpenAtLogin, setOpenAtLogin } from "./desktop/loginItem";
 
@@ -73,6 +87,7 @@ export function registerIpc(
   rendererReady: () => void,
   shell: DesktopShell,
   updater: AppUpdater,
+  downloads: DownloadStore,
 ) {
   const stopLogging = db.onTargetChange((target) => {
     const write = ["failed", "unknown", "awaiting_user"].includes(target.status)
@@ -87,6 +102,7 @@ export function registerIpc(
   app.once("will-quit", stopLogging);
   const images = new Map<string, ImageAsset>();
   const tabPreview = new TabPreviewWindow(window);
+  const toastOverlay = new ToastOverlayWindow(window);
   const publishing = new PublishService(db, accounts, join(app.getPath("userData"), "task-assets"));
   publishing.startScheduler();
   app.once("will-quit", () => publishing.stopScheduler());
@@ -122,24 +138,42 @@ export function registerIpc(
       !value ||
       !Array.isArray(value.tabs) ||
       value.tabs.length > 100 ||
-      !["accounts", "compose", "video", "history", "calendar", "analytics"].includes(value.page)
+      !["accounts", "publish", "compose", "video", "history", "calendar", "analytics"].includes(
+        value.page,
+      )
     )
       throw new Error("无效标签页状态");
     const accountIds = new Set(db.accounts().map((account) => account.id));
     const ids = new Set<string>();
-    const tabs = value.tabs.map((tab: { id: string; kind?: string }) => {
-      if (
-        !tab ||
-        typeof tab.id !== "string" ||
-        ids.has(tab.id) ||
-        (tab.kind === "new"
-          ? !/^new-[a-zA-Z0-9-]{1,80}$/.test(tab.id)
-          : tab.kind !== undefined || !accountIds.has(tab.id))
-      )
-        throw new Error("无效标签页");
-      ids.add(tab.id);
-      return tab.kind === "new" ? { id: tab.id, kind: "new" } : { id: tab.id };
-    });
+    const tabs = value.tabs.map(
+      (tab: { id: string; kind?: string; contentKind?: unknown; url?: unknown }) => {
+        if (!tab || typeof tab.id !== "string" || ids.has(tab.id)) throw new Error("无效标签页");
+        if (tab.kind === "new") {
+          if (!/^new-[a-zA-Z0-9-]{1,80}$/.test(tab.id)) throw new Error("无效标签页");
+          ids.add(tab.id);
+          return { id: tab.id, kind: "new" as const };
+        }
+        if (tab.kind === "compose") {
+          if (!/^compose-[a-zA-Z0-9-]{1,80}$/.test(tab.id) || !isContentKind(tab.contentKind))
+            throw new Error("无效标签页");
+          ids.add(tab.id);
+          return { id: tab.id, kind: "compose" as const, contentKind: tab.contentKind };
+        }
+        if (tab.kind === "web") {
+          if (
+            !/^web-[a-zA-Z0-9-]{1,80}$/.test(tab.id) ||
+            typeof tab.url !== "string" ||
+            !/^https?:\/\//i.test(tab.url.trim())
+          )
+            throw new Error("无效标签页");
+          ids.add(tab.id);
+          return { id: tab.id, kind: "web" as const, url: tab.url.trim() };
+        }
+        if (tab.kind !== undefined || !accountIds.has(tab.id)) throw new Error("无效标签页");
+        ids.add(tab.id);
+        return { id: tab.id };
+      },
+    );
     if (value.activeId !== null && !ids.has(value.activeId)) throw new Error("无效活动标签页");
     db.setSetting("workspaceSession", { tabs, activeId: value.activeId, page: value.page });
   });
@@ -273,7 +307,38 @@ export function registerIpc(
     return accounts.add(text(name), platform);
   });
   on("previewAccountBrowser", (id) => accounts.preview(text(id)));
-  on("openAccount", (id) => accounts.open(text(id)));
+  on("openAccount", (id, url) =>
+    accounts.open(text(id), typeof url === "string" && url.trim() ? url.trim() : undefined),
+  );
+  on("openWebBrowser", (id, url) => accounts.openWeb(text(id), text(url)));
+  on("resolveOmniboxUrl", (input) => resolveOmniboxUrl(text(input), systemSearchUrl));
+  on("webSearchProvider", () => systemSearchProvider());
+  on("browserNavigation", (id) => accounts.browserNavigation(text(id)));
+  on("navigateBrowser", (id, url) => accounts.navigateBrowser(text(id), text(url)));
+  on("goBackBrowser", (id) => accounts.goBackBrowser(text(id)));
+  on("goForwardBrowser", (id) => accounts.goForwardBrowser(text(id)));
+  on("reloadBrowser", (id) => accounts.reloadBrowser(text(id)));
+  on("browserZoom", (id) => accounts.browserZoom(text(id)));
+  on("setBrowserZoom", (id, factor) => {
+    if (typeof factor !== "number" || !Number.isFinite(factor)) throw new Error("无效缩放");
+    return accounts.setBrowserZoom(text(id), factor);
+  });
+  on("printBrowser", (id) => accounts.printBrowser(text(id)));
+  on("findInBrowser", (id, query, options) =>
+    accounts.findInBrowser(
+      text(id),
+      text(query),
+      options && typeof options === "object"
+        ? {
+            forward: (options as { forward?: boolean }).forward,
+            findNext: (options as { findNext?: boolean }).findNext,
+          }
+        : undefined,
+    ),
+  );
+  on("stopFindInBrowser", (id) => accounts.stopFindInBrowser(text(id)));
+  on("screenshotBrowser", (id) => accounts.screenshotBrowser(text(id)));
+  on("clearBrowserData", (id) => accounts.clearBrowserData(text(id)));
   on("layoutAccountBrowser", (id, bounds) => {
     if (id === null) return accounts.layout(null);
     if (
@@ -295,6 +360,10 @@ export function registerIpc(
   on("closeAccountBrowser", (id) => accounts.close(text(id)));
   on("showTabPreview", (value) => tabPreview.show(previewOverlay(value)));
   on("hideTabPreview", () => tabPreview.hide());
+  on("showToastOverlay", (value) =>
+    toastOverlay.show(toastOverlayPayload(value, window.getContentSize()[0])),
+  );
+  on("hideToastOverlay", () => toastOverlay.hide());
   on("refreshAccount", (id) => accounts.refresh(text(id)));
   on("deleteAccount", (id) => accounts.remove(text(id)));
   on("importMarkdown", async () => {
@@ -325,6 +394,33 @@ export function registerIpc(
     if (!Array.isArray(paths) || !paths.every((path) => typeof path === "string"))
       throw new Error("无效文件路径");
     return mediaImportHost().import(paths, kind, images);
+  });
+  on("openDownloadsFolder", async () => {
+    const result = await electronShell.openPath(app.getPath("downloads"));
+    if (result) throw new Error(result);
+  });
+  on("downloads", () => downloads.list());
+  on("removeDownload", (id) => downloads.remove(text(id)));
+  on("revealDownload", (id) => {
+    const item = downloads.get(text(id));
+    if (!item) throw new Error("下载项不存在");
+    if (!downloads.canReveal(item.id)) throw new Error("文件尚不可用");
+    electronShell.showItemInFolder(item.path);
+  });
+  on("copyDownloadUrl", (id) => {
+    const item = downloads.get(text(id));
+    if (!item?.url) throw new Error("下载地址不可用");
+    clipboard.writeText(item.url);
+  });
+  on("copyDownloadPath", (id) => {
+    const item = downloads.get(text(id));
+    if (!item?.path) throw new Error("下载路径不可用");
+    clipboard.writeText(item.path);
+  });
+  on("openExternalUrl", async (value) => {
+    const url = text(value).trim();
+    if (!/^https?:\/\//i.test(url)) throw new Error("无效网址");
+    await electronShell.openExternal(url);
   });
   on("revealInFolder", (path) => {
     electronShell.showItemInFolder(text(path));
@@ -403,6 +499,45 @@ export function registerIpc(
       when,
     );
   });
+  on("publishBatches", (kind, paths, batches, scheduledAt) => {
+    if (!isContentKind(kind)) throw new Error("无效内容类型");
+    if (!Array.isArray(paths) || !paths.every((path) => typeof path === "string"))
+      throw new Error("请重新选择发布图片");
+    for (const path of paths) {
+      if (images.has(path)) continue;
+      if (!isImage(path) && !isVideo(path) && !isAudio(path)) throw new Error("请重新选择发布素材");
+      images.set(path, { path, name: basename(path), preview: "" });
+    }
+    if (!Array.isArray(batches) || !batches.length) throw new Error("无效发布批次");
+    const resolved = batches.map((batch) => {
+      if (!batch || typeof batch !== "object") throw new Error("无效发布批次");
+      const body = text((batch as { body?: unknown }).body);
+      const titleValue = (batch as { title?: unknown }).title;
+      const title = typeof titleValue === "string" ? titleValue : null;
+      const targets = (batch as { targets?: unknown }).targets;
+      if (
+        !Array.isArray(targets) ||
+        !targets.every(
+          (t) =>
+            t &&
+            typeof t.accountId === "string" &&
+            typeof t.identityId === "string" &&
+            ["profile", "page"].includes(t.kind),
+        )
+      )
+        throw new Error("无效发布目标");
+      return { title, body, targets: targets as Target[] };
+    });
+    const when =
+      scheduledAt === undefined || scheduledAt === null
+        ? null
+        : typeof scheduledAt === "string"
+          ? scheduledAt
+          : (() => {
+              throw new Error("无效定时时间");
+            })();
+    return publishing.publishBatches(kind, paths, resolved, when);
+  });
   on("calendar", (range) => {
     if (!range || typeof range !== "object") throw new Error("无效日历范围");
     const from = text((range as { from?: unknown }).from);
@@ -419,10 +554,20 @@ export function registerIpc(
   on("rescheduleTask", (taskId, scheduledAt) =>
     publishing.rescheduleTask(text(taskId), text(scheduledAt)),
   );
-  on("analyticsSummary", (days) =>
-    db.analyticsSummary(typeof days === "number" && Number.isFinite(days) ? days : 30),
-  );
+  on("analyticsSummary", (query) => {
+    if (typeof query === "number" && Number.isFinite(query)) return db.analyticsSummary(query);
+    if (query && typeof query === "object") {
+      const raw = query as { days?: unknown; from?: unknown; to?: unknown };
+      return db.analyticsSummary({
+        days: typeof raw.days === "number" && Number.isFinite(raw.days) ? raw.days : undefined,
+        from: typeof raw.from === "string" ? raw.from : undefined,
+        to: typeof raw.to === "string" ? raw.to : undefined,
+      });
+    }
+    return db.analyticsSummary(30);
+  });
   on("retry", (id) => publishing.retry(text(id)));
+  on("republish", (id) => publishing.republish(text(id)));
   on("resume", (id) => publishing.resume(text(id)));
   on("openPost", async (value) => {
     const url = postUrl(text(value));
@@ -432,6 +577,45 @@ export function registerIpc(
   on("verifyTarget", (id, url) =>
     publishing.verify(text(id), url === undefined ? undefined : text(url)),
   );
+}
+
+function toastOverlayPayload(value: unknown, windowWidth: number): ToastOverlay {
+  if (!value || typeof value !== "object") throw new Error("无效通知叠层");
+  const overlay = value as Record<string, unknown>;
+  const number = (item: unknown, name: string) => {
+    if (typeof item !== "number" || !Number.isFinite(item)) throw new Error(`无效通知${name}`);
+    return item;
+  };
+  const width = number(overlay.width, "宽度");
+  const height = number(overlay.height, "高度");
+  if (width < 1 || height < 1 || width > windowWidth || height > 800)
+    throw new Error("无效通知尺寸");
+  const items = Array.isArray(overlay.toasts) ? overlay.toasts : [];
+  return {
+    x: number(overlay.x, "位置"),
+    y: number(overlay.y, "位置"),
+    width,
+    height,
+    theme: overlay.theme === "dark" ? "dark" : "light",
+    toasts: items.slice(0, 3).map((item) => {
+      if (!item || typeof item !== "object") throw new Error("无效通知条目");
+      const toast = item as Record<string, unknown>;
+      const title = typeof toast.title === "string" ? toast.title.slice(0, 200) : "";
+      if (!title) throw new Error("无效通知文案");
+      return {
+        icon:
+          typeof toast.icon === "string" &&
+          toast.icon.startsWith("data:image/svg+xml,") &&
+          toast.icon.length <= 16_000
+            ? toast.icon
+            : undefined,
+        type: typeof toast.type === "string" ? toast.type.slice(0, 32) : "default",
+        title,
+        description:
+          typeof toast.description === "string" ? toast.description.slice(0, 200) : undefined,
+      };
+    }),
+  };
 }
 
 function previewOverlay(value: unknown): TabPreviewOverlay {

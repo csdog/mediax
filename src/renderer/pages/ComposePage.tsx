@@ -1,31 +1,46 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { cn } from "cn";
+import { toast } from "sonner";
 import {
-  Monitor,
   X,
   ImagePlus,
   FileText,
   Save,
   Send,
   Plus,
-  RefreshCw,
   FolderOpen,
   CalendarClock,
+  Layers,
+  RotateCcw,
+  Users,
 } from "lucide-react";
 import { applyLocalFiles, pathsFromDataTransfer } from "@/lib/importLocalFiles";
+import { publishKindMeta } from "@/lib/publishKindMeta";
 import { DateTimePicker } from "@/components/DateTimePicker";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Field, FieldLabel, FieldTitle } from "@/components/ui/field";
-import { isAudio, isVideo, supportedKinds } from "../../shared/content";
-import type { AccountInfo, ContentKind, PlatformId, Target } from "../../shared/models";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { isAudio, isImage, isVideo, supportedKinds } from "../../shared/content";
+import type { AccountInfo, ContentKind, ImageAsset, PlatformId, Target } from "../../shared/models";
 import { platformInfo } from "../../shared/platforms";
-import { platformIcons } from "@/assets/platformIcons";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  groupPublishBatches,
+  platformHasCustomContent,
+  type PlatformContent,
+} from "../../shared/publishBatches";
+import { AccountIdentity, PlatformGlyph } from "@/components/AccountIdentity";
 import {
   Dialog,
   DialogContent,
@@ -39,19 +54,19 @@ import { useWorkspace } from "@/app/WorkspaceContext";
 import { useDesktopBehavior } from "@/hooks/useDesktopBehavior";
 import { resolveTimeZone } from "../../shared/timezones";
 
+type SettingsScope = "batch" | PlatformId;
+
 export function ComposePage() {
   const {
     body,
     setBody,
     contentKind,
-    setContentKind,
     title,
     setTitle,
     images,
     setImages,
     busy,
     run,
-    setNotice,
     accounts,
     selectedTargets,
     setSelectedTargets,
@@ -60,10 +75,12 @@ export function ComposePage() {
     setPublishDialogOpen,
     setFocusedTask,
     reload,
-    page,
     setPage,
     silentPublish,
     setActiveBrowser,
+    activeBrowser,
+    isComposeTab,
+    closeBrowserTab,
     composeScheduleAt,
     clearComposeSchedule,
   } = useWorkspace();
@@ -78,6 +95,10 @@ export function ComposePage() {
   const [publishMode, setPublishMode] = useState<"now" | "schedule">("now");
   const [scheduleAt, setScheduleAt] = useState(() => hoursFromNow(1));
   const [scheduleFromCalendar, setScheduleFromCalendar] = useState(false);
+  const [settingsScope, setSettingsScope] = useState<SettingsScope>("batch");
+  const [platformContent, setPlatformContent] = useState<
+    Partial<Record<PlatformId, PlatformContent>>
+  >({});
   const clearComposeScheduleRef = useRef(clearComposeSchedule);
   clearComposeScheduleRef.current = clearComposeSchedule;
 
@@ -95,15 +116,92 @@ export function ComposePage() {
       const result = await applyLocalFiles(paths, contentKind, images);
       if (result.markdown != null) setBody(result.markdown);
       setImages(result.images);
-      setNotice(result.notice);
+      if (result.notice) toast(result.notice);
     });
   };
   const paths = images.map((image) => image.path);
-  const ready = canPublish(contentKind, title, body, paths);
+  const selectedPlatforms = useMemo(() => {
+    const ids: PlatformId[] = [];
+    for (const target of selectedTargets) {
+      const account = accounts.find((item) => item.id === target.accountId);
+      if (account && !ids.includes(account.platform)) ids.push(account.platform);
+    }
+    return ids;
+  }, [accounts, selectedTargets]);
+  useEffect(() => {
+    if (settingsScope !== "batch" && !selectedPlatforms.includes(settingsScope))
+      setSettingsScope("batch");
+  }, [selectedPlatforms, settingsScope]);
+  useEffect(() => {
+    setPlatformContent((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const platform of Object.keys(next) as PlatformId[]) {
+        if (!selectedPlatforms.includes(platform)) {
+          delete next[platform];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [selectedPlatforms]);
+  const editingTitle =
+    settingsScope === "batch" ? title : (platformContent[settingsScope]?.title ?? title);
+  const editingBody =
+    settingsScope === "batch" ? body : (platformContent[settingsScope]?.body ?? body);
+  const scopeCustomized =
+    settingsScope !== "batch" &&
+    platformHasCustomContent(settingsScope, { title, body }, platformContent);
+  const setEditingTitle = (value: string) => {
+    if (settingsScope === "batch") {
+      setTitle(value);
+      return;
+    }
+    const platform = settingsScope;
+    setPlatformContent((prev) => ({
+      ...prev,
+      [platform]: { title: value, body: prev[platform]?.body ?? body },
+    }));
+  };
+  const setEditingBody = (value: string) => {
+    if (settingsScope === "batch") {
+      setBody(value);
+      return;
+    }
+    const platform = settingsScope;
+    setPlatformContent((prev) => ({
+      ...prev,
+      [platform]: { title: prev[platform]?.title ?? title, body: value },
+    }));
+  };
+  const publishBatches = useMemo(
+    () =>
+      selectedTargets.length
+        ? groupPublishBatches({
+            kind: contentKind,
+            title,
+            body,
+            targets: selectedTargets,
+            accounts,
+            platformContent,
+          })
+        : [],
+    [accounts, body, contentKind, platformContent, selectedTargets, title],
+  );
+  const ready =
+    selectedTargets.length > 0
+      ? publishBatches.every((batch) =>
+          canPublish(contentKind, batch.title ?? "", batch.body, paths),
+        )
+      : canPublish(contentKind, title, body, paths);
+  const customizedCount = selectedPlatforms.filter((platform) =>
+    platformHasCustomContent(platform, { title, body }, platformContent),
+  ).length;
   const signature = [
     contentKind,
     title,
     body,
+    JSON.stringify(platformContent),
     paths.join("\n"),
     selectedTargets
       .map((target) => `${target.accountId}:${target.identityId}`)
@@ -117,16 +215,57 @@ export function ComposePage() {
   const eligible = accounts.filter(
     (account) => supportedKinds(account.platform).includes(contentKind) && account.targets.length,
   );
-  const switchKind = (kind: ContentKind) => {
-    if (kind === contentKind) return;
-    setContentKind(kind);
-    setImages([]);
-    setSelectedTargets((current) =>
-      current.filter((target) => {
-        const account = accounts.find((item) => item.id === target.accountId);
-        return account ? supportedKinds(account.platform).includes(kind) : false;
-      }),
-    );
+  const kindMeta = publishKindMeta[contentKind];
+  const KindIcon = kindMeta.icon;
+  const needsMediaDrop =
+    (contentKind === "video" || contentKind === "audio") &&
+    !paths.some((path) => (contentKind === "video" ? isVideo(path) : isAudio(path)));
+  const chooseMedia = () =>
+    void run(async () => {
+      const added = await window.desktop.chooseImages(contentKind);
+      setImages((old) => [
+        ...old,
+        ...added.filter((item) => !old.some((image) => image.path === item.path)),
+      ]);
+    });
+  const coverImage = images.find((item) => isImage(item.path)) ?? null;
+  const setCoverPath = (path: string) => {
+    setImages((old) => {
+      const index = old.findIndex((item) => item.path === path);
+      if (index < 0) return old;
+      const next = [...old];
+      const [item] = next.splice(index, 1);
+      if (contentKind === "video" || contentKind === "audio") {
+        const mediaIndex = next.findIndex((entry) => isVideo(entry.path) || isAudio(entry.path));
+        next.splice(mediaIndex + 1, 0, item);
+        return next.filter((entry, i, list) => list.findIndex((x) => x.path === entry.path) === i);
+      }
+      next.unshift(item);
+      return next;
+    });
+  };
+  const chooseCover = () =>
+    void run(async () => {
+      const added = await window.desktop.chooseImages(
+        contentKind === "article" ? "article" : contentKind === "video" ? "video" : "moment",
+      );
+      const cover = added.find((item) => isImage(item.path));
+      if (!cover) return;
+      setImages((old) => {
+        if (contentKind === "article") return [cover];
+        const withoutCover = old.filter((item) => item.path !== cover.path);
+        if (contentKind === "video" || contentKind === "audio") {
+          const media = withoutCover.filter((item) => isVideo(item.path) || isAudio(item.path));
+          const others = withoutCover.filter((item) => !isVideo(item.path) && !isAudio(item.path));
+          return [...media, cover, ...others];
+        }
+        return [cover, ...withoutCover];
+      });
+    });
+  const openPublishConfirm = () => {
+    if (!ready || !selectedTargets.length) return;
+    setSyncedSignature(signature);
+    setPublishDialogOpen(true);
   };
   const toggleTarget = (target: Target, value: boolean) => {
     setSelectedTargets((old) =>
@@ -149,71 +288,165 @@ export function ComposePage() {
         <aside className="publish-accounts" aria-label="发布账号">
           <div className="flex items-center justify-between gap-2">
             <h2>发布账号</h2>
-            <span className="text-xs text-muted-foreground">共 {selectedTargets.length} 个</span>
+            <span className="text-sm text-muted-foreground">共 {selectedTargets.length} 个</span>
           </div>
-          <Button variant="outline" size="sm" className="mt-3 w-full" onClick={openPicker}>
+          <Button variant="outline" className="mt-5 w-full" onClick={openPicker}>
             <Plus />
             新增账号
           </Button>
-          <p className="mt-3 text-xs text-muted-foreground">快速填写后，同步到勾选的账号。</p>
-          <div className="publish-account-list mt-3 space-y-3">
-            {pickerOpen ? (
-              <p className="text-xs text-muted-foreground">在弹窗里勾选账号，确认添加。</p>
-            ) : (
-              eligible.flatMap((account) =>
-                account.targets.map((target) => (
-                  <TargetChoice
-                    key={`${account.id}:${target.identityId}`}
-                    account={account}
-                    target={target}
-                    checked={selectedTargets.some((item) => sameTarget(item, target))}
-                    pending={synced && selectedTargets.some((item) => sameTarget(item, target))}
+          <nav
+            className="mt-4 flex min-h-0 flex-1 flex-col gap-1.5 overflow-auto"
+            aria-label="内容设置范围"
+          >
+            <button
+              type="button"
+              className={cn(
+                "flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border-0 bg-transparent px-3.5 py-3 text-left text-foreground hover:bg-[color-mix(in_oklab,var(--muted)_55%,transparent)]",
+                settingsScope === "batch" &&
+                  "bg-[color-mix(in_oklab,var(--muted)_70%,transparent)]",
+              )}
+              onClick={() => setSettingsScope("batch")}
+            >
+              <span
+                className="mt-0 grid size-8 shrink-0 place-items-center rounded-[10px] bg-[color-mix(in_oklab,var(--muted)_80%,transparent)] text-muted-foreground"
+                aria-hidden
+              >
+                <Layers className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1 text-left">
+                <span className="block text-[15px] font-medium">快速填写</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  同步到未单独设置的平台
+                </span>
+              </span>
+            </button>
+            {selectedTargets.map((target) => {
+              const account = accounts.find((item) => item.id === target.accountId);
+              if (!account) return null;
+              const active = settingsScope === account.platform;
+              const customized = platformHasCustomContent(
+                account.platform,
+                { title, body },
+                platformContent,
+              );
+              const pending = synced && selectedTargets.some((item) => sameTarget(item, target));
+              const identityDetail = [
+                target.name,
+                target.kind === "profile" ? "个人主页" : "公共主页",
+                pending ? "待发布" : null,
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              return (
+                <div
+                  key={targetKey(target)}
+                  className={cn(
+                    "group relative flex items-stretch gap-0.5 rounded-xl",
+                    active && "bg-[color-mix(in_oklab,var(--muted)_70%,transparent)]",
+                  )}
+                >
+                  <button
+                    type="button"
+                    className="flex w-full min-w-0 cursor-pointer items-center rounded-xl border-0 bg-transparent py-3 pr-8 pl-3.5 text-left text-foreground hover:bg-[color-mix(in_oklab,var(--muted)_55%,transparent)]"
+                    onClick={() => setSettingsScope(account.platform)}
+                  >
+                    <AccountIdentity
+                      name={account.name}
+                      platform={account.platform}
+                      avatar={account.avatar}
+                      detail={identityDetail}
+                      titleAdornment={
+                        customized ? (
+                          <span
+                            className="publish-settings-dot shrink-0"
+                            title="已单独设置"
+                            aria-label="已单独设置"
+                          />
+                        ) : null
+                      }
+                    />
+                  </button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="absolute top-1.5 right-1 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                    aria-label={`移除 ${target.name}`}
                     disabled={busy}
-                    onCheckedChange={(value) => toggleTarget(target, value)}
-                  />
-                )),
-              )
+                    onClick={() => toggleTarget(target, false)}
+                  >
+                    <X />
+                  </Button>
+                </div>
+              );
+            })}
+            {!selectedTargets.length && (
+              <Empty className="border-0 py-8">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Users />
+                  </EmptyMedia>
+                  <EmptyTitle>{eligible.length ? "尚未选择发布身份" : "暂无可发布身份"}</EmptyTitle>
+                  <EmptyDescription>
+                    {eligible.length
+                      ? "点击上方「新增账号」勾选本次要发布的身份。"
+                      : "在账号管理中检查登录状态，识别可发布身份。"}
+                  </EmptyDescription>
+                </EmptyHeader>
+                {!eligible.length ? (
+                  <EmptyContent>
+                    <Button
+                      onClick={() => {
+                        setActiveBrowser(null);
+                        setPage("accounts");
+                      }}
+                    >
+                      <Users />
+                      账号管理
+                    </Button>
+                  </EmptyContent>
+                ) : null}
+              </Empty>
             )}
-            {!eligible.length && (
-              <p className="text-xs text-muted-foreground">
-                在账号管理中检查登录状态，识别可发布身份。
-              </p>
-            )}
-          </div>
+          </nav>
         </aside>
         <section className="draft-pane" aria-label="内容编辑">
           <div className="publish-toolbar">
-            <div>
-              <p className="text-xs text-muted-foreground">快速填写</p>
-              <h2>发布{kindCaption(contentKind)}</h2>
+            <div className="flex min-w-0 items-center gap-4">
+              <span
+                className="flex size-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm"
+                style={{ background: kindMeta.gradient }}
+                aria-hidden
+              >
+                <KindIcon className="size-7" strokeWidth={1.75} />
+              </span>
+              <div className="min-w-0">
+                <h2>{kindMeta.title}</h2>
+                <p className="publish-toolbar-hint">{kindMeta.hint}</p>
+              </div>
             </div>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-3">
               <Button
                 variant="outline"
-                size="sm"
-                disabled={busy || !ready || !selectedTargets.length}
-                onClick={() => {
-                  if (!ready || !selectedTargets.length) return;
-                  setSyncedSignature(signature);
-                  setNotice(`已同步到 ${selectedTargets.length} 个账号`);
-                }}
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    await window.desktop.saveDraft(body, images, contentKind, title);
+                    toast.success("草稿已保存到本机");
+                  })
+                }
               >
-                <RefreshCw />
-                同步到账号
+                <Save />
+                保存草稿
               </Button>
               <Button
-                size="sm"
-                disabled={busy || !synced || publishing}
-                onClick={() => setPublishDialogOpen(true)}
+                disabled={busy || !ready || !selectedTargets.length || publishing}
+                onClick={openPublishConfirm}
               >
                 <Send />
                 一键发布
               </Button>
             </div>
-          </div>
-          <div className="draft-note">
-            <Monitor />
-            先勾选账号，填写内容，同步到账号，再一键发布
           </div>
           {scheduleFromCalendar && publishMode === "schedule" ? (
             <div className="draft-note mediax-compose-schedule-banner">
@@ -243,192 +476,310 @@ export function ComposePage() {
               </button>
             </div>
           ) : null}
-          <div className="composer-dock">
-            <Card
-              className={`composer ${dragging ? "composer-drop-active" : ""}`}
-              onDragEnter={(event) => {
-                if (![...event.dataTransfer.types].includes("Files")) return;
-                event.preventDefault();
-                setDragging(true);
-              }}
-              onDragOver={(event) => {
-                if (![...event.dataTransfer.types].includes("Files")) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "copy";
-                setDragging(true);
-              }}
-              onDragLeave={(event) => {
-                if (event.currentTarget.contains(event.relatedTarget as Node)) return;
-                setDragging(false);
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                setDragging(false);
-                importPaths(pathsFromDataTransfer(event.dataTransfer));
-              }}
-            >
-              {dragging ? (
-                <div className="composer-drop-hint" aria-live="polite">
-                  松开以导入 Markdown 或素材
-                </div>
-              ) : null}
-              {page === "video" ? null : (
-                <div
-                  className="flex flex-wrap gap-2 px-3 pt-3"
-                  role="radiogroup"
-                  aria-label="内容类型"
-                >
-                  {(
-                    [
-                      ["moment", "图文"],
-                      ["article", "文章"],
-                      ["audio", "音频"],
-                    ] as const
-                  ).map(([kind, label]) => (
-                    <Button
-                      key={kind}
-                      type="button"
-                      role="radio"
-                      aria-checked={contentKind === kind}
-                      variant={contentKind === kind ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => switchKind(kind)}
-                    >
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-              )}
-              {contentKind === "article" && (
-                <div className="px-3 pt-3">
-                  <Label htmlFor="post-title">文章标题</Label>
-                  <Input
-                    id="post-title"
-                    value={title}
-                    maxLength={80}
-                    placeholder="填写文章标题"
-                    onChange={(event) => setTitle(event.target.value)}
-                  />
-                </div>
-              )}
-              <Label htmlFor="post-body" className="sr-only">
-                发布正文
-              </Label>
-              <Textarea
-                id="post-body"
-                placeholder="写下要分享的内容…"
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-              />
-              <p className={`preview-body px-3 ${body ? "" : "preview-placeholder"}`}>
-                {body || "正文将在这里显示"}
-              </p>
-              {images.length > 0 && (
-                <div className="composer-images">
-                  {images.map((image) => (
-                    <div className="relative" key={image.path}>
-                      {image.preview ? (
-                        <img
-                          className="size-14 rounded-lg border object-cover"
-                          src={image.preview}
-                          alt={image.name}
-                        />
-                      ) : (
-                        <div
-                          className="flex size-14 items-center justify-center rounded-lg border text-[10px] text-muted-foreground"
-                          title={image.name}
-                        >
-                          媒体
-                        </div>
-                      )}
-                      <Button
-                        variant="secondary"
-                        size="icon-xs"
-                        aria-label={`移除 ${image.name}`}
-                        onClick={() => setImages(images.filter((item) => item.path !== image.path))}
-                        className="absolute -top-1 -right-1 rounded-full"
-                      >
-                        <X />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="icon-xs"
-                        aria-label={`在 Finder 中显示 ${image.name}`}
-                        onClick={() =>
-                          void run(async () => {
-                            await window.desktop.revealInFolder(image.path);
-                          })
+          <div
+            className={`composer-dock ${dragging ? "composer-drop-active" : ""}`}
+            onDragEnter={(event) => {
+              if (![...event.dataTransfer.types].includes("Files")) return;
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragOver={(event) => {
+              if (![...event.dataTransfer.types].includes("Files")) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+              setDragging(true);
+            }}
+            onDragLeave={(event) => {
+              if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+              setDragging(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(false);
+              importPaths(pathsFromDataTransfer(event.dataTransfer));
+            }}
+          >
+            {dragging ? (
+              <div className="composer-drop-hint" aria-live="polite">
+                松开以导入素材或 Markdown
+              </div>
+            ) : null}
+            {settingsScope !== "batch" ? (
+              <div className="mb-2.5 flex items-start gap-2">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  {selectedTargets.map((target) => {
+                    const account = accounts.find((item) => item.id === target.accountId);
+                    if (!account || account.platform !== settingsScope) return null;
+                    const pending =
+                      synced && selectedTargets.some((item) => sameTarget(item, target));
+                    const identityDetail = [
+                      target.name,
+                      target.kind === "profile" ? "个人主页" : "公共主页",
+                      pending ? "待发布" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+                    return (
+                      <AccountIdentity
+                        key={targetKey(target)}
+                        name={account.name}
+                        platform={account.platform}
+                        avatar={account.avatar}
+                        detail={identityDetail}
+                        titleAdornment={
+                          scopeCustomized ? (
+                            <span
+                              className="publish-settings-dot shrink-0"
+                              title="已单独设置"
+                              aria-label="已单独设置"
+                            />
+                          ) : null
                         }
-                        className="absolute -bottom-1 -left-1 rounded-full"
+                      />
+                    );
+                  })}
+                </div>
+                {scopeCustomized ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0 text-xs text-muted-foreground"
+                    disabled={busy}
+                    onClick={() => {
+                      const platform = settingsScope as PlatformId;
+                      setPlatformContent((prev) => {
+                        const next = { ...prev };
+                        delete next[platform];
+                        return next;
+                      });
+                    }}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    恢复快速填写
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="composer-form">
+              {contentKind === "video" || contentKind === "audio" ? (
+                <section className="composer-section">
+                  <div className="composer-section-head">
+                    <Label>{contentKind === "video" ? "视频" : "音频"}</Label>
+                  </div>
+                  {needsMediaDrop ? (
+                    <button
+                      type="button"
+                      className="mediax-media-drop"
+                      disabled={busy}
+                      onClick={chooseMedia}
+                      aria-label={kindMeta.mediaAction}
+                    >
+                      <span
+                        className="flex size-16 items-center justify-center rounded-2xl text-white"
+                        style={{ background: kindMeta.gradient }}
+                        aria-hidden
                       >
-                        <FolderOpen />
+                        <KindIcon className="size-8" />
+                      </span>
+                      <span className="mt-4 text-base font-medium">{kindMeta.mediaAction}</span>
+                      <span className="mt-1.5 text-sm text-muted-foreground">
+                        点击选择，或拖拽文件到此处
+                      </span>
+                    </button>
+                  ) : (
+                    images
+                      .filter((image) =>
+                        contentKind === "video" ? isVideo(image.path) : isAudio(image.path),
+                      )
+                      .map((media) => (
+                        <div className="composer-media-chip" key={media.path}>
+                          <span className="truncate text-sm">{media.name}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`移除 ${media.name}`}
+                            onClick={() =>
+                              setImages(images.filter((item) => item.path !== media.path))
+                            }
+                          >
+                            <X />
+                          </Button>
+                        </div>
+                      ))
+                  )}
+                </section>
+              ) : null}
+
+              {contentKind === "moment" ? (
+                <section className="composer-section">
+                  <div className="composer-section-head">
+                    <Label>图片</Label>
+                    <div className="flex items-center gap-2">
+                      {images.length ? (
+                        <span className="text-sm text-muted-foreground">
+                          已上传 {images.length} 张图片，将同步到所选账号
+                        </span>
+                      ) : null}
+                      <Button type="button" disabled={busy} onClick={chooseMedia}>
+                        <ImagePlus className="size-4" />
+                        添加图片
                       </Button>
                     </div>
-                  ))}
+                  </div>
+                  <div className="composer-images">
+                    {images.map((image) => {
+                      const isCover = coverImage?.path === image.path;
+                      return (
+                        <div className="composer-image-tile" key={image.path}>
+                          {image.preview ? (
+                            <img
+                              className="composer-thumb border object-cover"
+                              src={image.preview}
+                              alt={image.name}
+                            />
+                          ) : (
+                            <div
+                              className="composer-thumb flex items-center justify-center border text-xs text-muted-foreground"
+                              title={image.name}
+                            >
+                              媒体
+                            </div>
+                          )}
+                          {isCover ? (
+                            <span className="composer-cover-badge">封面</span>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="composer-set-cover"
+                              disabled={busy}
+                              onClick={() => setCoverPath(image.path)}
+                            >
+                              设为封面
+                            </Button>
+                          )}
+                          <Button
+                            variant="secondary"
+                            size="icon-xs"
+                            aria-label={`移除 ${image.name}`}
+                            onClick={() =>
+                              setImages(images.filter((item) => item.path !== image.path))
+                            }
+                            className="absolute -top-1 -right-1 rounded-full"
+                          >
+                            <X />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon-xs"
+                            aria-label={`在 Finder 中显示 ${image.name}`}
+                            onClick={() =>
+                              void run(async () => {
+                                await window.desktop.revealInFolder(image.path);
+                              })
+                            }
+                            className="absolute -bottom-1 -left-1 rounded-full"
+                          >
+                            <FolderOpen />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      className="composer-image-add"
+                      disabled={busy}
+                      onClick={chooseMedia}
+                      aria-label="添加图片"
+                    >
+                      <Plus className="size-5" />
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+
+              {contentKind === "moment" || contentKind === "video" ? (
+                <CoverSection
+                  coverImage={coverImage}
+                  busy={busy}
+                  hint={
+                    contentKind === "moment"
+                      ? "如果不设置，平台通常默认使用第一张图片作为封面"
+                      : "不设置时，平台通常使用视频首帧作为封面"
+                  }
+                  onChoose={chooseCover}
+                />
+              ) : null}
+
+              <section className="composer-section">
+                <div className="composer-section-head">
+                  <Label htmlFor="post-title">标题</Label>
+                  <span className="text-sm text-muted-foreground">{editingTitle.length}/80</span>
                 </div>
-              )}
-              <div className="composer-tools">
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
+                <Input
+                  id="post-title"
+                  value={editingTitle}
+                  maxLength={80}
+                  placeholder="请输入标题..."
+                  onChange={(event) => setEditingTitle(event.target.value)}
+                />
+                {contentKind === "moment" ? (
+                  <p className="composer-section-hint">部分平台不支持标题，发布时会自动忽略</p>
+                ) : null}
+              </section>
+
+              <section className="composer-section">
+                <div className="composer-section-head">
+                  <Label htmlFor="post-body">{contentKind === "article" ? "正文" : "描述"}</Label>
+                  <div className="flex items-center gap-2">
+                    {contentKind === "article" || contentKind === "moment" ? (
                       <Button
                         variant="ghost"
-                        size="icon-sm"
-                        aria-label={mediaLabel(contentKind)}
                         disabled={busy}
                         onClick={() =>
                           void run(async () => {
-                            const added = await window.desktop.chooseImages(contentKind);
-                            setImages((old) => [
-                              ...old,
-                              ...added.filter(
-                                (item) => !old.some((image) => image.path === item.path),
-                              ),
-                            ]);
+                            const text = await window.desktop.importMarkdown();
+                            if (text !== null) {
+                              if (settingsScope === "batch") setBody(text);
+                              else setEditingBody(text);
+                            }
                           })
                         }
                       >
-                        <ImagePlus />
+                        <FileText className="size-4" />
+                        导入 Markdown
                       </Button>
-                    }
-                  />
-                  <TooltipContent>{mediaLabel(contentKind)}（也可拖入）</TooltipContent>
-                </Tooltip>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      const text = await window.desktop.importMarkdown();
-                      if (text !== null) setBody(text);
-                    })
+                    ) : null}
+                    <span className="text-sm text-muted-foreground">{editingBody.length} 字符</span>
+                  </div>
+                </div>
+                <Textarea
+                  id="post-body"
+                  className="composer-body-input"
+                  aria-label={contentKind === "article" ? "发布正文" : undefined}
+                  placeholder={
+                    contentKind === "video" || contentKind === "audio"
+                      ? "填写简介…"
+                      : contentKind === "moment"
+                        ? "请输入描述..."
+                        : "写下要分享的内容…"
                   }
-                >
-                  <FileText />
-                  导入 Markdown
-                </Button>
-                <span className="composer-count">{body.length} 字符</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      await window.desktop.saveDraft(body, images, contentKind, title);
-                      setNotice("草稿已保存到本机");
-                    })
-                  }
-                >
-                  <Save />
-                  保存草稿
-                </Button>
-              </div>
-            </Card>
-            <p className="composer-caption">
-              {images.length ? `${images.length} 个素材 · ` : ""}
-              {synced ? `已同步 ${selectedTargets.length} 个账号` : "填写后同步到账号，再一键发布"}
-            </p>
+                  value={editingBody}
+                  onChange={(event) => setEditingBody(event.target.value)}
+                />
+              </section>
+
+              {contentKind === "article" ? (
+                <CoverSection
+                  coverImage={coverImage}
+                  busy={busy}
+                  hint="上传一张封面图；不设置也可发布"
+                  onChoose={chooseCover}
+                />
+              ) : null}
+            </div>
           </div>
         </section>
         <AccountPicker
@@ -452,7 +803,10 @@ export function ComposePage() {
             <DialogHeader>
               <DialogTitle>确认发布</DialogTitle>
               <DialogDescription>
-                同一份内容会发到所选账号。定时发布需保持 MediaX 在运行，到点后自动入队。
+                {customizedCount
+                  ? `已有 ${customizedCount} 个平台单独设置，将按内容分组创建 ${publishBatches.length} 个任务。`
+                  : "同一份内容会发到所选账号。"}
+                定时发布需保持 MediaX 在运行，到点后自动入队。
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
@@ -491,23 +845,47 @@ export function ComposePage() {
                 </div>
               ) : null}
             </div>
-            <div className="space-y-2">
+            <ul className="flex flex-col gap-3">
               {selectedTargets.map((target) => {
                 const account = accounts.find((item) => item.id === target.accountId);
+                if (!account) {
+                  return (
+                    <li key={`${target.accountId}:${target.identityId}`} className="text-sm">
+                      {target.name}
+                    </li>
+                  );
+                }
                 return (
-                  <p key={`${target.accountId}:${target.identityId}`} className="text-sm">
-                    {account ? platformInfo[account.platform].label : "账号"} · {target.name} ·{" "}
-                    {account?.name} · {target.kind === "profile" ? "个人主页" : "公共主页"}
-                  </p>
+                  <li key={`${target.accountId}:${target.identityId}`}>
+                    <AccountIdentity
+                      name={account.name}
+                      platform={account.platform}
+                      avatar={account.avatar}
+                      detail={`${target.name} · ${target.kind === "profile" ? "个人主页" : "公共主页"}`}
+                    />
+                  </li>
                 );
               })}
-            </div>
-            {contentKind === "article" && <p className="text-sm font-medium">{title}</p>}
-            <div className="max-h-60 overflow-auto rounded-lg border p-3 text-sm whitespace-pre-wrap">
-              {body || "无正文"}
+            </ul>
+            <div className="max-h-60 space-y-3 overflow-auto">
+              {publishBatches.map((batch, index) => (
+                <div key={index} className="rounded-lg border p-3 text-sm">
+                  {batch.title ? <p className="mb-1 font-medium">{batch.title}</p> : null}
+                  <p className="whitespace-pre-wrap text-muted-foreground">
+                    {batch.body || "无正文"}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {batch.targets.length} 个账号
+                    {publishBatches.length > 1
+                      ? ` · 第 ${index + 1}/${publishBatches.length} 组`
+                      : ""}
+                  </p>
+                </div>
+              ))}
             </div>
             <p className="text-xs text-muted-foreground">
               {images.length} 个素材 · {kindCaption(contentKind)}
+              {publishBatches.length > 1 ? ` · ${publishBatches.length} 组内容` : ""}
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setPublishDialogOpen(false)}>
@@ -519,23 +897,25 @@ export function ComposePage() {
                   void run(async () => {
                     const scheduledAt =
                       publishMode === "schedule" ? scheduleAt.toISOString() : null;
-                    const taskId = await window.desktop.publish(
+                    const taskId = await window.desktop.publishBatches(
                       contentKind,
-                      contentKind === "article" ? title : null,
-                      body,
                       paths,
-                      selectedTargets,
+                      publishBatches,
                       scheduledAt,
                     );
                     setPublishDialogOpen(false);
                     setFocusedTask(taskId);
+                    if (isComposeTab && activeBrowser) await closeBrowserTab(activeBrowser);
+                    else setActiveBrowser(null);
                     if (silentPublish) setActiveBrowser(null);
                     await reload();
                     setPage(publishMode === "schedule" ? "calendar" : "history");
-                    setNotice(
+                    toast.success(
                       publishMode === "schedule"
                         ? "已加入排期；保持应用运行，到点后将自动发布。"
-                        : "任务已创建，将按并行设置发布。需要人工处理时请打开对应账号标签页。",
+                        : publishBatches.length > 1
+                          ? `已创建 ${publishBatches.length} 组任务，将按并行设置发布。`
+                          : "任务已创建，将按并行设置发布。需要人工处理时请打开对应账号标签页。",
                     );
                   })
                 }
@@ -606,7 +986,7 @@ function AccountPicker({
       <DialogContent className="sm:max-w-[760px]">
         <DialogHeader>
           <DialogTitle>选择账号</DialogTitle>
-          <DialogDescription>勾选本次要发布的账号，确认后再同步内容。</DialogDescription>
+          <DialogDescription>勾选本次要发布的账号（仅显示支持当前类型的平台）。</DialogDescription>
         </DialogHeader>
         <div className="grid min-h-80 grid-cols-[200px_minmax(0,1fr)] gap-3">
           <div className="space-y-2">
@@ -633,7 +1013,7 @@ function AccountPicker({
                   className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${platformFilter === id ? "bg-muted" : ""}`}
                   onClick={() => onPlatformFilter(id)}
                 >
-                  <PlatformMark id={id} />
+                  <PlatformGlyph id={id} />
                   {platformInfo[id].label}
                 </button>
               ))}
@@ -641,7 +1021,7 @@ function AccountPicker({
           </div>
           <div className="min-w-0">
             <div className="mb-3 flex items-center gap-3">
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-sm whitespace-nowrap ">
                 <Checkbox
                   checked={allChecked}
                   disabled={busy || !visibleTargets.length}
@@ -712,34 +1092,28 @@ function TargetChoice({
   disabled: boolean;
   onCheckedChange: (value: boolean) => void;
 }) {
-  const info = platformInfo[account.platform];
+  const identityDetail = [
+    target.name,
+    target.kind === "profile" ? "个人主页" : "公共主页",
+    pending ? "待发布" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <label className="flex items-start gap-2 text-sm">
-      <Checkbox checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
-      <PlatformMark id={account.platform} />
-      <span>
-        {target.name}
-        <span className="block text-xs text-muted-foreground">
-          {info.label} · {account.name} · {target.kind === "profile" ? "个人主页" : "公共主页"}
-          {pending ? " · 待发布" : ""}
-        </span>
-      </span>
+      <Checkbox
+        className="mt-3"
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange}
+      />
+      <AccountIdentity
+        name={account.name}
+        platform={account.platform}
+        avatar={account.avatar}
+        detail={identityDetail}
+      />
     </label>
-  );
-}
-
-function PlatformMark({ id }: { id: PlatformId }) {
-  const icon = platformIcons[id];
-  const info = platformInfo[id];
-  if (icon) return <img src={icon} alt="" className="mt-0.5 size-4 rounded object-cover" />;
-  return (
-    <span
-      className="platform-mark mt-0.5 text-[10px]"
-      style={{ background: info.color, width: 16, height: 16 }}
-      aria-hidden="true"
-    >
-      {info.mark}
-    </span>
   );
 }
 
@@ -754,11 +1128,43 @@ function targetKey(target: Target) {
 const kindCaption = (kind: ContentKind) =>
   kind === "article" ? "文章" : kind === "moment" ? "图文" : kind === "video" ? "视频" : "音频";
 
-function mediaLabel(kind: ContentKind) {
-  if (kind === "article") return "选择封面";
-  if (kind === "video") return "选择视频";
-  if (kind === "audio") return "选择音频";
-  return "选择图片";
+function CoverSection({
+  coverImage,
+  busy,
+  hint,
+  onChoose,
+}: {
+  coverImage: ImageAsset | null;
+  busy: boolean;
+  hint: string;
+  onChoose: () => void;
+}) {
+  return (
+    <section className="composer-section">
+      <div className="composer-section-head">
+        <Label>封面</Label>
+        <Button type="button" variant="outline" disabled={busy} onClick={onChoose}>
+          <ImagePlus className="size-4" />
+          {coverImage ? "更换封面" : "上传封面"}
+        </Button>
+      </div>
+      {coverImage ? (
+        <div className="composer-cover-preview">
+          {coverImage.preview ? (
+            <img src={coverImage.preview} alt={`${coverImage.name} 封面`} />
+          ) : (
+            <span>封面</span>
+          )}
+        </div>
+      ) : (
+        <button type="button" className="composer-cover-empty" disabled={busy} onClick={onChoose}>
+          <ImagePlus className="size-5" />
+          <span>选择封面图</span>
+        </button>
+      )}
+      <p className="composer-section-hint">{hint}</p>
+    </section>
+  );
 }
 
 function canPublish(kind: ContentKind, title: string, body: string, paths: string[]) {
