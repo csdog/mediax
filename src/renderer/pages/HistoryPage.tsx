@@ -59,6 +59,7 @@ const statusFilters = [
   { value: "success", label: "成功" },
   { value: "failed", label: "发布失败" },
   { value: "active", label: "发布中" },
+  { value: "scheduled", label: "已排期" },
 ];
 
 function titleOf(body: string) {
@@ -76,6 +77,12 @@ function stamp(iso: string) {
   return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function publishModeLabel(task: Task, targets: TaskTarget[]) {
+  if (task.scheduledAt || targets.some((target) => target.status === "scheduled"))
+    return task.scheduledAt ? `定时 ${stamp(task.scheduledAt)}` : "定时发布";
+  return "立即发布";
+}
+
 function summary(targets: TaskTarget[]): { label: string; tone: Tone } {
   const statuses = targets.map((target) => target.status);
   const has = (status: Status) => statuses.includes(status);
@@ -84,10 +91,13 @@ function summary(targets: TaskTarget[]): { label: string; tone: Tone } {
   if (has("verified") && has("failed")) return { label: "部分发布成功", tone: "warning" };
   if (has("failed") && statuses.every((status) => status === "failed"))
     return { label: "发布失败", tone: "danger" };
+  if (statuses.length && statuses.every((status) => status === "scheduled"))
+    return { label: "已排期", tone: "muted" };
   if (has("running") || has("submitted")) return { label: "发布中", tone: "progress" };
   if (has("awaiting_user")) return { label: "等待处理", tone: "warning" };
   if (has("unknown")) return { label: has("verified") ? "部分失败" : "发布失败", tone: "danger" };
   if (statuses.every((status) => status === "pending")) return { label: "排队中", tone: "muted" };
+  if (has("scheduled")) return { label: "部分排期", tone: "muted" };
   if (has("failed")) return { label: "部分失败", tone: "danger" };
   return { label: "进行中", tone: "progress" };
 }
@@ -113,6 +123,7 @@ function matchesStatus(targets: TaskTarget[], filter: string) {
     return targets.some((target) =>
       ["pending", "running", "awaiting_user", "submitted"].includes(target.status),
     );
+  if (filter === "scheduled") return targets.some((target) => target.status === "scheduled");
   return false;
 }
 
@@ -481,12 +492,14 @@ function RecordFacts({ task, targets }: { task: Task; targets: TaskTarget[] }) {
   return (
     <>
       <span className="history-publisher">{names.join("、") || "未指定"}</span>
-      <span>立即发布</span>
+      <span>{publishModeLabel(task, targets)}</span>
       <span className="text-muted-foreground">
         {accountCount} 账号 · {targets.length} 任务
       </span>
       <StatusBadge state={state} />
-      <span className="text-muted-foreground">{stamp(task.createdAt)}</span>
+      <span className="text-muted-foreground">
+        {task.scheduledAt ? stamp(task.scheduledAt) : stamp(task.createdAt)}
+      </span>
     </>
   );
 }
@@ -510,7 +523,7 @@ function RecordRow({
         <Work task={task} />
       </TableCell>
       <TableCell>{names.join("、") || "未指定"}</TableCell>
-      <TableCell>立即发布</TableCell>
+      <TableCell>{publishModeLabel(task, targets)}</TableCell>
       <TableCell className="text-muted-foreground">
         {accountCount} 账号 · {targets.length} 任务
       </TableCell>
@@ -523,7 +536,9 @@ function RecordRow({
             .join("\n")}
         />
       </TableCell>
-      <TableCell className="text-muted-foreground">{stamp(task.createdAt)}</TableCell>
+      <TableCell className="text-muted-foreground">
+        {task.scheduledAt ? stamp(task.scheduledAt) : stamp(task.createdAt)}
+      </TableCell>
       <TableCell>
         <RecordMenu task={task} targets={targets} />
       </TableCell>

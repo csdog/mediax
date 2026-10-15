@@ -1,6 +1,11 @@
-import { ArrowLeft, ArrowRight, FolderOpen, X, Monitor, Plus } from "lucide-react";
+import {
+  CodexArrowLeftIcon,
+  CodexSidebarIcon,
+  CodexSidebarHiddenIcon,
+} from "./CodexNavigationIcons";
+import { FolderOpen, X, Monitor, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useSidebar } from "@/components/ui/sidebar";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { useWorkspace } from "@/app/WorkspaceContext";
 import { useNativeTabPreview } from "@/hooks/useNativeTabPreview";
@@ -24,6 +29,7 @@ export function WorkspaceToolbar() {
     closeBrowserTab,
     newBrowserTab,
   } = useWorkspace();
+  const { state: sidebarState, toggleSidebar } = useSidebar();
   const nativePreview = typeof window.desktop.showTabPreview === "function";
   useNativeTabPreview(nativePreview ? hoveredTab : null);
   return (
@@ -32,16 +38,32 @@ export function WorkspaceToolbar() {
         <Button
           variant="ghost"
           size="icon-xs"
+          className="toolbar-nav-button"
           aria-label="后退"
           disabled={!settingsOpen}
           onClick={() => setSettingsOpen(false)}
         >
-          <ArrowLeft />
+          <CodexArrowLeftIcon />
         </Button>
-        <Button variant="ghost" size="icon-xs" aria-label="前进" disabled>
-          <ArrowRight />
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="toolbar-nav-button"
+          aria-label="前进"
+          disabled
+        >
+          <CodexArrowLeftIcon className="-scale-x-100" />
         </Button>
-        <SidebarTrigger aria-label="切换侧栏" />
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="toolbar-nav-button"
+          aria-label="切换侧栏"
+          data-slot="sidebar-trigger"
+          onClick={toggleSidebar}
+        >
+          {sidebarState === "collapsed" ? <CodexSidebarHiddenIcon /> : <CodexSidebarIcon />}
+        </Button>
       </div>
       <div className="tab-strip">
         <div

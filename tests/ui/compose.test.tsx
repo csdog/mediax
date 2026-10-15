@@ -130,9 +130,13 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     setThemePreference: vi.fn().mockImplementation(async (preference) => preference),
     autoUpdateEnabled: vi.fn().mockResolvedValue(true),
     setAutoUpdateEnabled: vi.fn().mockImplementation(async (enabled: boolean) => enabled),
-    desktopBehavior: vi.fn().mockResolvedValue({ keepAwakeWhilePublishing: true }),
+    desktopBehavior: vi.fn().mockResolvedValue({
+      keepAwakeWhilePublishing: true,
+      calendarTimezone: "system",
+    }),
     setDesktopBehavior: vi.fn().mockImplementation(async (patch) => ({
       keepAwakeWhilePublishing: true,
+      calendarTimezone: "system",
       ...patch,
     })),
     diagnostics: vi.fn().mockResolvedValue({

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Monitor,
   X,
@@ -9,14 +9,18 @@ import {
   Plus,
   RefreshCw,
   FolderOpen,
+  CalendarClock,
 } from "lucide-react";
 import { applyLocalFiles, pathsFromDataTransfer } from "@/lib/importLocalFiles";
+import { DateTimePicker } from "@/components/DateTimePicker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Field, FieldLabel, FieldTitle } from "@/components/ui/field";
 import { isAudio, isVideo, supportedKinds } from "../../shared/content";
 import type { AccountInfo, ContentKind, PlatformId, Target } from "../../shared/models";
 import { platformInfo } from "../../shared/platforms";
@@ -32,6 +36,8 @@ import {
 } from "@/components/ui/dialog";
 import { DocumentPage } from "@/components/workspace/DocumentPage";
 import { useWorkspace } from "@/app/WorkspaceContext";
+import { useDesktopBehavior } from "@/hooks/useDesktopBehavior";
+import { resolveTimeZone } from "../../shared/timezones";
 
 export function ComposePage() {
   const {
@@ -58,13 +64,31 @@ export function ComposePage() {
     setPage,
     silentPublish,
     setActiveBrowser,
+    composeScheduleAt,
+    clearComposeSchedule,
   } = useWorkspace();
+  const { settings: desktopBehavior } = useDesktopBehavior();
+  const scheduleTimeZone = resolveTimeZone(desktopBehavior.calendarTimezone);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [platformFilter, setPlatformFilter] = useState<PlatformId | "all">("all");
   const [platformQuery, setPlatformQuery] = useState("");
   const [accountQuery, setAccountQuery] = useState("");
   const [syncedSignature, setSyncedSignature] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [publishMode, setPublishMode] = useState<"now" | "schedule">("now");
+  const [scheduleAt, setScheduleAt] = useState(() => hoursFromNow(1));
+  const [scheduleFromCalendar, setScheduleFromCalendar] = useState(false);
+  const clearComposeScheduleRef = useRef(clearComposeSchedule);
+  clearComposeScheduleRef.current = clearComposeSchedule;
+
+  useEffect(() => {
+    if (!composeScheduleAt) return;
+    const min = minutesFromNow(2);
+    setPublishMode("schedule");
+    setScheduleAt(composeScheduleAt.getTime() < min.getTime() ? min : composeScheduleAt);
+    setScheduleFromCalendar(true);
+    clearComposeScheduleRef.current();
+  }, [composeScheduleAt]);
   const importPaths = (paths: string[]) => {
     if (!paths.length) return;
     void run(async () => {
@@ -191,6 +215,34 @@ export function ComposePage() {
             <Monitor />
             先勾选账号，填写内容，同步到账号，再一键发布
           </div>
+          {scheduleFromCalendar && publishMode === "schedule" ? (
+            <div className="draft-note mediax-compose-schedule-banner">
+              <CalendarClock />
+              <span>
+                日历排期：
+                {new Intl.DateTimeFormat("zh-CN", {
+                  timeZone: scheduleTimeZone,
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                }).format(scheduleAt)}{" "}
+                ({scheduleTimeZone})，确认发布时可再修改
+              </span>
+              <button
+                type="button"
+                className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
+                onClick={() => {
+                  setScheduleFromCalendar(false);
+                  setPublishMode("now");
+                }}
+              >
+                改为立即发布
+              </button>
+            </div>
+          ) : null}
           <div className="composer-dock">
             <Card
               className={`composer ${dragging ? "composer-drop-active" : ""}`}
@@ -400,9 +452,45 @@ export function ComposePage() {
             <DialogHeader>
               <DialogTitle>确认发布</DialogTitle>
               <DialogDescription>
-                同一份内容会按设置的并行数同时发布，确认后开始。
+                同一份内容会发到所选账号。定时发布需保持 MediaX 在运行，到点后自动入队。
               </DialogDescription>
             </DialogHeader>
+            <div className="space-y-3">
+              <RadioGroup
+                value={publishMode}
+                onValueChange={(value) => setPublishMode(value as "now" | "schedule")}
+                className="grid gap-2 sm:grid-cols-2"
+              >
+                <FieldLabel>
+                  <Field orientation="horizontal">
+                    <RadioGroupItem value="now" />
+                    <FieldTitle>立即发布</FieldTitle>
+                  </Field>
+                </FieldLabel>
+                <FieldLabel>
+                  <Field orientation="horizontal">
+                    <RadioGroupItem value="schedule" />
+                    <FieldTitle>定时发布</FieldTitle>
+                  </Field>
+                </FieldLabel>
+              </RadioGroup>
+              {publishMode === "schedule" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="schedule-at">发布时间</Label>
+                  <DateTimePicker
+                    id="schedule-at"
+                    value={scheduleAt}
+                    min={minutesFromNow(2)}
+                    timeZone={scheduleTimeZone}
+                    size="lg"
+                    onChange={setScheduleAt}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    按 {scheduleTimeZone} 解释；关机或退出应用将无法到点发布。
+                  </p>
+                </div>
+              ) : null}
+            </div>
             <div className="space-y-2">
               {selectedTargets.map((target) => {
                 const account = accounts.find((item) => item.id === target.accountId);
@@ -429,23 +517,30 @@ export function ComposePage() {
                 disabled={busy || !ready}
                 onClick={() =>
                   void run(async () => {
+                    const scheduledAt =
+                      publishMode === "schedule" ? scheduleAt.toISOString() : null;
                     const taskId = await window.desktop.publish(
                       contentKind,
                       contentKind === "article" ? title : null,
                       body,
                       paths,
                       selectedTargets,
+                      scheduledAt,
                     );
                     setPublishDialogOpen(false);
                     setFocusedTask(taskId);
                     if (silentPublish) setActiveBrowser(null);
                     await reload();
-                    setPage("history");
-                    setNotice("任务已创建，将按并行设置发布。需要人工处理时请打开对应账号标签页。");
+                    setPage(publishMode === "schedule" ? "calendar" : "history");
+                    setNotice(
+                      publishMode === "schedule"
+                        ? "已加入排期；保持应用运行，到点后将自动发布。"
+                        : "任务已创建，将按并行设置发布。需要人工处理时请打开对应账号标签页。",
+                    );
                   })
                 }
               >
-                确认发布
+                {publishMode === "schedule" ? "确认排期" : "确认发布"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -671,4 +766,12 @@ function canPublish(kind: ContentKind, title: string, body: string, paths: strin
   if (kind === "video") return paths.some(isVideo);
   if (kind === "audio") return paths.some(isAudio);
   return Boolean(body.trim());
+}
+
+function hoursFromNow(hours: number) {
+  return new Date(Date.now() + hours * 60 * 60 * 1000);
+}
+
+function minutesFromNow(minutes: number) {
+  return new Date(Date.now() + minutes * 60 * 1000);
 }

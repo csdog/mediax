@@ -104,6 +104,12 @@ export function useWorkspaceController() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const openSettings = () => setSettingsOpen(true);
   const [focusedTask, setFocusedTask] = useState<string | undefined>();
+  const [composeScheduleAt, setComposeScheduleAt] = useState<Date | null>(null);
+  const openComposeSchedule = (at: Date) => {
+    setComposeScheduleAt(at);
+    setPage("compose");
+  };
+  const clearComposeSchedule = () => setComposeScheduleAt(null);
   const removeAccount = async (id: string) => {
     setBrowserTabs((tabs) => tabs.filter((tab) => tab.id !== id));
     setActiveBrowser((current) => (current === id ? null : current));
@@ -363,6 +369,9 @@ export function useWorkspaceController() {
     openSettings,
     focusedTask,
     setFocusedTask,
+    composeScheduleAt,
+    openComposeSchedule,
+    clearComposeSchedule,
     openBrowser,
     removeAccount,
     reload,

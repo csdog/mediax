@@ -68,6 +68,7 @@ export type Target = {
   kind: "profile" | "page";
 };
 export type Status =
+  | "scheduled"
   | "pending"
   | "running"
   | "awaiting_user"
@@ -83,6 +84,8 @@ export type Task = {
   body: string;
   images: string[];
   createdAt: string;
+  /** ISO; null/undefined means publish immediately when created. */
+  scheduledAt?: string | null;
   cover?: string | null;
 };
 export type TaskTarget = Target & {
@@ -91,6 +94,35 @@ export type TaskTarget = Target & {
   status: Status;
   error: string | null;
   url: string | null;
+};
+export type CalendarEntry = {
+  task: Task;
+  targets: TaskTarget[];
+  when: string;
+};
+export type AnalyticsSummary = {
+  days: number;
+  since: string;
+  totals: {
+    tasks: number;
+    targets: number;
+    verified: number;
+    failed: number;
+    awaitingUser: number;
+    scheduled: number;
+    pendingOrRunning: number;
+  };
+  successRate: number | null;
+  byPlatform: Array<{ platform: PlatformId; targets: number; verified: number; failed: number }>;
+  byAccount: Array<{
+    accountId: string;
+    name: string;
+    platform: PlatformId;
+    targets: number;
+    verified: number;
+    failed: number;
+  }>;
+  daily: Array<{ date: string; tasks: number; verified: number; failed: number }>;
 };
 export type ImageAsset = { path: string; preview: string; name: string };
 export type AccountInfo = Account & {
@@ -143,10 +175,11 @@ export interface DesktopApi {
   autoUpdateEnabled(): Promise<boolean>;
   setAutoUpdateEnabled(enabled: boolean): Promise<boolean>;
   onUpdateStatus(listener: (status: UpdateStatus) => void): () => void;
-  desktopBehavior(): Promise<{ keepAwakeWhilePublishing: boolean }>;
+  desktopBehavior(): Promise<{ keepAwakeWhilePublishing: boolean; calendarTimezone: string }>;
   setDesktopBehavior(settings: {
     keepAwakeWhilePublishing?: boolean;
-  }): Promise<{ keepAwakeWhilePublishing: boolean }>;
+    calendarTimezone?: string;
+  }): Promise<{ keepAwakeWhilePublishing: boolean; calendarTimezone: string }>;
   publishSettings(): Promise<{
     silent: boolean;
     concurrency: number;
@@ -249,8 +282,12 @@ export interface DesktopApi {
     body: string,
     images: string[],
     targets: Target[],
+    scheduledAt?: string | null,
   ): Promise<string>;
   history(): Promise<{ tasks: Task[]; targets: TaskTarget[] }>;
+  calendar(range: { from: string; to: string }): Promise<CalendarEntry[]>;
+  rescheduleTask(taskId: string, scheduledAt: string): Promise<Task>;
+  analyticsSummary(days?: number): Promise<AnalyticsSummary>;
   openPost(url: string): Promise<void>;
   verifyTarget(id: string, url?: string): Promise<void>;
   retry(id: string): Promise<void>;
@@ -274,7 +311,7 @@ export type UpdateStatus = {
   canCheck: boolean;
   canInstall: boolean;
 };
-export type DesktopPage = "accounts" | "compose" | "video" | "history";
+export type DesktopPage = "accounts" | "compose" | "video" | "history" | "calendar" | "analytics";
 export type DesktopCommand =
   | { action: "tab"; operation: TabAction }
   | { action: "settings" }

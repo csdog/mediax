@@ -88,6 +88,8 @@ export function registerIpc(
   const images = new Map<string, ImageAsset>();
   const tabPreview = new TabPreviewWindow(window);
   const publishing = new PublishService(db, accounts, join(app.getPath("userData"), "task-assets"));
+  publishing.startScheduler();
+  app.once("will-quit", () => publishing.stopScheduler());
   const text = (value: unknown) => {
     if (typeof value !== "string") throw new Error("无效文本");
     return value;
@@ -120,7 +122,7 @@ export function registerIpc(
       !value ||
       !Array.isArray(value.tabs) ||
       value.tabs.length > 100 ||
-      !["accounts", "compose", "video", "history"].includes(value.page)
+      !["accounts", "compose", "video", "history", "calendar", "analytics"].includes(value.page)
     )
       throw new Error("无效标签页状态");
     const accountIds = new Set(db.accounts().map((account) => account.id));
@@ -194,6 +196,7 @@ export function registerIpc(
       value as Partial<DesktopBehavior>,
     );
     db.setSetting("keepAwakeWhilePublishing", next.keepAwakeWhilePublishing);
+    db.setSetting("calendarTimezone", next.calendarTimezone);
     shell.syncPowerSave();
     return next;
   });
@@ -363,7 +366,7 @@ export function registerIpc(
     tasks: db.tasks().map((task) => ({ ...task, cover: coverDataUrl(task.images[0]) })),
     targets: db.targets(),
   }));
-  on("publish", (kind, title, body, paths, targets) => {
+  on("publish", (kind, title, body, paths, targets, scheduledAt) => {
     if (!isContentKind(kind)) throw new Error("无效内容类型");
     if (!Array.isArray(paths) || !paths.every((path) => typeof path === "string"))
       throw new Error("请重新选择发布图片");
@@ -383,14 +386,42 @@ export function registerIpc(
       )
     )
       throw new Error("无效发布目标");
+    const when =
+      scheduledAt === undefined || scheduledAt === null
+        ? null
+        : typeof scheduledAt === "string"
+          ? scheduledAt
+          : (() => {
+              throw new Error("无效定时时间");
+            })();
     return publishing.publish(
       kind,
       typeof title === "string" ? title : null,
       text(body),
       paths,
       targets,
+      when,
     );
   });
+  on("calendar", (range) => {
+    if (!range || typeof range !== "object") throw new Error("无效日历范围");
+    const from = text((range as { from?: unknown }).from);
+    const to = text((range as { to?: unknown }).to);
+    if (Number.isNaN(new Date(from).getTime()) || Number.isNaN(new Date(to).getTime()))
+      throw new Error("无效日历范围");
+    return db
+      .calendarEntries(new Date(from).toISOString(), new Date(to).toISOString())
+      .map((entry) => ({
+        ...entry,
+        task: { ...entry.task, cover: coverDataUrl(entry.task.images[0]) },
+      }));
+  });
+  on("rescheduleTask", (taskId, scheduledAt) =>
+    publishing.rescheduleTask(text(taskId), text(scheduledAt)),
+  );
+  on("analyticsSummary", (days) =>
+    db.analyticsSummary(typeof days === "number" && Number.isFinite(days) ? days : 30),
+  );
   on("retry", (id) => publishing.retry(text(id)));
   on("resume", (id) => publishing.resume(text(id)));
   on("openPost", async (value) => {

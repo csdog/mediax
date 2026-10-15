@@ -54,7 +54,9 @@ GitHub Release 的自动 **What's Changed** 只汇总**合并进默认分支的 
 
 创作页只有文章、动态、视频、音频。文章要标题和正文，最多一张封面；动态要正文，附件只能是图片；视频和音频可以没有正文，但必须各有一个对应文件。只列出支持当前类型的账号。能力表以 `supportedKinds` 为准。已有的抖音、快手、小红书图文就是动态，不要再写一套。
 
-正文保持纯文本，外加现有 Markdown 导入。不要加富文本编辑器，也不要加定时发布。
+正文保持纯文本，外加现有 Markdown 导入。不要加富文本编辑器。
+
+定时发布：任务可带 `scheduledAt`，目标状态为 `scheduled`；**仅 MediaX 在运行时**由 `ScheduleService` 到点翻成 `pending` 再入队。关机不保证发出。可配合设置「发布/排期时保持唤醒」（防休眠与息屏）。
 
 `createTask` 要求目标 `identityId` 为数字。站点没有数字 ID 时用 `"1"`，名称仍显示站点上的账号名。
 
@@ -62,7 +64,7 @@ GitHub Release 的自动 **What's Changed** 只汇总**合并进默认分支的 
 
 ## 数据
 
-当前 schema 拒绝高于 5 的 `user_version`。下一张迁移是 `drizzle/0003_*.sql`，并把 `Database` 的版本上限改到 6，同时把“版本过高”测试再加一档。已发布的 SQL 不要改。改表用 `pnpm run db:generate`，并提交 SQL、`drizzle/meta/_journal.json` 和快照。不要对用户库执行 `drizzle-kit push`。
+当前 schema 拒绝高于 6 的 `user_version`。下一张迁移是 `drizzle/0004_*.sql`，并把 `Database` 的版本上限改到 7，同时把“版本过高”测试再加一档。已发布的 SQL 不要改。改表用 `pnpm run db:generate`，并提交 SQL、`drizzle/meta/_journal.json` 和快照。不要对用户库执行 `drizzle-kit push`。
 
 业务库在 `~/Library/Application Support/mediax/mediax.sqlite`。`MEDIAX_USER_DATA` 可改测试目录。开发日志在仓库 `logs/main.log`。日志里不要写正文、Cookie、密码或图片预览。
 

@@ -17,7 +17,7 @@ describe("TaskPowerSave", () => {
     stop.mockClear();
   });
 
-  it("starts and stops the power save blocker with active publish targets", async () => {
+  it("starts and stops display/app blockers with active publish targets", async () => {
     const { TaskPowerSave } = await import("../../src/main/desktop/TaskPowerSave");
     const db = new Database(":memory:");
     const account = db.addAccount("Keeper");
@@ -26,10 +26,10 @@ describe("TaskPowerSave", () => {
       [],
       [{ accountId: account.id, identityId: "1", name: "T", kind: "profile" }],
     );
-    const target = db.targets()[0];
+    const target = db.targets()[0]!;
     let enabled = true;
     const saver = new TaskPowerSave(db, () => enabled);
-    // pending counts as active, so the constructor sync starts the blocker
+    expect(start).toHaveBeenCalledWith("prevent-display-sleep");
     expect(start).toHaveBeenCalledWith("prevent-app-suspension");
 
     start.mockClear();
@@ -37,7 +37,7 @@ describe("TaskPowerSave", () => {
     expect(start).not.toHaveBeenCalled();
 
     db.transition(target.id, "verified");
-    expect(stop).toHaveBeenCalledWith(7);
+    expect(stop).toHaveBeenCalled();
 
     enabled = false;
     start.mockClear();

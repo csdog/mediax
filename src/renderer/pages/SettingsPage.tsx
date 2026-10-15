@@ -99,6 +99,8 @@ export function SettingsPage() {
         onKeepAwakeWhilePublishing={(enabled) =>
           setDesktopBehavior({ keepAwakeWhilePublishing: enabled })
         }
+        calendarTimezone={desktopBehavior.calendarTimezone}
+        onCalendarTimezone={(timezone) => setDesktopBehavior({ calendarTimezone: timezone })}
         notificationSettings={notificationSettings}
         onNotificationSettings={setNotificationSettings}
         notificationPermission={notificationPermission}

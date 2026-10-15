@@ -7,9 +7,11 @@ import type { ContentKind, Target } from "../../shared/models";
 import { Database } from "../storage/Database";
 import { AccountService } from "../accounts/AccountService";
 import { PublishQueue } from "./PublishQueue";
+import { ScheduleService } from "./ScheduleService";
 
 export class PublishService {
   private queue: PublishQueue;
+  private schedule: ScheduleService;
   private running: Promise<void> | null = null;
   private creating = false;
   constructor(
@@ -22,6 +24,15 @@ export class PublishService {
       (target) => accounts.adapter(target.accountId),
       () => readPublishSettings((key) => db.setting(key)).concurrency,
     );
+    this.schedule = new ScheduleService(db, () => {
+      void this.queue.run().catch(() => {});
+    });
+  }
+  startScheduler() {
+    this.schedule.start();
+  }
+  stopScheduler() {
+    this.schedule.stop();
   }
   private async execute(work: () => Promise<void>) {
     if (this.running) throw new Error("已有发布任务正在执行");
@@ -39,11 +50,12 @@ export class PublishService {
     body: string,
     paths: string[],
     selected: Target[],
+    scheduledAt?: string | null,
   ): Promise<string> {
     if (this.creating) throw new Error("正在创建发布任务，请勿重复提交");
     this.creating = true;
     try {
-      return await this.create(kind, title, body, paths, selected);
+      return await this.create(kind, title, body, paths, selected, scheduledAt);
     } finally {
       this.creating = false;
     }
@@ -54,10 +66,17 @@ export class PublishService {
     body: string,
     paths: string[],
     selected: Target[],
+    scheduledAt?: string | null,
   ): Promise<string> {
     if (!selected.length) throw new Error("请填写正文并选择发布目标");
     if (this.running) throw new Error("已有发布任务正在执行");
-    if (this.db.targets().some((t) => t.status === "awaiting_user" || t.status === "pending"))
+    if (
+      this.db
+        .targets()
+        .some(
+          (t) => t.status === "awaiting_user" || t.status === "pending" || t.status === "running",
+        )
+    )
       throw new Error("请先在发布记录中处理尚未完成的任务");
     const listed = this.accounts.list();
     const known = listed.flatMap((a) => a.targets);
@@ -94,12 +113,19 @@ export class PublishService {
         await copyFile(source, path);
         images.push(path);
       }
-      id = this.db.createTask(body, images, targets, { contentKind: kind, title }).id;
+      id = this.db.createTask(body, images, targets, {
+        contentKind: kind,
+        title,
+        scheduledAt: scheduledAt ?? null,
+      }).id;
     } catch (error) {
       await rm(directory, { recursive: true, force: true });
       throw error;
     }
-    // Queue execution is independent of renderer lifetime; progress is persisted in SQLite.
+    if (scheduledAt) {
+      this.schedule.kick();
+      return id;
+    }
     void this.execute(() => this.queue.run()).catch((error) => {
       for (const target of this.db.targets(id).filter((t) => t.status === "pending"))
         this.db.transition(
@@ -109,6 +135,11 @@ export class PublishService {
         );
     });
     return id;
+  }
+  rescheduleTask(taskId: string, scheduledAt: string) {
+    const task = this.db.rescheduleTask(taskId, scheduledAt);
+    this.schedule.kick();
+    return task;
   }
   async retry(id: string) {
     if (this.running) throw new Error("已有发布任务正在执行");

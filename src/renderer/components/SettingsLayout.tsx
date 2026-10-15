@@ -21,6 +21,13 @@ import {
   NumberFieldIncrement,
   NumberFieldInput,
 } from "@/components/ui/number-field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ProfileMark } from "@/components/ProfileMark";
 import { PanelErrorBoundary } from "@/components/PanelErrorBoundary";
 import type { UpdateStatus } from "../../shared/models";
@@ -32,6 +39,7 @@ import {
   storageCleanupActions,
   type StorageCleanupId,
 } from "../../shared/storageUsage";
+import { CALENDAR_TIMEZONES, SYSTEM_TIMEZONE, systemTimeZone } from "../../shared/timezones";
 
 const categories = [
   {
@@ -39,7 +47,7 @@ const categories = [
     title: "常规",
     icon: Settings,
     keywords:
-      "菜单栏 窗口 深度链接 协议 Dock 角标 登录时启动 开机 快捷键 静默 发布 并行 网速 限速 名称 头像 个人资料 更新 版本",
+      "菜单栏 窗口 深度链接 协议 Dock 角标 登录时启动 开机 快捷键 静默 发布 并行 网速 限速 名称 头像 个人资料 更新 版本 时区 日历",
   },
   {
     id: "appearance",
@@ -180,6 +188,8 @@ export function SettingsLayout({
   onInstallUpdate,
   keepAwakeWhilePublishing,
   onKeepAwakeWhilePublishing,
+  calendarTimezone,
+  onCalendarTimezone,
   notificationSettings,
   onNotificationSettings,
   notificationPermission,
@@ -231,6 +241,8 @@ export function SettingsLayout({
   onInstallUpdate(): void;
   keepAwakeWhilePublishing: boolean;
   onKeepAwakeWhilePublishing(enabled: boolean): void;
+  calendarTimezone: string;
+  onCalendarTimezone(timezone: string): void;
   notificationSettings: NotificationSettings;
   onNotificationSettings(patch: Partial<NotificationSettings>): void;
   notificationPermission: { supported: boolean; label: string; detail: string };
@@ -344,14 +356,51 @@ export function SettingsLayout({
                   />
                   <div className="settings-row">
                     <div>
-                      <h3>发布时保持唤醒</h3>
-                      <p>有发布任务进行中时，阻止系统休眠，避免上传中断。</p>
+                      <h3>发布 / 排期时保持唤醒</h3>
+                      <p>
+                        有进行中或等待排期的任务时，阻止系统休眠与息屏（需本机保持 MediaX
+                        运行，到点才会发布）。
+                      </p>
                     </div>
                     <Switch
                       checked={keepAwakeWhilePublishing}
                       onCheckedChange={(checked) => onKeepAwakeWhilePublishing(checked === true)}
-                      aria-label="发布时保持唤醒"
+                      aria-label="发布或排期时保持唤醒"
                     />
+                  </div>
+                  <div className="settings-row">
+                    <div>
+                      <h3>日历时区</h3>
+                      <p>
+                        内容日历网格与排期选时按此时区解释；任务仍以 UTC 存储，到点按绝对时间触发。
+                      </p>
+                    </div>
+                    <Select
+                      items={CALENDAR_TIMEZONES.map((item) => ({
+                        value: item.value,
+                        label:
+                          item.value === SYSTEM_TIMEZONE
+                            ? `${item.label} (${systemTimeZone()})`
+                            : item.label,
+                      }))}
+                      value={calendarTimezone || SYSTEM_TIMEZONE}
+                      onValueChange={(value) => {
+                        if (value) onCalendarTimezone(value);
+                      }}
+                    >
+                      <SelectTrigger aria-label="日历时区" className="w-56">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CALENDAR_TIMEZONES.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.value === SYSTEM_TIMEZONE
+                              ? `${item.label} (${systemTimeZone()})`
+                              : item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="settings-row">
                     <div>

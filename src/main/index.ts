@@ -189,6 +189,8 @@ async function start(): Promise<void> {
     ].map((d) => d.workArea),
   );
   const startHidden = shouldStartHidden();
+  // Dev + `--watch` restarts the process on main/preload edits; avoid stealing editor focus.
+  const revealInactive = !app.isPackaged;
   mark("mediax/willCreateWindow");
   const windowIcon = join(
     app.isPackaged ? process.resourcesPath : join(__dirname, "../../build"),
@@ -196,7 +198,8 @@ async function start(): Promise<void> {
   );
   const win = new BrowserWindow({
     ...bounds,
-    show: !startHidden,
+    // Always create hidden; reveal after first paint so showInactive can keep focus in the IDE.
+    show: false,
     minWidth: Math.min(960, bounds.width),
     minHeight: Math.min(640, bounds.height),
     title: "",
@@ -253,6 +256,10 @@ async function start(): Promise<void> {
   measure("mediax/windowLoad", "mediax/willLoadWindow", "mediax/didLoadWindow");
   measure("mediax/startup", "mediax/willStart", "mediax/didLoadWindow");
   log.info("Application window loaded");
+  if (!startHidden) {
+    if (revealInactive) win.showInactive();
+    else win.show();
+  }
   lifecycle.markRestored();
   // Eventually phase: account sync + updater + Agent control API after first paint settles.
   lifecycle.whenEventually(() => {

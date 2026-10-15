@@ -1,4 +1,4 @@
-import { Download, Settings, FileText, ChevronDown, LoaderCircle, Monitor } from "lucide-react";
+import { Download, Settings, ChevronDown, LoaderCircle, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { ProfileMark } from "@/components/ProfileMark";
@@ -17,6 +17,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
+import { CodexComposeIcon } from "./CodexNavigationIcons";
 import { navigation as nav } from "@/app/navigation";
 import { useWorkspace } from "@/app/WorkspaceContext";
 import type { UpdateStatus } from "../../../shared/models";
@@ -59,28 +60,34 @@ export function WorkspaceNavigation() {
     <>
       <aside className="activity-rail" aria-label="快捷导航">
         <div className="flex flex-col gap-2">
-          {nav.map((n) => (
-            <Tooltip key={n.id}>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`打开${n.title}`}
-                    data-active={page === n.id}
-                    onClick={() => {
-                      setActiveBrowser(null);
-                      setPage(n.id);
-                      void run(reload);
-                    }}
-                  >
-                    <n.icon className="size-4" />
-                  </Button>
-                }
-              />
-              <TooltipContent side="right">{n.title}</TooltipContent>
-            </Tooltip>
-          ))}
+          {nav.map((n) => {
+            const Icon = page === n.id ? n.selectedIcon : n.icon;
+            return (
+              <Tooltip key={n.id}>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-lg"
+                      aria-label={`打开${n.title}`}
+                      data-active={page === n.id}
+                      onClick={() => {
+                        setActiveBrowser(null);
+                        setPage(n.id);
+                        void run(reload);
+                      }}
+                    >
+                      <Icon
+                        className="size-5 text-neutral-500 data-[active=true]:text-foreground"
+                        data-active={page === n.id}
+                      />
+                    </Button>
+                  }
+                />
+                <TooltipContent side="right">{n.title}</TooltipContent>
+              </Tooltip>
+            );
+          })}
         </div>
         <div className="mt-auto flex flex-col items-center gap-2">
           {showUpdatePrompt ? (
@@ -196,7 +203,7 @@ export function WorkspaceNavigation() {
               void run(reload);
             }}
           >
-            <FileText className="size-3.5" />
+            <CodexComposeIcon className="size-4" />
             新建内容
           </Button>
         </SidebarHeader>
@@ -205,23 +212,27 @@ export function WorkspaceNavigation() {
             <SidebarGroupLabel className="px-3 text-xs font-normal">项目</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {nav.map((n) => (
-                  <SidebarMenuItem key={n.id}>
-                    <SidebarMenuButton
-                      className="h-9 px-3 font-normal"
-                      isActive={page === n.id}
-                      tooltip={n.title}
-                      onClick={() => {
-                        setActiveBrowser(null);
-                        setPage(n.id);
-                        void run(reload);
-                      }}
-                    >
-                      <n.icon />
-                      <span>{n.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {nav.map((n) => {
+                  const Icon = page === n.id ? n.selectedIcon : n.icon;
+                  return (
+                    <SidebarMenuItem key={n.id}>
+                      <SidebarMenuButton
+                        className="font-normal"
+                        isActive={page === n.id}
+                        tooltip={n.title}
+                        size={"lg"}
+                        onClick={() => {
+                          setActiveBrowser(null);
+                          setPage(n.id);
+                          void run(reload);
+                        }}
+                      >
+                        <Icon />
+                        <span>{n.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

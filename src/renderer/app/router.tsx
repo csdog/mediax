@@ -10,6 +10,8 @@ import { RouteError } from "@/components/RouteError";
 import { AccountsPage } from "@/pages/AccountsPage";
 import { ComposePage } from "@/pages/ComposePage";
 import { HistoryPage } from "@/pages/HistoryPage";
+import { CalendarPage } from "@/pages/CalendarPage";
+import { AnalyticsPage } from "@/pages/AnalyticsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 const rootRoute = createRootRoute({
   component: () => (
@@ -39,6 +41,16 @@ const historyRoute = createRoute({
   path: "/history",
   component: HistoryPage,
 });
+const calendarRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/calendar",
+  component: CalendarPage,
+});
+const analyticsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/analytics",
+  component: AnalyticsPage,
+});
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
@@ -49,6 +61,8 @@ const routeTree = rootRoute.addChildren([
   composeRoute,
   videoRoute,
   historyRoute,
+  calendarRoute,
+  analyticsRoute,
   settingsRoute,
 ]);
 export function createWorkspaceRouter() {
@@ -57,8 +71,8 @@ export function createWorkspaceRouter() {
     history: createMemoryHistory({ initialEntries: ["/accounts"] }),
     defaultPendingMinMs: 0,
     defaultErrorComponent: RouteError,
-    defaultOnCatch: (error) => {
-      console.error("Route render failed", error);
+    defaultOnCatch: (error, errorInfo) => {
+      console.error("Route render failed", error, errorInfo);
     },
   });
 }

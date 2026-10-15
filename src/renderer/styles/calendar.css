@@ -1,0 +1,270 @@
+.sx-react-calendar-wrapper {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+}
+.sx-react-calendar-wrapper .sx__calendar-wrapper {
+  height: 100%;
+}
+/*
+ * theme-shadcn hardcodes default zinc tokens on html:has(.is-shadcn).
+ * Remap to this app's shadcn/CSS variables (and keep --radius from :root).
+ */
+html:has(.is-shadcn) {
+  --radius: 0.75rem;
+  --sx-color-primary: var(--primary);
+  --sx-color-on-primary: var(--primary-foreground);
+  --sx-color-primary-container: var(--primary);
+  --sx-color-on-primary-container: var(--primary-foreground);
+  --sx-color-secondary: var(--secondary);
+  --sx-color-on-secondary: var(--secondary-foreground);
+  --sx-color-secondary-container: var(--secondary);
+  --sx-color-on-secondary-container: var(--secondary-foreground);
+  --sx-color-background: var(--background);
+  --sx-color-on-background: var(--foreground);
+  --sx-color-surface: var(--card);
+  --sx-color-on-surface: var(--card-foreground);
+  --sx-color-surface-container: var(--muted);
+  --sx-color-surface-container-low: var(--muted);
+  --sx-color-surface-container-high: var(--accent);
+  --sx-color-surface-dim: var(--muted);
+  --sx-color-surface-bright: var(--card);
+  --sx-color-outline: var(--muted-foreground);
+  --sx-color-outline-variant: var(--border);
+  --sx-color-neutral: var(--muted-foreground);
+  --sx-color-neutral-variant: var(--border);
+  --sx-color-surface-tint: var(--primary);
+  --sx-color-shadow: var(--foreground);
+  --sx-internal-color-text: var(--foreground);
+  --sx-internal-color-light-gray: var(--muted);
+  --sx-internal-color-gray-ripple-background: var(--accent);
+  --sx-color-popup-border: var(--border);
+  --sx-border: 1px solid var(--border);
+  --sx-rounding-small: var(--radius);
+  --sx-rounding-extra-small: calc(var(--radius) - 4px);
+  --sx-event-border-radius: calc(var(--radius) - 4px);
+}
+html:has(.is-shadcn) .is-dark,
+.dark:has(.is-shadcn) {
+  --sx-color-primary: var(--primary);
+  --sx-color-on-primary: var(--primary-foreground);
+  --sx-color-primary-container: var(--primary);
+  --sx-color-on-primary-container: var(--primary-foreground);
+  --sx-border: 1px solid var(--border);
+  --sx-color-popup-border: var(--border);
+}
+/* Postiz-style external controls replace the built-in header. */
+.mediax-calendar .sx__calendar-header {
+  display: none !important;
+}
+.mediax-calendar .sx__calendar {
+  border-radius: var(--radius);
+}
+/* Theme hides the first hour row; keep the row hidden, only show 00:00 text. */
+.mediax-calendar .sx__week-grid__hour:first-child .sx__week-grid__hour-text {
+  visibility: visible;
+}
+.mediax-week-grid-year {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--sx-color-neutral);
+  margin-top: -2px;
+}
+.sx__week-grid__date--is-today .mediax-week-grid-year {
+  color: var(--sx-color-primary);
+}
+/* Empty slots are clickable create targets (Postiz-style). */
+.mediax-calendar .sx__time-grid-day,
+.mediax-calendar .sx__month-grid-day {
+  cursor: pointer;
+}
+/* Day column / month cell selected while add-schedule popover is open. */
+.mediax-calendar .sx__time-grid-day.is-selected {
+  background: color-mix(in srgb, var(--emphasis) 4%, transparent);
+}
+.mediax-calendar .sx__month-grid-day.is-selected {
+  background: color-mix(in srgb, var(--emphasis) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--emphasis) 35%, transparent);
+}
+.mediax-calendar .sx__time-grid-background-event {
+  pointer-events: none;
+}
+.mediax-calendar .sx__time-grid-background-event[title="过去"],
+.mediax-calendar .sx__month-grid-background-event[title="过去"],
+.mediax-calendar .sx__date-grid-background-event[title="过去"] {
+  pointer-events: auto;
+  cursor: not-allowed;
+}
+/* Custom event cards: platform AvatarGroup + single publish time. */
+.mediax-calendar .sx__time-grid-event {
+  padding: 0;
+}
+.mediax-calendar .sx__time-grid-event-inner {
+  min-height: 100%;
+}
+.mediax-cal-event {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 100%;
+  padding: 4px 6px;
+  overflow: hidden;
+  border-radius: inherit;
+  border-left: 3px solid transparent;
+  font-size: 11px;
+  line-height: 1.25;
+}
+.mediax-cal-event--scheduled {
+  background: #e6f3ff;
+  border-left-color: #0285ff;
+  color: #0b4f8a;
+}
+.mediax-cal-event--published {
+  background: #f3f3f3;
+  border-left-color: #5d5d5d;
+  color: #0d0d0d;
+}
+.dark .mediax-cal-event--scheduled {
+  background: #16324a;
+  border-left-color: #339cff;
+  color: #d0ebff;
+}
+.dark .mediax-cal-event--published {
+  background: #2c2c2c;
+  border-left-color: #a0a0a0;
+  color: #f3f3f3;
+}
+.mediax-cal-event__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.mediax-cal-event__avatars {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.mediax-cal-event__time {
+  flex-shrink: 0;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+.mediax-cal-event--month {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  height: auto;
+  min-height: 0;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.mediax-cal-event--month .mediax-cal-event__title {
+  flex: 1;
+}
+.mediax-cal-event--month .mediax-cal-event__time {
+  font-size: 10px;
+}
+/* List view: publish time is a point, not a range. */
+.mediax-calendar .sx__list-event-end-time,
+.mediax-calendar .sx__list-event-arrow {
+  display: none;
+}
+/* Schedule create / reschedule dialog atmosphere */
+.schedule-dialog__glow {
+  position: absolute;
+  width: min(36rem, 80vw);
+  height: 14rem;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--emphasis) 18%, transparent),
+    transparent 100%
+  );
+  filter: blur(28px);
+  pointer-events: none;
+  animation: schedule-dialog-glow 4.8s ease-in-out infinite alternate;
+}
+.schedule-dialog__brand {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.schedule-dialog__hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  border-radius: calc(var(--radius-dialog) - 6px);
+  background:
+    radial-gradient(
+      ellipse 80% 90% at 20% 0%,
+      color-mix(in srgb, var(--emphasis) 12%, transparent),
+      transparent 70%
+    ),
+    var(--muted);
+}
+.schedule-dialog__clock {
+  margin: 0;
+  font-size: clamp(2.25rem, 5vw, 2.75rem);
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+}
+.schedule-dialog__day {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+@keyframes schedule-dialog-glow {
+  from {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .schedule-dialog__glow {
+    animation: none;
+  }
+}
+/* Now-line time badge on the left axis (Schedule-X only draws the line). */
+.mediax-calendar .mediax-current-time-label {
+  position: absolute;
+  left: 4px;
+  width: calc(var(--sx-calendar-week-grid-padding-left) - 8px);
+  transform: translateY(-50%);
+  z-index: 3;
+  pointer-events: none;
+  box-sizing: border-box;
+  padding: 2px 0;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: #7c3aed;
+}
+.mediax-calendar .sx__current-time-indicator {
+  background-color: #7c3aed;
+}
+.mediax-calendar .sx__current-time-indicator::before {
+  background-color: #7c3aed;
+}
+.mediax-calendar .sx__current-time-indicator-full-week {
+  background-color: rgb(124 58 237 / 38%);
+}

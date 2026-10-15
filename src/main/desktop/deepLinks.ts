@@ -2,7 +2,14 @@ import { app } from "electron";
 import { resolve } from "node:path";
 import type { DesktopCommand, DesktopPage } from "../../shared/models";
 
-const pages = new Set<DesktopPage>(["accounts", "compose", "video", "history"]);
+const pages = new Set<DesktopPage>([
+  "accounts",
+  "compose",
+  "video",
+  "history",
+  "calendar",
+  "analytics",
+]);
 
 /** Prefer registering once early so cold-start open-url / argv deep links work. */
 export function registerDeepLinkProtocol() {
