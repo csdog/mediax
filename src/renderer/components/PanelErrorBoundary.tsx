@@ -27,12 +27,7 @@ export class PanelErrorBoundary extends Component<Props, State> {
         variant="panel"
         className="min-h-0 w-full flex-1"
         title={this.props.title ?? "这部分暂时无法显示"}
-        description={
-          this.props.description ??
-          (import.meta.env.DEV
-            ? "开发模式下会显示技术详情。"
-            : "请重试；若仍失败，可先切换到其他功能。")
-        }
+        description={this.props.description ?? "请重试；若仍失败，可先切换到其他功能。"}
         error={this.state.error}
         onRetry={() => this.setState({ error: null })}
       />

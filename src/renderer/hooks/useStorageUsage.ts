@@ -1,3 +1,4 @@
+import { userErrorMessage } from "../../shared/userError";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -45,7 +46,7 @@ export function useStorageUsage() {
     },
     onError: (error) => {
       setMessage({
-        text: error instanceof Error ? error.message : String(error),
+        text: userErrorMessage(error),
         error: true,
       });
     },

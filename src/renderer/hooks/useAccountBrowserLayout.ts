@@ -1,3 +1,4 @@
+import { userErrorMessage } from "../../shared/userError";
 import { useEffect, useRef } from "react";
 
 type Options = {
@@ -32,7 +33,7 @@ export function useAccountBrowserLayout({
         if (current !== revision) return;
         await window.desktop.layoutAccountBrowser(activeBrowser, bounds);
       } catch (error) {
-        if (current === revision) setNotice(String(error));
+        if (current === revision) setNotice(userErrorMessage(error));
       }
     };
     void update();

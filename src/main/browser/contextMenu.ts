@@ -5,6 +5,7 @@ import {
   type WebContents,
 } from "electron";
 import type { Options } from "electron-context-menu";
+import { userErrorMessage } from "../../shared/userError";
 
 type OpenUrl = (url: string) => void;
 const webUrl = (url: string) => /^https?:\/\//i.test(url);
@@ -194,7 +195,7 @@ export function browserContextMenuOptions(contents: WebContents, openUrl: OpenUr
               } catch (error) {
                 dialog.showErrorBox(
                   "网页保存失败",
-                  error instanceof Error ? error.message : String(error),
+                  userErrorMessage(error, "网页未能保存，请稍后重试。"),
                 );
               }
             },

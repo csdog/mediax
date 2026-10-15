@@ -1,3 +1,4 @@
+import { userErrorMessage } from "../../shared/userError";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UpdateStatus } from "../../shared/models";
@@ -50,7 +51,10 @@ export function useAppUpdate() {
     return () => window.removeEventListener("mediax:update-status", receive);
   }, []);
   return {
-    status,
+    status:
+      status.state === "error"
+        ? { ...status, message: userErrorMessage(status.message, "暂时无法检查更新，请稍后重试。") }
+        : status,
     autoUpdateEnabled: autoUpdate.data ?? true,
     setAutoUpdateEnabled: (enabled: boolean) => saveAuto.mutate(enabled),
     checkForUpdates: async () => {

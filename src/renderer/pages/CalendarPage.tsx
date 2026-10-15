@@ -364,11 +364,7 @@ export function CalendarPage() {
     <DocumentPage>
       <PanelErrorBoundary
         title="内容日历暂时无法显示"
-        description={
-          import.meta.env.DEV
-            ? "开发模式下会显示技术详情；常见原因是日历控件尚未就绪。"
-            : "请重试；若仍失败，可先使用创作或其他页面。详细信息已写入本地日志。"
-        }
+        description="请重试；若仍失败，可先使用创作或其他页面。详细信息已写入本地日志。"
       >
         <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto px-8 py-6">
           <div>

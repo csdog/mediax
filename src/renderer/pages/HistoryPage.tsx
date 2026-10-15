@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { userErrorMessage } from "../../shared/userError";
 import { useMutation } from "@tanstack/react-query";
 import { cn } from "cn";
 import {
@@ -589,6 +590,7 @@ function RecordRow({
           title={targets
             .map((target) => target.error)
             .filter((error): error is string => Boolean(error))
+            .map((error) => userErrorMessage(error, "发布未完成，请打开账号确认后重试。"))
             .join("\n")}
         />
       </TableCell>

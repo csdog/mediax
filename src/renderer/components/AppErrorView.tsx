@@ -1,3 +1,4 @@
+import { userErrorMessage } from "../../shared/userError";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "cn";
@@ -12,8 +13,6 @@ export type AppErrorViewProps = {
   variant?: "full" | "panel";
   className?: string;
 };
-
-const isDev = import.meta.env.DEV;
 
 export function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message || error.name;
@@ -40,14 +39,9 @@ export function AppErrorView({
   variant = "full",
   className,
 }: AppErrorViewProps) {
-  const detail = errorMessage(error);
-  const stack = errorStack(error);
+  const detail = error == null ? "" : userErrorMessage(error);
   const heading = title ?? (variant === "full" ? "页面暂时无法显示" : "这部分暂时无法显示");
-  const body =
-    description ??
-    (isDev
-      ? "开发模式下会显示技术详情，便于定位问题。"
-      : "可以重试，或先使用其他功能。详细信息已写入本地日志。");
+  const body = description ?? "可以重试，或先使用其他功能。详细信息已写入本地日志。";
 
   return (
     <div
@@ -76,17 +70,7 @@ export function AppErrorView({
         <div className="app-error-view__copy">
           <h2 className="app-error-view__title">{heading}</h2>
           <p className="app-error-view__desc">{body}</p>
-          {isDev ? (
-            <div className="app-error-view__dev">
-              <p className="app-error-view__dev-label">开发信息</p>
-              {detail ? <pre className="app-error-view__detail">{detail}</pre> : null}
-              {stack ? <pre className="app-error-view__stack">{stack}</pre> : null}
-            </div>
-          ) : detail ? (
-            <p className="app-error-view__prod-hint">
-              如需排查，可在设置中导出诊断或查看本地日志。
-            </p>
-          ) : null}
+          {detail ? <p className="app-error-view__prod-hint">{detail}</p> : null}
         </div>
         <div className="app-error-view__actions">
           {onRetry ? (
