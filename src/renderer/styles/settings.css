@@ -349,17 +349,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-.shortcut-settings-header h2 {
-  margin: 0;
-  font-size: var(--font-size-heading);
-  line-height: var(--line-height-heading);
-  font-weight: 600;
+  flex-wrap: wrap;
 }
 .shortcut-settings-search {
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1 1 200px;
+  min-width: 0;
 }
 .shortcut-settings-search > svg {
   position: absolute;
@@ -376,7 +373,7 @@
 }
 .shortcut-settings-list {
   border: 1px solid var(--border);
-  border-radius: var(--radius-popover);
+  border-radius: var(--radius-pane);
   background: var(--card);
   overflow: hidden;
 }
@@ -387,7 +384,7 @@
   align-items: center;
   gap: 16px;
   min-height: 64px;
-  padding: 14px 16px;
+  padding: 16px;
   border-top: 1px solid var(--border);
 }
 .shortcut-settings-row:first-child {
