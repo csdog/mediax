@@ -44,7 +44,7 @@ export function WorkspaceShell() {
         <SidebarInset className="min-w-0 bg-background">
           {!settingsOpen && (
             <>
-              {showBrowserChrome ? <BrowserChrome /> : null}
+              {showBrowserChrome ? <BrowserChrome key={activeBrowser ?? "new-tab"} /> : null}
               <div className="workspace-main">
                 {isComposeTab ? (
                   <ComposePage />

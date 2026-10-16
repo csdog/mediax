@@ -7,6 +7,10 @@ import type { BrowserBounds, PlatformId } from "../../shared/models";
 export class AccountBrowserManager {
   private windows = new Map<string, BrowserWindow>();
   private views = new Map<string, WebContentsView>();
+  private favicons = new Map<string, string>();
+  favicon(id: string) {
+    return this.favicons.get(id);
+  }
   private activeId: string | null = null;
   private bounds?: BrowserBounds;
   private bridge = new CdpBridge();
@@ -111,6 +115,7 @@ export class AccountBrowserManager {
     if (this.host && !this.host.isDestroyed()) this.host.contentView.removeChildView(view);
     if (!view.webContents.isDestroyed()) view.webContents.close();
     this.views.delete(id);
+    this.favicons.delete(id);
     const win = this.windows.get(id);
     this.windows.delete(id);
     if (win && !win.isDestroyed()) win.destroy();
@@ -178,6 +183,31 @@ export class AccountBrowserManager {
     view.setBounds({ x: 0, y: 44, width: 1000, height: 700 });
     view.setVisible(!this.host);
     view.webContents.setBackgroundThrottling(false);
+    const notifyNavigation = (url = view.webContents.getURL()) => {
+      if (!this.host || this.host.isDestroyed() || view.webContents.isDestroyed()) return;
+      const contents = view.webContents;
+      this.host.webContents.send("mediax:browser-navigation-changed", accountId, {
+        url,
+        title: contents.getTitle(),
+        icon: this.favicons.get(accountId),
+        canGoBack: contents.navigationHistory.canGoBack(),
+        canGoForward: contents.navigationHistory.canGoForward(),
+      });
+    };
+    view.webContents.on("did-start-navigation", (_event, url, inPlace, isMainFrame) => {
+      if (!isMainFrame) return;
+      if (!inPlace) this.favicons.delete(accountId);
+      notifyNavigation(url);
+    });
+    view.webContents.on("did-redirect-navigation", (_event, url, _inPlace, isMainFrame) => {
+      if (isMainFrame) notifyNavigation(url);
+    });
+    view.webContents.on("did-navigate", (_event, url) => notifyNavigation(url));
+    view.webContents.on("did-navigate-in-page", (_event, url, isMainFrame) => {
+      if (isMainFrame) notifyNavigation(url);
+    });
+    view.webContents.on("page-title-updated", () => notifyNavigation());
+    view.webContents.on("did-stop-loading", () => notifyNavigation());
     const remember = (touch: boolean, icon?: string) => {
       if (view.webContents.isDestroyed()) return;
       this.onVisit?.(
@@ -195,9 +225,13 @@ export class AccountBrowserManager {
     view.webContents.on("page-title-updated", () => remember(false));
     view.webContents.on("page-favicon-updated", (_event, favicons) => {
       const page = view.webContents;
+      const url = page.getURL();
+      const title = page.getTitle();
       void loadFavicon(page.session, favicons).then((icon) => {
-        if (!icon || page.isDestroyed()) return;
-        this.onVisit?.(accountId, page.getURL(), page.getTitle(), false, icon);
+        if (!icon || page.isDestroyed() || page.getURL() !== url) return;
+        this.favicons.set(accountId, icon);
+        notifyNavigation(url);
+        this.onVisit?.(accountId, url, title, false, icon);
       });
     });
     void installBrowserContextMenu(view.webContents, (url) => {

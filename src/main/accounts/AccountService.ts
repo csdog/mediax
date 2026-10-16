@@ -121,6 +121,7 @@ export class AccountService {
     const history = contents.navigationHistory;
     return {
       url: contents.getURL(),
+      icon: this.browsers.favicon(id),
       title: contents.getTitle(),
       canGoBack: history.canGoBack(),
       canGoForward: history.canGoForward(),

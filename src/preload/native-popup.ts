@@ -10,7 +10,9 @@ const api = {
     ipcRenderer.on("mediax:native-popup", receive);
     return () => ipcRenderer.removeListener("mediax:native-popup", receive);
   },
-  notifyNativePopup(event: { type: "resize"; height: number } | NativePopupHostEvent) {
+  notifyNativePopup(
+    event: { type: "ready" } | { type: "resize"; height: number } | NativePopupHostEvent,
+  ) {
     ipcRenderer.send("mediax:native-popup-notify", event);
   },
 };

@@ -196,7 +196,6 @@ export type NativePopupAction =
 export type NativePopupRequest = {
   kind: NativePopupKind;
   theme: "light" | "dark";
-  focus: boolean;
   x: number;
   y: number;
   width: number;
@@ -208,10 +207,12 @@ export type NativePopupRequest = {
   zoomPercent?: number;
 };
 export type NativePopupHostEvent =
+  | { type: "focus-omnibox" }
   | { type: "closed" }
   | { type: "action"; action: NativePopupAction };
 export type BrowserPreview = { title: string; hostname: string; image: string | null };
 export type BrowserNavigation = {
+  icon?: string;
   url: string;
   title: string;
   canGoBack: boolean;
@@ -262,6 +263,9 @@ export interface DesktopApi {
   resolveOmniboxUrl(input: string): Promise<string | null>;
   webSearchProvider(): Promise<WebSearchProvider>;
   browserNavigation(id: string): Promise<BrowserNavigation>;
+  onBrowserNavigationChanged(
+    listener: (id: string, navigation: BrowserNavigation) => void,
+  ): () => void;
   browserHistory(query: string): Promise<BrowserHistoryEntry[]>;
   removeBrowserHistory(url: string): Promise<void>;
   navigateBrowser(id: string, url: string): Promise<BrowserNavigation>;
@@ -288,7 +292,9 @@ export interface DesktopApi {
   hideNativePopup(): Promise<void>;
   onNativePopup(listener: (popup: NativePopupRequest) => void): () => void;
   onNativePopupHostEvent(listener: (event: NativePopupHostEvent) => void): () => void;
-  notifyNativePopup(event: { type: "resize"; height: number } | NativePopupHostEvent): void;
+  notifyNativePopup(
+    event: { type: "ready" } | { type: "resize"; height: number } | NativePopupHostEvent,
+  ): void;
   closeAccountBrowser(id: string): Promise<void>;
   shortcutSettings(): Promise<ShortcutSettings>;
   setGlobalShortcut(accelerator: string): Promise<ShortcutSettings>;

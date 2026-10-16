@@ -5,14 +5,13 @@ import { cn } from "cn";
 import {
   CircleHelp,
   Download,
-  ExternalLink,
+  Monitor,
   FileText,
   Image as ImageIcon,
   Music,
   Video,
   LayoutGrid,
   List,
-  Monitor,
   Play,
   Plus,
   RefreshCw,
@@ -52,6 +51,7 @@ import {
 } from "@/components/ui/empty";
 import {
   PlatformAvatarGroup,
+  AccountAvatarGroup,
   type CalendarPublisher,
 } from "@/components/calendar/PlatformAvatarGroup";
 import { ActionIconButton } from "@/components/workspace/ActionIconButton";
@@ -537,13 +537,16 @@ function StatusBadge({ state, title }: { state: { label: string; tone: Tone }; t
 
 function RecordFacts({ task, targets }: { task: Task; targets: TaskTarget[] }) {
   const { accounts } = useWorkspace();
-  const names = publisherNames(targets, accounts);
   const publishers = publishersOf(targets, accounts);
   const accountCount = new Set(targets.map((target) => target.accountId)).size;
   const state = summary(targets);
   return (
     <>
-      <span>{names.join("、") || "未指定"}</span>
+      {publishers.length ? (
+        <AccountAvatarGroup publishers={publishers} size="default" />
+      ) : (
+        <span>未指定</span>
+      )}
       <PlatformAvatarGroup publishers={publishers} size="default" />
       <span>{publishModeLabel(task, targets)}</span>
       <span className="text-muted-foreground">
@@ -567,7 +570,6 @@ function RecordRow({
   focused: boolean;
 }) {
   const { accounts } = useWorkspace();
-  const names = publisherNames(targets, accounts);
   const publishers = publishersOf(targets, accounts);
   const accountCount = new Set(targets.map((target) => target.accountId)).size;
   const state = summary(targets);
@@ -576,7 +578,13 @@ function RecordRow({
       <TableCell>
         <Work task={task} />
       </TableCell>
-      <TableCell>{names.join("、") || "未指定"}</TableCell>
+      <TableCell>
+        {publishers.length ? (
+          <AccountAvatarGroup publishers={publishers} size="default" />
+        ) : (
+          "未指定"
+        )}
+      </TableCell>
       <TableCell>
         <PlatformAvatarGroup publishers={publishers} size="default" />
       </TableCell>
@@ -609,30 +617,19 @@ function actionLabel(verb: string, name: string, many: boolean) {
 }
 
 function RecordActions({ task: _task, targets }: { task: Task; targets: TaskTarget[] }) {
-  const { run, busy, openBrowser, accounts, reload } = useWorkspace();
+  const { run, busy, openWebBrowser, reload } = useWorkspace();
   const republish = useMutation({
     mutationFn: async (id: string) => {
       await window.desktop.republish(id);
       await reload();
     },
   });
-  const accountsInTask = [...new Map(targets.map((target) => [target.accountId, target])).values()];
+  const articleUrls = [...new Set(targets.flatMap((target) => (target.url ? [target.url] : [])))];
   const manyTargets = targets.length > 1;
-  const manyAccounts = accountsInTask.length > 1;
   return (
     <div className="inline-flex flex-wrap items-center justify-center gap-1 [.account-grid-item_&]:mt-2 [.account-grid-item_&]:justify-start">
       {targets.flatMap((target) => {
         const items = [];
-        if (target.url)
-          items.push(
-            <ActionIconButton
-              key={`${target.id}-open`}
-              label={actionLabel("打开", target.name, manyTargets)}
-              onClick={() => void run(() => window.desktop.openPost(target.url!))}
-            >
-              <ExternalLink />
-            </ActionIconButton>,
-          );
         if (["failed", "submitted", "verified", "unknown"].includes(target.status))
           items.push(
             <ActionIconButton
@@ -672,20 +669,13 @@ function RecordActions({ task: _task, targets }: { task: Task; targets: TaskTarg
           );
         return items;
       })}
-      {accountsInTask.map((target) => {
-        const name =
-          accounts.find((account) => account.id === target.accountId)?.name ?? target.name;
-        return (
-          <ActionIconButton
-            key={`${target.accountId}-browser`}
-            label={actionLabel("打开账号", name, manyAccounts)}
-            disabled={busy}
-            onClick={() => void run(() => openBrowser({ id: target.accountId, name }))}
-          >
-            <Monitor />
-          </ActionIconButton>
-        );
-      })}
+      <ActionIconButton
+        label="打开文章"
+        disabled={busy || articleUrls.length === 0}
+        onClick={() => void run(() => Promise.all(articleUrls.map((url) => openWebBrowser(url))))}
+      >
+        <Monitor />
+      </ActionIconButton>
     </div>
   );
 }

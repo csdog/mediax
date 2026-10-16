@@ -4,6 +4,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { userErrorMessage } from "../../shared/userError";
 import type {
+  BrowserNavigation,
   AccountInfo,
   ContentKind,
   ImageAsset,
@@ -23,11 +24,12 @@ import { desktopPages } from "@/app/navigation";
 import { accountsOptions, historyOptions } from "@/app/queries";
 import { publishKindMeta } from "@/lib/publishKindMeta";
 
-type BrowserTab =
+type BrowserTab = { icon?: string } & (
   | { id: string; name: string; kind?: undefined }
   | { id: string; name: string; kind: "new" }
   | { id: string; name: string; kind: "compose"; contentKind: ContentKind }
-  | { id: string; name: string; kind: "web"; url: string };
+  | { id: string; name: string; kind: "web"; url: string }
+);
 
 const emptyAccounts: AccountInfo[] = [];
 const emptyRecords: { tasks: Task[]; targets: TaskTarget[] } = { tasks: [], targets: [] };
@@ -174,12 +176,13 @@ export function useWorkspaceController() {
       const remaining = isNewTab ? tabs.filter((tab) => tab.id !== activeBrowser) : tabs;
       return remaining.some((tab) => tab.id === account.id)
         ? remaining
-        : [...remaining, { id: account.id, name: account.name }];
+        : [...remaining, { id: account.id, name: "正在加载…" }];
     });
     setActiveBrowser(account.id);
     await (url !== undefined
       ? window.desktop.openAccount(account.id, url)
       : window.desktop.openAccount(account.id));
+    syncWebTab(account.id, await window.desktop.browserNavigation(account.id));
     await queryClient.fetchQuery({ ...accountsOptions, staleTime: 0 });
   };
   const openWebBrowser = async (
@@ -204,20 +207,24 @@ export function useWorkspaceController() {
     setActiveBrowser(id);
     await window.desktop.openWebBrowser(id, url);
   };
-  const syncWebTab = (id: string, nav: { url: string; title: string }) => {
-    setBrowserTabs((tabs) =>
-      tabs.map((tab) => {
-        if (tab.id !== id || tab.kind !== "web") return tab;
-        let name = nav.title.trim() || tab.name;
-        try {
-          if (!nav.title.trim()) name = new URL(nav.url).hostname;
-        } catch {
-          /* keep */
-        }
-        return { ...tab, url: nav.url, name };
-      }),
-    );
-  };
+  const syncWebTab = useCallback(
+    (id: string, nav: Pick<BrowserNavigation, "url" | "title" | "icon">) => {
+      setBrowserTabs((tabs) =>
+        tabs.map((tab) => {
+          if (tab.id !== id || tab.kind === "new" || tab.kind === "compose") return tab;
+          let name = nav.title.trim() || tab.name;
+          try {
+            if (!nav.title.trim()) name = new URL(nav.url).hostname;
+          } catch {
+            /* keep */
+          }
+          return { ...tab, ...(tab.kind === "web" ? { url: nav.url } : {}), name, icon: nav.icon };
+        }),
+      );
+    },
+    [],
+  );
+  useEffect(() => window.desktop.onBrowserNavigationChanged(syncWebTab), [syncWebTab]);
   const submitOmnibox = async (input: string) => {
     const url = await window.desktop.resolveOmniboxUrl(input);
     if (!url) throw new Error("请输入搜索内容或网址");
@@ -273,18 +280,6 @@ export function useWorkspaceController() {
     }
   };
   useEffect(() => {
-    setBrowserTabs((tabs) => {
-      let changed = false;
-      const next = tabs.map((tab) => {
-        const account = accounts.find((item) => item.id === tab.id);
-        if (!account || account.name === tab.name) return tab;
-        changed = true;
-        return { ...tab, name: account.name };
-      });
-      return changed ? next : tabs;
-    });
-  }, [accounts]);
-  useEffect(() => {
     void run(async () => {
       const loadedAccounts = await queryClient.fetchQuery(accountsOptions);
       setAccounts(loadedAccounts);
@@ -318,7 +313,7 @@ export function useWorkspaceController() {
               },
             ];
           const account = loadedAccounts.find((a) => a.id === tab.id);
-          return account ? [{ id: account.id, name: account.name }] : [];
+          return account ? [{ id: account.id, name: "正在加载…" }] : [];
         });
         setBrowserTabs(restored);
         setPage(saved.page);
@@ -327,6 +322,7 @@ export function useWorkspaceController() {
           try {
             if (tab.kind === "web") await window.desktop.openWebBrowser(tab.id, tab.url);
             else await window.desktop.openAccount(tab.id);
+            syncWebTab(tab.id, await window.desktop.browserNavigation(tab.id));
           } catch (error) {
             toast.error(`恢复 ${tab.name} 失败：${userErrorMessage(error)}`);
           }

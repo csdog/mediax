@@ -1,9 +1,14 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { BrowserWindow } from "electron";
 import { AccountBrowserManager } from "../../src/main/browser/AccountBrowserManager";
+import { loadFavicon } from "../../src/main/browser/favicon";
 import { platforms } from "../../src/shared/models";
 vi.mock("../../src/main/browser/contextMenu", () => ({
   installBrowserContextMenu: vi.fn(async () => {}),
+}));
+
+vi.mock("../../src/main/browser/favicon", () => ({
+  loadFavicon: vi.fn(async () => "data:image/png;base64,aWNvbg=="),
 }));
 
 const state = vi.hoisted(() => ({ destroyed: false }));
@@ -13,6 +18,8 @@ const view = vi.hoisted(() => ({
   setBorderRadius: vi.fn(),
   webContents: {
     isDestroyed: () => state.destroyed,
+    getTitle: () => "Example",
+    navigationHistory: { canGoBack: () => true, canGoForward: () => false },
     getURL: () => "https://mp.toutiao.com/",
     getUserAgent: () =>
       "Mozilla/5.0 MediaX/0.3.5 Chrome/152.0.7977.130 Electron/44.7.0 Safari/537.36",
@@ -179,3 +186,81 @@ it.each(["javascript:alert(1)", "file:///tmp/test.html", "invalid", "about:blank
     expect(view.webContents.loadURL).not.toHaveBeenCalled();
   },
 );
+
+it("publishes main-frame navigation and redirects before loading completes", async () => {
+  const send = vi.fn();
+  const host = {
+    on: vi.fn(),
+    webContents: { on: vi.fn(), send },
+    isDestroyed: () => false,
+    getContentSize: () => [1000, 700],
+    contentView: { addChildView: vi.fn() },
+  };
+  const browsers = new AccountBrowserManager(host as unknown as BrowserWindow);
+  let finish!: () => void;
+  view.webContents.loadURL.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const opening = browsers.open("web-test", "https://example.com", { focus: false });
+  const emit = (name: string, ...args: unknown[]) => {
+    for (const [event, listener] of view.webContents.on.mock.calls) {
+      if (event === name) listener({}, ...args);
+    }
+  };
+  emit("did-start-navigation", "https://example.com/start", false, false);
+  expect(send).not.toHaveBeenCalled();
+  emit("did-start-navigation", "https://example.com/start", false, true);
+  expect(send).toHaveBeenLastCalledWith(
+    "mediax:browser-navigation-changed",
+    "web-test",
+    expect.objectContaining({ url: "https://example.com/start" }),
+  );
+  emit("did-redirect-navigation", "https://example.com/final", false, true);
+  expect(send).toHaveBeenLastCalledWith(
+    "mediax:browser-navigation-changed",
+    "web-test",
+    expect.objectContaining({ url: "https://example.com/final" }),
+  );
+  emit("did-navigate-in-page", "https://example.com/final#section", true);
+  expect(send).toHaveBeenLastCalledWith(
+    "mediax:browser-navigation-changed",
+    "web-test",
+    expect.objectContaining({ url: "https://example.com/final#section" }),
+  );
+  emit("page-favicon-updated", ["https://mp.toutiao.com/favicon.ico"]);
+  await vi.waitFor(() =>
+    expect(send).toHaveBeenLastCalledWith(
+      "mediax:browser-navigation-changed",
+      "web-test",
+      expect.objectContaining({ icon: "data:image/png;base64,aWNvbg==" }),
+    ),
+  );
+  expect(loadFavicon).toHaveBeenCalled();
+  expect(browsers.favicon("web-test")).toBe("data:image/png;base64,aWNvbg==");
+  emit("did-start-navigation", "https://example.com/next", false, true);
+  expect(browsers.favicon("web-test")).toBeUndefined();
+  finish();
+  await opening;
+});
+
+it("reports native page focus and clicks even without a history popup", async () => {
+  const browsers = manager();
+  const interaction = vi.fn();
+  browsers.setPageInteraction(interaction);
+  view.webContents.loadURL.mockResolvedValueOnce(undefined);
+  await browsers.open("web-page", "https://example.com/", { focus: false });
+  const emit = (name: string, ...args: unknown[]) => {
+    for (const [event, listener] of view.webContents.on.mock.calls) {
+      if (event === name) listener({}, ...args);
+    }
+  };
+  emit("focus");
+  expect(interaction).toHaveBeenCalledOnce();
+  emit("input-event", { type: "mouseDown" });
+  expect(interaction).toHaveBeenCalledTimes(2);
+  emit("input-event", { type: "mouseMove" });
+  expect(interaction).toHaveBeenCalledTimes(2);
+});

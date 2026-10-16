@@ -51,10 +51,10 @@ import type { AppUpdater } from "./desktop/AppUpdater";
 import { TabPreviewWindow } from "./desktop/TabPreviewWindow";
 import { ToastOverlayWindow } from "./desktop/ToastOverlayWindow";
 import {
-  NativePopupWindow,
+  NativePopupView,
   parseNativePopup,
   parseNativePopupAction,
-} from "./desktop/NativePopupWindow";
+} from "./desktop/NativePopupView";
 import {
   buildDiagnosticReport,
   exportDiagnosticReport,
@@ -111,10 +111,16 @@ export function registerIpc(
   const images = new Map<string, ImageAsset>();
   const tabPreview = new TabPreviewWindow(window);
   const toastOverlay = new ToastOverlayWindow(window);
-  const nativePopup = new NativePopupWindow(window, (event) => {
+  const nativePopup = new NativePopupView(window, (event) => {
     if (!window.isDestroyed()) window.webContents.send("mediax:native-popup-event", event);
   });
-  accounts.setBrowserPageInteraction(() => nativePopup.hide(true));
+  accounts.setBrowserPageInteraction(() => {
+    nativePopup.hide();
+    // Native page focus does not reliably blur the main renderer's active input.
+    // Notify even when the history popup was empty or already closed.
+    if (!window.isDestroyed())
+      window.webContents.send("mediax:native-popup-event", { type: "closed" });
+  });
   const publishing = new PublishService(db, accounts, join(app.getPath("userData"), "task-assets"));
   publishing.startScheduler();
   app.once("will-quit", () => publishing.stopScheduler());
@@ -403,6 +409,10 @@ export function registerIpc(
   ipcMain.on("mediax:native-popup-notify", (event, value) => {
     if (!nativePopup.owns(event.sender)) return;
     if (!value || typeof value !== "object") return;
+    if (value.type === "ready") {
+      nativePopup.rendererReady();
+      return;
+    }
     if (value.type === "resize" && typeof value.height === "number") {
       nativePopup.resize(value.height);
       return;

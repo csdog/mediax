@@ -11,7 +11,6 @@ export type BrowserHistoryEntry = {
 };
 
 const limit = 200;
-const suggestions = 8;
 
 export function rememberVisit(
   entries: BrowserHistoryEntry[],
@@ -36,9 +35,9 @@ export function rememberVisit(
   const existing = entries.find((entry) => entry.url === href);
   const nextIcon = icon || existing?.icon;
   if (!touch && existing?.title === name && existing.icon === nextIcon) return entries;
-  const nextAccountId = accountId ?? existing?.accountId;
-  const nextAccountLabel = accountLabel ?? existing?.accountLabel;
-  const nextAccountAvatar = accountAvatar ?? existing?.accountAvatar;
+  const nextAccountId = accountId ?? (touch ? undefined : existing?.accountId);
+  const nextAccountLabel = accountLabel ?? (touch ? undefined : existing?.accountLabel);
+  const nextAccountAvatar = accountAvatar ?? (touch ? undefined : existing?.accountAvatar);
   const next = [
     {
       url: href,
@@ -66,7 +65,7 @@ export function matchBrowserHistory(entries: BrowserHistoryEntry[], query: strin
           entry.accountLabel?.toLowerCase().includes(needle),
       )
     : ranked;
-  return matched.slice(0, suggestions);
+  return matched.slice(0, limit);
 }
 
 export function removeHistoryEntry(entries: BrowserHistoryEntry[], url: string) {

@@ -320,31 +320,40 @@ html.dark .toolbar-omnibox:focus-within {
 }
 .browser-history {
   margin: 0;
-  padding: 6px;
+  padding: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-weight: 430;
+  line-height: 1.5;
   max-height: 320px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
 }
 .browser-history-item {
+  @apply h-9;
   position: relative;
   display: flex;
   flex-direction: row;
   align-items: center;
   width: 100%;
-  border-radius: 8px;
+  border-radius: 12.5px;
   background: transparent;
   color: var(--foreground);
 }
 .browser-history-main {
+  @apply h-9;
   display: flex;
   flex: 1;
   min-width: 0;
   align-items: center;
-  gap: 8px;
-  padding: 6px 28px 6px 10px;
+  gap: 10px;
+  padding: 0 36px 0 10px;
   border: 0;
   border-radius: inherit;
   appearance: none;
   background: transparent;
+  font: inherit;
   text-align: start;
   color: inherit;
   cursor: default;
@@ -352,14 +361,14 @@ html.dark .toolbar-omnibox:focus-within {
 .browser-history-remove {
   position: absolute;
   top: 50%;
-  right: 4px;
+  right: 10px;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   background: transparent;
   color: var(--muted-foreground);
   opacity: 0;
@@ -370,8 +379,8 @@ html.dark .toolbar-omnibox:focus-within {
     color 150ms ease;
 }
 .browser-history-remove svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 .browser-history-item:hover .browser-history-remove,
 .browser-history-item[data-hover="true"] .browser-history-remove,
@@ -397,13 +406,16 @@ html.dark .browser-history-search[data-hover="true"] {
   background: var(--accent);
 }
 .browser-history-line {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--font-size-control);
-  line-height: 18px;
+  line-height: inherit;
 }
 .browser-history-icon,
 .browser-history-fallback,
@@ -413,6 +425,7 @@ html.dark .browser-history-search[data-hover="true"] {
   flex-shrink: 0;
 }
 .browser-history-icon {
+  border-radius: 2.5px;
   object-fit: contain;
 }
 .browser-history-fallback,
@@ -420,11 +433,24 @@ html.dark .browser-history-search[data-hover="true"] {
   color: var(--muted-foreground);
 }
 .browser-history-title {
+  flex-shrink: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--foreground);
 }
 .browser-history-sep,
 .browser-history-url {
   color: var(--muted-foreground);
+}
+.browser-history-sep {
+  flex-shrink: 0;
+}
+.browser-history-url {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .browser-history-account-avatar {
   width: 20px;
@@ -444,13 +470,14 @@ html.dark .browser-history-search[data-hover="true"] {
 .browser-history-search {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 6px 10px;
+  padding: 0 36px 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 12.5px;
   appearance: none;
   background: transparent;
+  font: inherit;
   text-align: start;
   color: var(--foreground);
   cursor: default;
@@ -489,6 +516,9 @@ html.dark .browser-history-search[data-hover="true"] {
   list-style: none;
   max-height: 320px;
   overflow: auto;
+}
+html.native-popup.native-popup-history {
+  --radius-popover: 15px;
 }
 html.native-popup {
   width: 100%;

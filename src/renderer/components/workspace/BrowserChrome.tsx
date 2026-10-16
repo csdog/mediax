@@ -18,6 +18,8 @@ import type {
   NativePopupRequest,
 } from "../../../shared/models";
 
+import { useBrowserNavigation } from "@/hooks/useBrowserNavigation";
+
 type ChromePopup = NativePopupKind | null;
 
 function popupTheme(): NativePopupRequest["theme"] {
@@ -29,28 +31,30 @@ export function BrowserChrome() {
   const {
     activeBrowserViewId,
     submitOmnibox,
+    openBrowser,
     goBackBrowser,
     goForwardBrowser,
     reloadBrowser,
     run,
     setSettingsOpen,
   } = useWorkspace();
+  useEffect(
+    () => () => {
+      void window.desktop.hideNativePopup();
+    },
+    [],
+  );
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectAddressOnMouseUp = useRef(false);
+  const restoringOmniboxFocus = useRef(false);
   const omniboxRef = useRef<HTMLFormElement>(null);
   const extensionsAnchorRef = useRef<HTMLDivElement>(null);
   const downloadsAnchorRef = useRef<HTMLDivElement>(null);
   const menuAnchorRef = useRef<HTMLDivElement>(null);
-  const historyBlurTimer = useRef(0);
   const findRef = useRef<HTMLInputElement>(null);
   const [popup, setPopup] = useState<ChromePopup>(null);
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
-  const navigation = useQuery({
-    queryKey: ["desktop", "browser-navigation", activeBrowserViewId],
-    enabled: Boolean(activeBrowserViewId),
-    queryFn: () => window.desktop.browserNavigation(activeBrowserViewId!),
-    refetchInterval: activeBrowserViewId ? 1000 : false,
-  });
   const zoom = useQuery({
     queryKey: ["desktop", "browser-zoom", activeBrowserViewId],
     enabled: Boolean(activeBrowserViewId),
@@ -78,9 +82,12 @@ export function BrowserChrome() {
   }, [queryClient]);
   const searchName = provider.data?.name?.trim();
   const hint = searchName ? `搜索 ${searchName} 或输入网址` : "搜索或输入网址";
-  const currentUrl = navigation.data?.url ?? "";
+
   const [address, setAddress] = useState("");
   const [editingAddress, setEditingAddress] = useState(false);
+  const [submittingAddress, setSubmittingAddress] = useState(false);
+  const navigation = useBrowserNavigation(activeBrowserViewId, () => setSubmittingAddress(false));
+  const currentUrl = navigation.data?.url ?? "";
   const [historyQuery, setHistoryQuery] = useState<string | null>(null);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const historyOpen = popup === "history";
@@ -90,12 +97,14 @@ export function BrowserChrome() {
     queryFn: () => window.desktop.browserHistory(historyQuery ?? ""),
   });
   const suggestions = history.data ?? [];
+  const hasSearchSuggestion = Boolean(historyQuery?.trim());
+  const suggestionCount = suggestions.length + (hasSearchSuggestion ? 1 : 0);
   const pageReady = Boolean(activeBrowserViewId);
   const downloadItems = downloads.data ?? [];
   useEffect(() => {
-    if (editingAddress) return;
+    if (editingAddress || submittingAddress) return;
     setAddress(activeBrowserViewId ? currentUrl : "");
-  }, [activeBrowserViewId, currentUrl, editingAddress]);
+  }, [activeBrowserViewId, currentUrl, editingAddress, submittingAddress]);
   useEffect(() => {
     if (!findOpen) return;
     findRef.current?.focus();
@@ -109,10 +118,30 @@ export function BrowserChrome() {
   const externalLabel = "在外部浏览器中打开";
   const externalTarget = (editingAddress ? address : currentUrl).trim();
   const goToAddress = (value: string) => {
+    setAddress(value);
+    setSubmittingAddress(true);
     setEditingAddress(false);
     setPopup(null);
     setHistoryIndex(-1);
-    void run(() => submitOmnibox(value));
+    void run(async () => {
+      try {
+        await submitOmnibox(value);
+      } finally {
+        setSubmittingAddress(false);
+      }
+    });
+  };
+  const openHistory = (url: string) => {
+    const entry = suggestions.find((item) => item.url === url);
+    const account = accounts.data?.find((item) => item.id === entry?.accountId);
+    if (!account) {
+      goToAddress(url);
+      return;
+    }
+    setEditingAddress(false);
+    setPopup(null);
+    setHistoryIndex(-1);
+    void run(() => openBrowser(account, url));
   };
   const onSubmitAddress = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -198,7 +227,7 @@ export function BrowserChrome() {
       setSettingsOpen(true);
       return;
     }
-    if (action.type === "open-history") goToAddress(action.url);
+    if (action.type === "open-history") openHistory(action.url);
     if (action.type === "submit-omnibox") goToAddress(action.value);
     if (action.type === "remove-history") {
       void run(async () => {
@@ -210,7 +239,19 @@ export function BrowserChrome() {
   };
   useEffect(() => {
     return window.desktop.onNativePopupHostEvent((event) => {
+      if (event.type === "focus-omnibox") {
+        restoringOmniboxFocus.current = true;
+        try {
+          inputRef.current?.focus({ preventScroll: true });
+        } finally {
+          restoringOmniboxFocus.current = false;
+        }
+        return;
+      }
       if (event.type === "closed") {
+        inputRef.current?.blur();
+        setEditingAddress(false);
+        setHistoryIndex(-1);
         setPopup(null);
         return;
       }
@@ -224,13 +265,15 @@ export function BrowserChrome() {
       if (!(target instanceof Node)) return;
       if (document.querySelector("[data-browser-chrome]")?.contains(target)) return;
       setPopup(null);
+      setEditingAddress(false);
+      setHistoryIndex(-1);
     };
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [popup]);
   useEffect(() => {
     if (popup === "history" && !history.isFetched) return;
-    if (popup === "history" && suggestions.length === 0) {
+    if (popup === "history" && suggestionCount === 0) {
       void window.desktop.hideNativePopup();
       return;
     }
@@ -244,7 +287,7 @@ export function BrowserChrome() {
       if (!rect) return;
       const searchQuery =
         historyQuery !== null && historyQuery.trim() ? historyQuery.trim() : undefined;
-      const historyEntries = suggestions.slice(0, 8).map((entry) => {
+      const historyEntries = suggestions.map((entry) => {
         if (entry.accountAvatar) return entry;
         const account = accounts.data?.find((item) => item.id === entry.accountId);
         if (!account?.avatar && !account?.name) return entry;
@@ -257,7 +300,6 @@ export function BrowserChrome() {
       void window.desktop.showNativePopup({
         kind: "history",
         theme,
-        focus: false,
         x: Math.max(8, Math.round(rect.x)),
         y: Math.round(rect.bottom + 8),
         width: Math.max(160, Math.round(rect.width)),
@@ -279,7 +321,6 @@ export function BrowserChrome() {
     void window.desktop.showNativePopup({
       kind: popup,
       theme,
-      focus: false,
       x: Math.max(8, Math.round(rect.right - width)),
       y: Math.round(rect.bottom + 8),
       width,
@@ -293,6 +334,7 @@ export function BrowserChrome() {
     history.isFetched,
     historyQuery,
     historyIndex,
+    suggestionCount,
     accounts.data,
     downloads.data,
     pageReady,
@@ -389,27 +431,35 @@ export function BrowserChrome() {
             autoCapitalize="off"
             autoCorrect="off"
             role="combobox"
-            aria-expanded={historyOpen && suggestions.length > 0}
+            aria-expanded={historyOpen && suggestionCount > 0}
             aria-controls="browser-history"
             aria-autocomplete="list"
+            onMouseDown={(event) => {
+              selectAddressOnMouseUp.current =
+                !editingAddress || document.activeElement !== event.currentTarget;
+            }}
+            onMouseUp={(event) => {
+              if (!selectAddressOnMouseUp.current) return;
+              selectAddressOnMouseUp.current = false;
+              event.currentTarget.select();
+            }}
             onFocus={(event) => {
-              window.clearTimeout(historyBlurTimer.current);
+              // Only a native suggestion's temporary focus transfer preserves selection.
+              if (restoringOmniboxFocus.current) return;
               setEditingAddress(true);
               setPopup("history");
               setHistoryQuery(null);
               setHistoryIndex(-1);
-              const input = event.currentTarget;
-              input.setSelectionRange(0, 0);
+              event.currentTarget.select();
             }}
-            onBlur={() => {
+            onBlur={(event) => {
+              // Native popup focus has no DOM relatedTarget. Its host owns dismissal.
+              if (!event.relatedTarget) return;
               setEditingAddress(false);
-              historyBlurTimer.current = window.setTimeout(() => {
-                setPopup((current) => (current === "history" ? null : current));
-                setHistoryIndex(-1);
-              }, 180);
+              setPopup((current) => (current === "history" ? null : current));
+              setHistoryIndex(-1);
             }}
             onChange={(event) => {
-              window.clearTimeout(historyBlurTimer.current);
               setEditingAddress(true);
               setPopup("history");
               setHistoryQuery(event.target.value);
@@ -417,28 +467,35 @@ export function BrowserChrome() {
               setAddress(event.target.value);
             }}
             onKeyDown={(event) => {
-              if (event.key === "ArrowDown" && suggestions.length) {
+              if (event.nativeEvent.isComposing) return;
+              if ((event.key === "ArrowDown" || event.key === "ArrowUp") && suggestionCount) {
                 event.preventDefault();
                 setPopup("history");
-                setHistoryIndex((index) => Math.min(suggestions.length - 1, index + 1));
-                return;
-              }
-              if (event.key === "ArrowUp") {
-                event.preventDefault();
-                setHistoryIndex((index) => Math.max(-1, index - 1));
+                const index =
+                  event.key === "ArrowDown"
+                    ? Math.min(suggestionCount - 1, historyIndex + 1)
+                    : Math.max(-1, historyIndex - 1);
+                setHistoryIndex(index);
+                setAddress(
+                  index >= 0 && index < suggestions.length
+                    ? suggestions[index]!.url
+                    : (historyQuery ?? currentUrl),
+                );
                 return;
               }
               if (event.key === "Escape") {
-                if (popup !== "history") return;
                 event.preventDefault();
                 setPopup(null);
                 setHistoryIndex(-1);
+                setHistoryQuery(null);
+                setAddress(currentUrl);
                 return;
               }
               if (event.key !== "Enter") return;
               event.preventDefault();
               const picked = historyIndex >= 0 ? suggestions[historyIndex] : undefined;
-              goToAddress(picked?.url ?? event.currentTarget.value);
+              if (historyOpen && picked) openHistory(picked.url);
+              else goToAddress(event.currentTarget.value);
             }}
           />
           <Tooltip>

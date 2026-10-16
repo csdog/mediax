@@ -9,6 +9,10 @@ vi.mock("../../src/renderer/lib/logging", () => ({ initializeRendererLogging: vi
 it("imports and saves content, manages desktop tabs/settings, and requires target selection plus publish confirmation", async () => {
   let commandListener: ((command: any) => void) | undefined;
   let profile = { name: "MediaX", avatar: null as string | null };
+  let firstAccountCreated = false;
+  const navigationListeners = new Set<
+    Parameters<typeof window.desktop.onBrowserNavigationChanged>[0]
+  >();
   window.desktop = {
     accountGroups: vi.fn().mockResolvedValue([]),
     createAccountGroup: vi.fn(),
@@ -101,6 +105,19 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     checkForUpdates: vi.fn(),
     installUpdate: vi.fn(),
     onUpdateStatus: vi.fn(() => () => undefined),
+    browserNavigation: vi.fn(async () => ({
+      url: "https://facebook.com/",
+      title: "Facebook 网站",
+      icon: "data:image/png;base64,aWNvbg==",
+      canGoBack: false,
+      canGoForward: false,
+    })),
+    onBrowserNavigationChanged: (listener) => {
+      navigationListeners.add(listener);
+      return () => {
+        navigationListeners.delete(listener);
+      };
+    },
     onDownloadsChanged: vi.fn(() => () => undefined),
     onNativePopupHostEvent: vi.fn(() => () => undefined),
     showNativePopup: vi.fn().mockResolvedValue(undefined),
@@ -191,11 +208,21 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       detail: null,
     })),
     accounts: vi.fn().mockResolvedValue([]),
-    addAccount: vi.fn().mockResolvedValue({
-      id: "account-1",
-      name: "Facebook 账号 1",
-      login: "unchecked",
-      targets: [],
+    addAccount: vi.fn().mockImplementation(async () => {
+      const account = {
+        id: "account-1",
+        name: "Facebook 账号 1",
+        platform: "facebook",
+        login: "logged_in",
+        targets: [],
+      };
+      if (!firstAccountCreated) {
+        firstAccountCreated = true;
+        vi.mocked(window.desktop.accounts).mockResolvedValue([account] as Awaited<
+          ReturnType<typeof window.desktop.accounts>
+        >);
+      }
+      return account;
     }),
     layoutAccountBrowser: vi.fn().mockResolvedValue(undefined),
     closeAccountBrowser: vi.fn().mockResolvedValue(undefined),
@@ -244,6 +271,17 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     screen.getByRole("tab", { name: "新标签页", exact: true }).getAttribute("aria-selected"),
   ).toBe("true");
   expect(screen.queryByRole("dialog", { name: "新建标签页" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "新建标签页" }));
+  fireEvent.click(screen.getByRole("button", { name: "扩展" }));
+  await waitFor(() =>
+    expect(window.desktop.showNativePopup).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "extensions" }),
+    ),
+  );
+  vi.mocked(window.desktop.hideNativePopup).mockClear();
+  await act(async () => commandListener?.({ action: "tab", operation: "close" }));
+  await waitFor(() => expect(window.desktop.hideNativePopup).toHaveBeenCalled());
+  expect(screen.getAllByRole("tab", { name: "新标签页", exact: true })).toHaveLength(1);
   await act(async () => commandListener?.({ action: "tab", operation: "close" }));
   await waitFor(() =>
     expect(screen.queryByRole("tab", { name: "新标签页", exact: true })).toBeNull(),
@@ -289,15 +327,46 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   await waitFor(() => expect(window.desktop.openAccount).toHaveBeenCalledWith("account-1"));
   expect(window.desktop.addAccount).toHaveBeenCalledWith("Facebook 账号 1", "facebook");
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "添加账号" })).toBeNull());
-  expect(screen.getByRole("tab", { name: "Facebook 账号 1" }).getAttribute("aria-selected")).toBe(
+  expect(screen.getByRole("tab", { name: "Facebook 网站" }).getAttribute("aria-selected")).toBe(
     "true",
   );
+  const pageTab = screen.getByRole("tab", { name: "Facebook 网站" });
+  expect(within(pageTab).getByAltText("网站图标").getAttribute("src")).toBe(
+    "data:image/png;base64,aWNvbg==",
+  );
+  expect(within(pageTab).getByLabelText("账号：Facebook 账号 1")).toBeTruthy();
+  act(() => {
+    for (const listener of navigationListeners)
+      listener("account-1", {
+        url: "https://facebook.com/next",
+        title: "新的页面标题",
+        icon: "data:image/png;base64,bmV3",
+        canGoBack: true,
+        canGoForward: false,
+      });
+  });
+  expect(screen.getByRole("tab", { name: "新的页面标题" })).toBeTruthy();
+  expect(
+    within(screen.getByRole("tab", { name: "新的页面标题" }))
+      .getByAltText("网站图标")
+      .getAttribute("src"),
+  ).toBe("data:image/png;base64,bmV3");
+  act(() => {
+    for (const listener of navigationListeners)
+      listener("account-1", {
+        url: "https://facebook.com/",
+        title: "Facebook 网站",
+        icon: "data:image/png;base64,aWNvbg==",
+        canGoBack: true,
+        canGoForward: false,
+      });
+  });
   fireEvent.click(screen.getByRole("tab", { name: "账号管理" }));
   await waitFor(() => expect(window.desktop.layoutAccountBrowser).toHaveBeenCalledWith(null));
-  fireEvent.click(screen.getByRole("tab", { name: "Facebook 账号 1" }));
-  fireEvent.click(screen.getByRole("button", { name: "关闭 Facebook 账号 1 标签页" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Facebook 网站" }));
+  fireEvent.click(screen.getByRole("button", { name: "关闭 Facebook 网站 标签页" }));
   await waitFor(() => expect(window.desktop.closeAccountBrowser).toHaveBeenCalledWith("account-1"));
-  await waitFor(() => expect(screen.queryByRole("tab", { name: "Facebook 账号 1" })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("tab", { name: "Facebook 网站" })).toBeNull());
   expect(screen.queryByRole("button", { name: "设置", exact: true })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "打开头像菜单" }));
   expect(screen.getByRole("dialog", { name: "用户菜单" }).textContent).toContain("MediaX");
@@ -434,12 +503,12 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   fireEvent.click(screen.getByRole("button", { name: "添加账号", exact: true }));
   fireEvent.click(screen.getByRole("button", { name: "Facebook" }));
   await waitFor(() =>
-    expect(screen.getByRole("tab", { name: "Facebook 账号 1" }).getAttribute("aria-selected")).toBe(
+    expect(screen.getByRole("tab", { name: "Facebook 网站" }).getAttribute("aria-selected")).toBe(
       "true",
     ),
   );
-  fireEvent.click(screen.getByRole("button", { name: "关闭 Facebook 账号 1 标签页" }));
-  await waitFor(() => expect(screen.queryByRole("tab", { name: "Facebook 账号 1" })).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: "关闭 Facebook 网站 标签页" }));
+  await waitFor(() => expect(screen.queryByRole("tab", { name: "Facebook 网站" })).toBeNull());
   fireEvent.click(screen.getByRole("tab", { name: "账号管理", exact: true }));
   await waitFor(() =>
     expect(

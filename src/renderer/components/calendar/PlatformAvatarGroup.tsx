@@ -1,3 +1,4 @@
+import { UserRound } from "lucide-react";
 import {
   Avatar,
   AvatarFallback,
@@ -28,17 +29,31 @@ type PlatformAvatarGroupProps = {
 };
 
 /** Stacked platform marks; hover lists accounts like Account Management「账号信息」. */
-export function PlatformAvatarGroup({
+export function PlatformAvatarGroup(props: PlatformAvatarGroupProps) {
+  return <PublisherAvatarGroup {...props} variant="platform" />;
+}
+
+/** Stacked account avatars; distinct accounts on the same platform remain visible. */
+export function AccountAvatarGroup(props: PlatformAvatarGroupProps) {
+  return <PublisherAvatarGroup {...props} variant="account" />;
+}
+
+function PublisherAvatarGroup({
   publishers,
   size = "sm",
   className,
-}: PlatformAvatarGroupProps) {
+  variant,
+}: PlatformAvatarGroupProps & { variant: "platform" | "account" }) {
   const platforms = uniquePlatforms(publishers);
   if (!platforms.length) return null;
 
-  const visible = platforms.slice(0, MAX_VISIBLE);
-  const extra = platforms.length - visible.length;
   const accounts = uniquePublishers(publishers);
+  const visiblePlatforms = platforms.slice(0, MAX_VISIBLE);
+  const visibleAccounts = accounts.slice(0, MAX_VISIBLE);
+  const extra = Math.max(
+    0,
+    (variant === "account" ? accounts.length : platforms.length) - MAX_VISIBLE,
+  );
 
   return (
     <HoverCard>
@@ -51,7 +66,11 @@ export function PlatformAvatarGroup({
               "inline-flex max-w-full cursor-default rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
               className,
             )}
-            aria-label={platforms.map((id) => platformInfo[id].label).join("、")}
+            aria-label={
+              variant === "account"
+                ? `发布账号：${accounts.map((account) => `${account.name}（${platformInfo[account.platform].label}）`).join("、")}`
+                : platforms.map((id) => platformInfo[id].label).join("、")
+            }
           >
             <AvatarGroup
               className={cn(
@@ -60,9 +79,23 @@ export function PlatformAvatarGroup({
               )}
               data-size={size}
             >
-              {visible.map((id) => (
-                <PlatformAvatar key={id} id={id} size={size} />
-              ))}
+              {variant === "account"
+                ? visibleAccounts.map((account) => (
+                    <Avatar
+                      key={account.id ?? `${account.platform}:${account.name}`}
+                      size={size}
+                      className={size === "sm" ? "size-5" : undefined}
+                      aria-label={account.name}
+                    >
+                      {account.avatar ? (
+                        <AvatarImage src={account.avatar} alt={`${account.name} 头像`} />
+                      ) : null}
+                      <AvatarFallback className="bg-transparent text-foreground">
+                        <UserRound className={size === "sm" ? "size-3.5" : "size-5"} aria-hidden />
+                      </AvatarFallback>
+                    </Avatar>
+                  ))
+                : visiblePlatforms.map((id) => <PlatformAvatar key={id} id={id} size={size} />)}
               {extra > 0 ? (
                 <AvatarGroupCount className={size === "sm" ? "size-5 text-[10px]" : undefined}>
                   +{extra}

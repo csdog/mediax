@@ -55,7 +55,7 @@ function act(action: NativePopupAction) {
   window.desktop.notifyNativePopup({ type: "action", action });
 }
 
-// macOS child windows may not apply :hover until tracked explicitly.
+// Share the same hover state across history rows, downloads, and menu items.
 const rowHover: HTMLAttributes<HTMLElement> = {
   onMouseEnter: (event) => {
     event.currentTarget.dataset.hover = "true";
@@ -199,24 +199,24 @@ function HistoryPanel({ popup }: { popup: NativePopupRequest }) {
   const entries = popup.historyEntries ?? [];
   const selected = popup.historyIndex ?? -1;
   const searchQuery = popup.historySearchQuery?.trim();
-  const [hoverKey, setHoverKey] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const syncHover = (event: PointerEvent) => {
-      const row = document
-        .elementFromPoint(event.clientX, event.clientY)
-        ?.closest<HTMLElement>("[data-history-row]");
-      setHoverKey(row?.dataset.historyRow ?? null);
-    };
-    const clearHover = () => setHoverKey(null);
-    document.addEventListener("pointermove", syncHover);
-    document.addEventListener("pointerleave", clearHover);
-    return () => {
-      document.removeEventListener("pointermove", syncHover);
-      document.removeEventListener("pointerleave", clearHover);
-    };
-  }, []);
+    listRef.current
+      ?.querySelector<HTMLElement>('[aria-selected="true"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [selected]);
   return (
-    <div className="browser-history" role="listbox" aria-label="历史记录">
+    <div
+      ref={listRef}
+      className="browser-history select-none"
+      role="listbox"
+      aria-label="历史记录"
+      onMouseDownCapture={(event) => {
+        // Keep DOM focus out of suggestion buttons; activate only on click release.
+        if (event.button === 0) event.preventDefault();
+      }}
+      onPointerDownCapture={() => window.getSelection()?.removeAllRanges()}
+    >
       {entries.map((entry, index) => (
         <div
           key={entry.url}
@@ -224,21 +224,21 @@ function HistoryPanel({ popup }: { popup: NativePopupRequest }) {
           aria-selected={index === selected}
           className="browser-history-item"
           data-history-row={entry.url}
-          data-hover={hoverKey === entry.url ? "true" : undefined}
+          {...rowHover}
           data-active={index === selected ? "true" : undefined}
         >
           <button
             type="button"
             className="browser-history-main"
-            onMouseDown={(event) => {
-              event.preventDefault();
-              act({ type: "open-history", url: entry.url });
-            }}
+            tabIndex={-1}
+            onClick={() => act({ type: "open-history", url: entry.url })}
           >
-            <HistoryIcon src={entry.icon} />
+            <HistoryIcon key={entry.icon} src={entry.icon} />
             <span className="browser-history-line">
               <span className="browser-history-title">{entry.title}</span>
-              <span className="browser-history-sep"> — </span>
+              <span className="browser-history-sep" aria-hidden>
+                —
+              </span>
               <span className="browser-history-url">{formatHistoryUrl(entry.url)}</span>
             </span>
             <AccountAvatar entry={entry} />
@@ -247,11 +247,8 @@ function HistoryPanel({ popup }: { popup: NativePopupRequest }) {
             type="button"
             className="browser-history-remove"
             aria-label="从历史记录中删除"
-            onMouseDown={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              act({ type: "remove-history", url: entry.url });
-            }}
+            tabIndex={-1}
+            onClick={() => act({ type: "remove-history", url: entry.url })}
           >
             <X aria-hidden />
           </button>
@@ -262,11 +259,12 @@ function HistoryPanel({ popup }: { popup: NativePopupRequest }) {
           type="button"
           className="browser-history-item browser-history-search"
           data-history-row="search"
-          data-hover={hoverKey === "search" ? "true" : undefined}
-          onMouseDown={(event) => {
-            event.preventDefault();
-            act({ type: "submit-omnibox", value: searchQuery });
-          }}
+          role="option"
+          aria-selected={selected === entries.length}
+          data-active={selected === entries.length ? "true" : undefined}
+          {...rowHover}
+          tabIndex={-1}
+          onClick={() => act({ type: "submit-omnibox", value: searchQuery })}
         >
           <Search className="browser-history-search-icon" aria-hidden />
           <span className="browser-history-line">{searchQuery}</span>
@@ -367,10 +365,13 @@ export function NativePopupApp() {
   const [popup, setPopup] = useState<NativePopupRequest | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    return window.desktop.onNativePopup((next) => {
+    const unsubscribe = window.desktop.onNativePopup((next) => {
       document.documentElement.classList.toggle("dark", next.theme === "dark");
+      document.documentElement.classList.toggle("native-popup-history", next.kind === "history");
       setPopup(next);
     });
+    window.desktop.notifyNativePopup({ type: "ready" });
+    return unsubscribe;
   }, []);
   useEffect(() => {
     const card = cardRef.current;
