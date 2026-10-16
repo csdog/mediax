@@ -6,6 +6,7 @@ import { createServer } from "node:net";
 import { dirname } from "node:path";
 import { log } from "../logging";
 import { createControlApp } from "./createApp";
+import type { ControlServices } from "./business";
 import { controlConfigPath } from "./paths";
 
 export type ControlListenInfo = {
@@ -63,7 +64,9 @@ async function writeControlConfig(info: {
 }
 
 /** Start loopback Hono control API and publish `~/.mediax/agent/control.json` for mediax-agent. */
-export async function startControlServer(): Promise<ControlListenInfo | null> {
+export async function startControlServer(
+  services: ControlServices,
+): Promise<ControlListenInfo | null> {
   if (process.env.MEDIAX_CONTROL_DISABLE === "1") {
     log.info("Control API disabled via MEDIAX_CONTROL_DISABLE");
     return null;
@@ -78,7 +81,7 @@ export async function startControlServer(): Promise<ControlListenInfo | null> {
   const baseUrl = `http://127.0.0.1:${port}`;
   const apiVersion = 1;
   const configPath = controlConfigPath();
-  const hono = createControlApp({ token, version: app.getVersion() });
+  const hono = createControlApp({ token, version: app.getVersion(), services });
 
   await new Promise<void>((resolve, reject) => {
     server = serve(

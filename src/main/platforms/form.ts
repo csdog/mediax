@@ -1,3 +1,4 @@
+import { readCreatorProfile, type CreatorPlatform } from "../accounts/creatorProfile";
 import type { Locator, Page } from "playwright-core";
 import type { Target, Task } from "../../shared/models";
 import { NeedsUser, NotSubmitted } from "./Publisher";
@@ -20,8 +21,14 @@ export async function discoverProfile(
   accountId: string,
   name: string,
   loggedOut: (url: string) => boolean,
+  platform?: CreatorPlatform,
 ): Promise<Target[]> {
   if (loggedOut(page.url())) return [];
+  if (platform) {
+    await page.waitForFunction(readCreatorProfile, platform, { timeout: 10_000 }).catch(() => {});
+    const profile = await page.evaluate(readCreatorProfile, platform);
+    if (profile) name = profile.name;
+  }
   return [{ accountId, identityId: "1", name, kind: "profile" }];
 }
 

@@ -17,6 +17,7 @@ import { platformInfo } from "../../shared/platforms";
 import { bandwidthLimitBytesPerSecond, readPublishSettings } from "../../shared/publishSettings";
 import { NeedsUser, type Publisher } from "../platforms/Publisher";
 import { discoveredAccountName, shouldAdoptAccountName, usableAccountName } from "./accountName";
+import { isCreatorPlatform, readCreatorProfile } from "./creatorProfile";
 import { Database } from "../storage/Database";
 import { AccountBrowserManager } from "../browser/AccountBrowserManager";
 
@@ -215,7 +216,11 @@ export class AccountService {
         if (state) this.states.set(id, { ...state, avatar: undefined });
       }
       if (!owner) return;
-      const found = (await view.webContents.executeJavaScript(avatarProbe)) as {
+      const found = (await view.webContents.executeJavaScript(
+        isCreatorPlatform(account.platform)
+          ? `(${readCreatorProfile.toString()})(${JSON.stringify(account.platform)})`
+          : avatarProbe,
+      )) as {
         href?: string | null;
         rect?: { x: number; y: number; width: number; height: number } | null;
         name?: string | null;
@@ -233,13 +238,21 @@ export class AccountService {
       }
       if (image && image !== previous) this.db.setSetting(`avatar:${id}`, { owner, actor, image });
       const named = usableAccountName(account.platform, found?.name);
-      if (named && shouldAdoptAccountName(account.name, named)) this.db.renameAccount(id, named);
+      if (
+        named &&
+        (isCreatorPlatform(account.platform) || shouldAdoptAccountName(account.name, named))
+      )
+        this.db.renameAccount(id, named);
       const state = this.states.get(id);
       if (state)
         this.states.set(id, {
           ...state,
           avatar: image,
-          name: named && shouldAdoptAccountName(state.name, named) ? named : state.name,
+          name:
+            named &&
+            (isCreatorPlatform(account.platform) || shouldAdoptAccountName(state.name, named))
+              ? named
+              : state.name,
         });
       return image;
     } catch {

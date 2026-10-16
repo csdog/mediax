@@ -30,7 +30,7 @@ export class XiaohongshuAdapter implements Publisher {
         timeout: 60000,
       });
     }
-    return discoverProfile(page, accountId, "小红书账号", loggedOut);
+    return discoverProfile(page, accountId, "小红书账号", loggedOut, "xiaohongshu");
   }
 
   async prepare(task: Task, _target: TaskTarget) {

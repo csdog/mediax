@@ -1,6 +1,7 @@
 import { BrowserWindow, WebContentsView, type Session } from "electron";
 import { CdpBridge } from "./CdpBridge";
 import { installBrowserContextMenu } from "./contextMenu";
+import { loadFavicon } from "./favicon";
 import { log } from "../logging";
 import type { BrowserBounds, PlatformId } from "../../shared/models";
 export class AccountBrowserManager {
@@ -14,6 +15,7 @@ export class AccountBrowserManager {
     private host?: BrowserWindow,
     private endpoint?: string,
     private onSession?: (session: Session) => void,
+    private onVisit?: (url: string, title: string, touch: boolean, icon?: string) => void,
   ) {
     if (!host) return;
     host.on("resize", () => this.layout());
@@ -153,6 +155,22 @@ export class AccountBrowserManager {
     view.setBounds({ x: 0, y: 44, width: 1000, height: 700 });
     view.setVisible(!this.host);
     view.webContents.setBackgroundThrottling(false);
+    const remember = (touch: boolean, icon?: string) => {
+      if (view.webContents.isDestroyed()) return;
+      this.onVisit?.(view.webContents.getURL(), view.webContents.getTitle(), touch, icon);
+    };
+    view.webContents.on("did-navigate", () => remember(true));
+    view.webContents.on("did-navigate-in-page", (_event, _url, isMainFrame) => {
+      if (isMainFrame) remember(true);
+    });
+    view.webContents.on("page-title-updated", () => remember(false));
+    view.webContents.on("page-favicon-updated", (_event, favicons) => {
+      const page = view.webContents;
+      void loadFavicon(page.session, favicons).then((icon) => {
+        if (!icon || page.isDestroyed()) return;
+        this.onVisit?.(page.getURL(), page.getTitle(), false, icon);
+      });
+    });
     void installBrowserContextMenu(view.webContents, (url) => {
       if (this.host && !this.host.isDestroyed())
         this.host.webContents.send("mediax:command", { action: "open-web", url });
@@ -187,7 +205,21 @@ export class AccountBrowserManager {
     }
     win.contentView.addChildView(view);
     this.views.set(accountId, view);
-    view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    view.webContents.setWindowOpenHandler(({ url }) => {
+      // Account links often use target=_blank (e.g. Zhihu's creator center).
+      // Keep navigation in this view so it retains the account's partition.
+      try {
+        const target = new URL(url);
+        if (["http:", "https:"].includes(target.protocol) && !view.webContents.isDestroyed()) {
+          void this.loadURL(view, target.href).catch((error) =>
+            log.warn("Account popup navigation failed", { error: String(error) }),
+          );
+        }
+      } catch {
+        // Ignore invalid URLs and keep native popup windows disabled.
+      }
+      return { action: "deny" };
+    });
     this.onSession?.(view.webContents.session);
     if (this.host) this.layout();
     else {

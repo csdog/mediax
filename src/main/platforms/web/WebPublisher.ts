@@ -1,3 +1,4 @@
+import { isCreatorPlatform } from "../../accounts/creatorProfile";
 import type { Page } from "playwright-core";
 import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { ContentKind, PlatformId, Target, Task, TaskTarget } from "../../../shared/models";
@@ -28,7 +29,13 @@ export class WebPublisher implements Publisher {
     if (!page.url().includes(new URL(this.flow.home).hostname)) {
       await page.goto(this.flow.home, { waitUntil: "domcontentloaded", timeout: 60000 });
     }
-    return discoverProfile(page, accountId, this.flow.label, this.flow.loggedOut);
+    return discoverProfile(
+      page,
+      accountId,
+      this.flow.label,
+      this.flow.loggedOut,
+      isCreatorPlatform(this.flow.platform) ? this.flow.platform : undefined,
+    );
   }
 
   async prepare(task: Task, _target: TaskTarget) {

@@ -1,147 +1,115 @@
 # AGENTS.md
 
-macOS 本地多平台发布应用。Git 仓库是 `mediax-desktop/`；外层 `mediax/` 只是容器。开发、测试和打包都在本目录执行。
+## 项目与工作目录
 
-## 命令
+MediaX 是本地多平台发布应用。Git 仓库是 `mediax-desktop/`，外层 `mediax/` 只是容器；开发、测试、打包和 Git 操作都在仓库目录执行。
 
-完整本地开发 / 测试 / 打包步骤见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。Node 与 pnpm 以 `mise.toml` 为准；`electron` 不在 PATH 上，用 `pnpm run` 或 `pnpm exec`。
+- 产品显示名用 **MediaX**；协议、包名、数据目录等标识符用小写 `mediax`，见 `src/shared/product.ts`。
+- Node 与 pnpm 版本以 `mise.toml` 为准；`electron` 不在 PATH 上，通过 `pnpm run` 或 `pnpm exec` 调用。
+- 开发、打包、Dock 名和 `MediaX.app` 重命名步骤见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
+- 界面采用 React、TanStack Router/Query、Tailwind 和 shadcn/Base UI；图标只用 Lucide。视觉规范见 [docs/ui-style.md](docs/ui-style.md)。
+
+## 工作原则
+
+- **优先复用现有工具和成熟库。** 先查项目已有实现与依赖，再考虑新依赖；轮询、请求状态、缓存、路由、表单、日期、样式合并等不要重复造轮子。只有现有方案确实不能满足业务时，才小范围自行实现。
+- 用户提示只显示清楚的原因和处理建议，不展示 IPC 方法名、错误码、代码、文件路径或调用栈；技术详情保留在诊断日志中。
+- 日志中不要写正文、Cookie、密码或图片预览。
+- 未经用户明确要求，不提交、不推送、不正式发版；不修改 Git 配置，不跳过钩子。
+
+## 命令与验证
+
+在仓库目录通过 `mise exec --` 执行：
 
 ```sh
-pnpm run dev
-pnpm run typecheck
-pnpm run test:unit
-pnpm run test:ui
-pnpm run lint
-pnpm run fmt
+mise exec -- pnpm run dev
+mise exec -- pnpm run typecheck
+mise exec -- pnpm run test:unit
+mise exec -- pnpm run test:ui
+mise exec -- pnpm run lint
+mise exec -- pnpm run fmt
 ```
 
-集成 / 打包测试只有用户明确要求时才跑；不要为了验证向真实账号再发一条帖。Dock 名与 `MediaX.app` 重命名细节见 DEVELOPMENT.md。
+按改动范围验证，避免重复检查：
 
-## 版本与发版
+- 界面与交互：`test:ui`，走通受影响的流程。
+- 主进程、发布规则、启动或导入路径：`test:unit`；启动改动还要关注日志中的 `[perf]` 与 `Startup performance marks`。
+- 类型、共享模型、IPC、平台适配器、DOM / Playwright 脚本或启动 / 导入路径：`typecheck` 必须通过。
+- 格式使用 oxfmt，静态检查使用 oxlint。
+- **集成与打包测试仅在用户明确要求时执行。** 不要为了验证向真实账号发布内容。
 
-对用户可见的功能、重命名、安装包行为或默认配置有实质变化时，**同一批提交里**要抬 `package.json` 的 `version`（semver：破坏性/大改 → minor 或 major；小修 → patch）。不要只推代码、事后再补版本。
+## 代码导航
 
-**只要 `package.json` 的 `version` 相对上一已发布版本有增加，合并进 `main` 后必须立刻打并推送同号 `v*` 标签**（如 `0.3.1` → `v0.3.1`）。禁止出现「版本号已抬、tag 未打」；不要等用户再提醒发版。
-
-### 走 PR，再打 tag
-
-GitHub Release 的自动 **What's Changed** 只汇总**合并进默认分支的 PR**，不列出直推 `main` 的 commit。因此：
-
-1. 在功能分支上开发并提交（含需要的 version bump）。
-2. 开 PR → 审查 → **merge 进 `main`**（不要把发版相关改动只直推 `main`）。
-3. **同一轮操作内**在已合并的 `main` 上打并推送 `v*` 标签（与 `package.json` 一致，如 `v0.3.1`），触发 GitHub Actions 打安装包并发 Release。
-
-仅 `git push` 主分支不会发版；仅打 tag 但中间没有合并 PR 时，Release 往往只有 Full Changelog 链接、没有 What's Changed。用户要求「提交并推送」且属于发版范围时：默认走 PR 合并后再打 tag；用户明确说「直推 / 不要 PR」时才直推，并自行写清 release 正文（或接受无 What's Changed）。无论走 PR 还是直推，**version bump 后都必须打 tag**。
-
-显示名是 **MediaX**；协议、包名、数据目录等标识符用小写 `mediax`（见 `src/shared/product.ts`）。
-
-## 代码位置
-
-- `src/shared/models.ts`：平台 ID、任务、桌面 API。
-- `src/shared/content.ts`：内容类型 `article | moment | video | audio`，以及 `supportedKinds`、`validatePublish`。
-- `src/shared/platforms.ts`：平台名称、角标和颜色。每个 `PlatformId` 都要有条目。
-- `src/main/platforms/catalog.ts`：登录页和会话判断。每个平台都要有 `sessions` 条目。
-- `src/main/platforms/registry.ts`：按平台创建发布器。没有发布流程的平台保持 `LoginAdapter`。
-- `src/main/platforms/web/`：文章、动态和音频的浏览器编辑流程。已有视频平台的成功路径留在各自适配器里。
-- `src/main/publish/`：发布前校验、复制素材、可配置并行队列。
+- `src/shared/models.ts`：平台 ID、任务模型、桌面 API。
+- `src/shared/content.ts`：内容类型、`supportedKinds` 和 `validatePublish`；平台发布能力以这里为准。
+- `src/shared/platforms.ts`：平台名称、角标和颜色；每个 `PlatformId` 都必须有条目。
+- `src/main/platforms/catalog.ts`：平台入口和会话判断；每个平台都必须有 `sessions` 条目。
+- `src/main/platforms/registry.ts`：发布器注册；未实现发布流程的平台保持 `LoginAdapter`。
+- `src/main/platforms/web/`：文章、动态、音频的浏览器编辑流程；已有视频平台的成功路径留在各自适配器中。
+- `src/main/publish/`：发布前校验、素材复制、可配置并行队列。
 - `src/main/storage/`：Drizzle schema 与 SQLite。
-- `src/main/control/`：Agent 本机控制面（Hono + OpenAPI）。`Eventually` 阶段监听 `127.0.0.1`，写 `~/.mediax/agent/control.json`（根目录可用 `MEDIAX_HOME` 覆盖）；`GET /health` 需 bearer；`GET /doc` 为 OpenAPI。可用 `MEDIAX_CONTROL_DISABLE=1` / `MEDIAX_CONTROL_PORT`。
 - `src/renderer/pages/ComposePage.tsx`：文章、动态、视频、音频创作页。
+- `src/main/control/`：Agent 本机控制面，使用 Hono + OpenAPI；在 `Eventually` 阶段监听 `127.0.0.1`。连接信息写入 `~/.mediax/agent/control.json`，根目录可通过 `MEDIAX_HOME` 覆盖；`GET /health` 需 bearer，`GET /doc` 提供 OpenAPI。配置项为 `MEDIAX_CONTROL_DISABLE=1` 和 `MEDIAX_CONTROL_PORT`。
 
-界面用 React、TanStack Router/Query、Tailwind 和 shadcn/Base UI。图标只用 Lucide。视觉规范见 `docs/ui-style.md`。
+## 内容与发布
 
-## 样式（Tailwind 优先）
+- 发布使用应用内 Electron Chromium，由 Playwright 经本机 CDP 操作；不要另开浏览器或注入用户的日常浏览器。发布 CDP 留在主进程，不移入渲染进程或 Worker。
+- 创作页只有 `article | moment | video | audio`：文章需要标题和正文，最多一张封面；动态需要正文，附件只能是图片；视频和音频可以没有正文，但必须各有一个对应文件。
+- 账号列表只显示支持当前内容类型的账号。已有的抖音、快手、小红书图文属于动态，不另建内容类型。
+- 正文保持纯文本，复用现有 Markdown 导入，不增加富文本编辑器。
+- `createTask` 的目标 `identityId` 必须为数字字符串；站点没有数字 ID 时用 `"1"`，名称仍显示站点账号名。
+- 点击发布前调用 `markSubmitted`。控件缺失或未登录时抛 `NeedsUser`，让任务停在待人工处理，不假装发布成功。
+- 定时任务带 `scheduledAt`，目标状态为 `scheduled`；仅在 MediaX 运行时，由 `ScheduleService` 到点改为 `pending` 并入队。关机不保证发布，可配合「发布/排期时保持唤醒」设置防止休眠与息屏。
 
-渲染层样式优先用 **Tailwind utility**，不要默认去写一整段裸 CSS。
+## 界面与类型
 
-- **一次用**：在组件 `className` 里直接写 utility（如 `inline-flex items-center justify-center gap-1`）。
-- **要复用**：优先抽小组件，把 class 收在一处；若必须保留 class 钩子（表格列、第三方挂载点等），再用 CSS 里的 `@apply` 组合 utility，例如：
+### Tailwind 优先
 
-```css
-.account-toolbar-actions {
-  @apply inline-flex flex-wrap items-center gap-2;
-}
-```
+- 一次性样式直接写在组件 `className` 中，例如 `inline-flex items-center justify-center gap-1`。
+- 复用样式优先抽小组件；确需保留 class 钩子时，使用 CSS `@apply` 组合 utility。
+- 裸 CSS 仅用于现有 token、窗口外壳，或 utility 无法表达的选择器和动画，例如 `workspace.css`、`tokens.css`。
+- 历史页面、表单和列表操作默认用 Tailwind；同一块布局不在 Tailwind 与自定义 CSS 中重复定义。
 
-- **才写裸 CSS**：现有 token / 窗口外壳 / 非 Tailwind 能表达的选择器或动画（`workspace.css`、`tokens.css` 等）。不要为了「复用」再堆一套平行的手写 class。
-- 改历史页面、表单、列表操作等 UI 时，默认 Tailwind；与现有 CSS 文件混用时，同一块布局不要 Tailwind 和自定义 CSS 各写一半。
+### TypeScript 边界
 
-## 发布约束
+- 保持 `strict`；新增 API、IPC 和共享模型先明确类型。禁止大面积 `as any` / `@ts-ignore`；确需断言时使用更窄的类型或类型守卫，并说明原因。
+- `PlatformId`、`ContentKind` 等联合类型使用穷尽检查，避免漏平台或内容类型。
+- `tsconfig` 已包含 `DOM` 和 `DOM.Iterable`；DOM 集合可使用 `for...of`、展开或 `Array.from`，不要为绕过报错关闭类型库。
+- Playwright `Locator` / `Page` 与 DOM 类型不混用；`page.evaluate` 回调只使用可序列化传入的值和页面内可访问的变量。
+- Electron 主进程不引用仅渲染层存在的 DOM 全局；预加载与沙箱边界的值显式收窄类型。
 
-发布使用应用内 Electron Chromium，经本机 CDP 由 Playwright 操作。不要另开浏览器，也不要注入到用户日常浏览器。
+## 数据与迁移
 
-创作页只有文章、动态、视频、音频。文章要标题和正文，最多一张封面；动态要正文，附件只能是图片；视频和音频可以没有正文，但必须各有一个对应文件。只列出支持当前类型的账号。能力表以 `supportedKinds` 为准。已有的抖音、快手、小红书图文就是动态，不要再写一套。
+- 业务库位于 `~/Library/Application Support/mediax/mediax.sqlite`；测试可通过 `MEDIAX_USER_DATA` 指定目录。开发日志位于仓库 `logs/main.log`。
+- 当前数据库拒绝高于 6 的 `user_version`。下一张迁移为 `drizzle/0004_*.sql`，届时将 `Database` 上限改为 7，并同步提高“版本过高”测试档位。
+- 已发布的迁移 SQL 不修改。改表使用 `pnpm run db:generate`，同时提交 SQL、`drizzle/meta/_journal.json` 和快照。
+- 不对用户数据库执行 `drizzle-kit push`。
 
-正文保持纯文本，外加现有 Markdown 导入。不要加富文本编辑器。
+## 性能与窗口生命周期
 
-定时发布：任务可带 `scheduledAt`，目标状态为 `scheduled`；**仅 MediaX 在运行时**由 `ScheduleService` 到点翻成 `pending` 再入队。关机不保证发出。可配合设置「发布/排期时保持唤醒」（防休眠与息屏）。
+参考 [Electron Performance](https://www.electronjs.org/docs/latest/tutorial/performance)，沿用 VS Code 的 code cache / UtilityProcess / 分阶段生命周期，以及将重活移出主进程的原则。排期见 [docs/TODO.md](docs/TODO.md)。
 
-`createTask` 要求目标 `identityId` 为数字。站点没有数字 ID 时用 `"1"`，名称仍显示站点上的账号名。
+- 主进程禁止新增同步 `fs` / `child_process`（`*Sync`）阻塞 UI；长 CPU 任务和大文件编解码放 UtilityProcess / Worker，或延到 `Eventually`。
+- 在 `markRestored` 前不启动账号全量同步、更新检查或其他可延后的网络 / 磁盘扫描。生命周期顺序保持 `Starting → Restored → Eventually`。
+- 冷启动不静态导入 Playwright、updater 或大解析库等重依赖，需要时再动态加载。
+- 新窗口与账号视图保持 `sandbox`、`contextIsolation`，默认关闭拼写检查；账号页为原生拼写菜单显式启用。主窗口保持 `spellcheck: false`，打包界面使用 `v8CacheOptions: 'bypassHeatCheck'`。
+- 账号内嵌页确需后台活跃时可关闭 `backgroundThrottling`；主窗口不默认关闭。显式管理视图及其 `webContents` 的关闭与销毁。
+- 保留已落地的启动优化：ready 前清默认菜单、单实例冲突用 `app.exit(0)`、版本升级清 Chromium code cache、CDP 就绪与窗口加载并行、启动性能埋点、Markdown / 素材导入进 UtilityProcess 并保留失败回退。
+- 相关实现位于 `src/main/index.ts`、`browser/CdpBridge.ts`、`browser/AccountBrowserManager.ts`、`desktop/codeCache.ts`、`desktop/appLifecycle.ts`、`desktop/perfMarks.ts`、`desktop/AppUpdater.ts`、`content/mediaImportHost.ts` 和 `workers/mediaImportWorker.ts`；以上未带前缀的路径均相对 `src/main/`。
 
-点击发布前调用 `markSubmitted`。控件缺失或未登录时抛 `NeedsUser`，让任务停在待人工处理，不要假装已发布。
+## Git、版本与正式发版
 
-## 数据
+### 日常开发
 
-当前 schema 拒绝高于 6 的 `user_version`。下一张迁移是 `drizzle/0004_*.sql`，并把 `Database` 的版本上限改到 7，同时把“版本过高”测试再加一档。已发布的 SQL 不要改。改表用 `pnpm run db:generate`，并提交 SQL、`drizzle/meta/_journal.json` 和快照。不要对用户库执行 `drizzle-kit push`。
+- 在功能分支上开发和提交；普通提交、推送、PR 合并以及开发 / 测试打包都不视为正式发版。
+- **开发期间保留当前版本号，不为每项功能或修复升版本号。** 用户只要求「提交」「推送」「提交并推送」或「合并 PR」时，不自行升版本号、打 tag 或发布 Release。
 
-业务库在 `~/Library/Application Support/mediax/mediax.sqlite`。`MEDIAX_USER_DATA` 可改测试目录。开发日志在仓库 `logs/main.log`。日志里不要写正文、Cookie、密码或图片预览。
+### 正式发版
 
-## 性能优化
+只有用户明确要求正式发版时才执行以下流程：
 
-对标 [Electron Performance](https://www.electronjs.org/docs/latest/tutorial/performance)、VS Code（code cache / UtilityProcess / 生命周期分阶段）和 Codex Desktop（重活出主进程）。改启动路径或主进程重活时遵守本节，不要为了省事把同步 I/O 或大模块重新塞回冷启动。
+1. 汇总自上一正式版本以来的全部改动，按 semver 选择下一版本：破坏性变更 → major；新增功能 → minor；兼容性修复 → patch。一次发版只提升一次 `package.json` 的 `version`。
+2. 将版本变更纳入发版 PR，审查后合并进 `main`。GitHub 自动生成的 What's Changed 汇总已合并 PR，因此默认通过 PR 发版。
+3. 在同一轮发版操作内，为对应的已合并提交打并推送同号标签：版本 `X.Y.Z` → tag `vX.Y.Z`，触发 GitHub Actions 构建安装包并发布同标签 Release。
+4. 确认构建成功、Release 已发布、安装包上传完整且版本一致后，才报告发版完成。失败时处理同一次发版，不为重试反复升版本号。
 
-### 已落地
-
-| 措施                                                                       | 位置 / 约定                                                                            |
-| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| ready 前 `Menu.setApplicationMenu(null)`                                   | `src/main/index.ts`                                                                    |
-| 单实例冲突用 `app.exit(0)`，不用 `app.quit()`                              | 避免启动期 Chrome_IOThread SIGTRAP                                                     |
-| 主窗口 / 账号视图 `spellcheck: false`、`v8CacheOptions: 'bypassHeatCheck'` | `index.ts`、`AccountBrowserManager`                                                    |
-| 版本升级清 Chromium code cache                                             | `src/main/desktop/codeCache.ts`                                                        |
-| CDP 就绪与窗口 `loadURL`/`loadFile` 并行                                   | `index.ts`                                                                             |
-| 生命周期 `Starting → Restored → Eventually`                                | `src/main/desktop/appLifecycle.ts`；账号同步、自动更新只进 Eventually                  |
-| 启动埋点 `mediax/will*` / `did*`                                           | `src/main/desktop/perfMarks.ts`；Eventually 打摘要日志                                 |
-| 懒加载 `playwright-core`、`electron-updater`                               | `CdpBridge.connect`、`AppUpdater` 首次使用时再 `import`                                |
-| 素材 / Markdown 导入进 UtilityProcess                                      | `src/main/content/mediaImportHost.ts` + `workers/mediaImportWorker.ts`；失败回退主进程 |
-
-### Agent 约束
-
-- **主进程**：禁止新增同步 `fs` / `child_process`（`*Sync`）挡在 UI 线程上；长 CPU 或大文件编解码放 UtilityProcess / Worker，或延到 Eventually。
-- **启动**：不要在 `markRestored` 之前拉起账号全量同步、更新检查、或其它可延后的网络 / 磁盘扫描。
-- **模块**：冷启动路径不要静态 `import` 重依赖（Playwright、updater、大解析库）；需要时再动态加载。
-- **窗口**：新 `BrowserWindow` / `WebContentsView` 默认带上 `sandbox`、`contextIsolation`、`spellcheck: false`；打包向 UI 用 `v8CacheOptions: 'bypassHeatCheck'`。账号内嵌页若必须后台保持活跃可关 `backgroundThrottling`，主窗口不要默认关。
-- **发布 CDP**：仍须留在主进程（要碰 `webContents`）；不要为了「性能」另开用户浏览器或把 Playwright 塞进渲染进程。
-- **验证**：改启动或导入路径后跑 `pnpm run typecheck` 与 `pnpm run test:unit`；关注日志里的 `[perf]` 与 `Startup performance marks`。
-
-参考清单与排期备注见 `docs/TODO.md`。
-
-## TypeScript 类型
-
-目标：改完后尽量不出现 `tsc` 错误；`pnpm run typecheck` 必须通过。不要用大面积 `as any` / `@ts-ignore` 糊弄过去。
-
-### 约定
-
-- 保持 `strict`；新增 API、IPC、共享模型先写清类型（优先改 `src/shared/models.ts` 等共享定义）。
-- DOM 集合可迭代：`tsconfig` 已含 `DOM` + `DOM.Iterable`。对 `NodeListOf` / `HTMLCollection` 用 `for...of`、展开或 `Array.from(...)` 均可；不要为绕过类型去关 lib。
-- 常见坑示例：
-  - `TS2488`：`NodeListOf<Element>` 不可迭代 → 确认 lib 含 `DOM.Iterable`，或写成 `Array.from(document.querySelectorAll(...))`。
-  - Playwright `Locator` / `Page` 与 DOM 类型不要混用；`page.evaluate` 回调内只使用可序列化进浏览器的类型。
-  - Electron 主进程不要引用仅渲染层存在的 DOM 全局；预加载与沙箱边界上的值用显式类型收窄。
-- 联合类型与 `PlatformId` / `ContentKind` 用穷尽检查（`switch` + `never`），避免漏平台。
-- 禁止无必要的 `any`；确需放宽时用更窄的断言或类型守卫，并注明原因。
-
-### 验证
-
-涉及类型、共享模型、IPC、平台适配器或 DOM/Playwright 脚本时，提交前跑：
-
-```sh
-pnpm run typecheck
-```
-
-## 改动习惯
-
-界面改动用 `pnpm run test:ui` 走通受影响的流程。主进程和发布规则用 `pnpm run test:unit`。类型改动再跑 `pnpm run typecheck`。格式用 oxfmt，检查用 oxlint。
-
-**尽量用已有工具和成熟库，不自己手写。** 轮询、请求状态、缓存、路由、表单、日期、样式合并等常见能力，优先用项目已依赖的栈（如 TanStack Query / Router、react-hook-form、date-fns、现有 hooks 与组件）。先查仓库里有没有现成用法，再考虑新依赖；不要为同构问题再造一套 util / 轮询器 / 状态机。只有现有库明显盖不住、或业务特异到库帮不上时，才小范围手写。
-
-除非用户明确要求，不要提交或推送。不要改 git 配置，不要跳过钩子。
+仅推送 `main` 不会发版；只改版本号、只打标签或只建 Release 都不算完成发版。用户明确要求「直推 / 不要 PR」时才直推，并自行写清 Release 正文；无论哪种流程，正式发版都要完成版本号、tag、Release 和安装包验证。

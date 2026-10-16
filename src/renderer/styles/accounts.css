@@ -110,19 +110,12 @@
   font-size: var(--font-size-caption);
   color: var(--hint);
 }
-.account-filter-item[aria-pressed="true"],
-.account-group-all {
+.account-filter-item[aria-pressed="true"] {
   background: var(--selected);
 }
 .account-groups {
   border-top: 1px solid var(--border);
   margin-top: 24px;
-}
-.account-groups > p {
-  text-align: center;
-  color: var(--hint);
-  font-size: var(--font-size-caption);
-  margin: 24px 0;
 }
 .account-results {
   min-width: 0;

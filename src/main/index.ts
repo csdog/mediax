@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
 import { productId, productName } from "../shared/product";
 import { AccountBrowserManager } from "./browser/AccountBrowserManager";
+import { BrowserHistoryStore } from "./browser/BrowserHistoryStore";
 import { Database } from "./storage/Database";
 import { AccountService } from "./accounts/AccountService";
 import { registerIpc } from "./ipc";
@@ -238,9 +239,17 @@ async function start(): Promise<void> {
   const downloads = new DownloadStore(() => {
     if (!win.isDestroyed()) win.webContents.send("mediax:downloads-changed", downloads.list());
   });
+  const browserHistory = new BrowserHistoryStore(
+    join(app.getPath("userData"), "browser-history.json"),
+  );
   const accounts = new AccountService(
     db,
-    new AccountBrowserManager(win, endpoint, (session) => downloads.watch(session)),
+    new AccountBrowserManager(
+      win,
+      endpoint,
+      (session) => downloads.watch(session),
+      (url, title, touch, icon) => browserHistory.remember(url, title, touch, icon),
+    ),
   );
   accounts.applyBandwidthLimit();
   app.on("will-quit", () => {
@@ -250,7 +259,16 @@ async function start(): Promise<void> {
       stopControlServer().catch((error) => log.warn("Control API stop failed", error)),
     );
   });
-  registerIpc(db, accounts, win, () => shell.rendererReady(), shell, updater, downloads);
+  const publishing = registerIpc(
+    db,
+    accounts,
+    win,
+    () => shell.rendererReady(),
+    shell,
+    updater,
+    downloads,
+    browserHistory,
+  );
   if (maximized) win.maximize();
   app.on("will-quit", () => db.close());
   mark("mediax/willLoadWindow");
@@ -273,7 +291,7 @@ async function start(): Promise<void> {
     accounts.startAutoRefresh();
     updater.start();
     void import("./control/ControlServer")
-      .then(({ startControlServer }) => startControlServer())
+      .then(({ startControlServer }) => startControlServer({ db, accounts, publishing }))
       .catch((error) => log.error("Control API failed to start", error));
     log.info("Startup performance marks", { marks: startupPerfSnapshot() });
   });

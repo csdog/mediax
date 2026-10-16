@@ -200,7 +200,7 @@ export function WorkspaceNavigation() {
           </Popover>
         </div>
       </aside>
-      <Sidebar className="border-0" variant="sidebar">
+      <Sidebar className="border-0" variant="sidebar" role="navigation" aria-label="工作区导航">
         <SidebarHeader className="px-2 py-2">
           <div className="flex h-8 items-center gap-1.5 px-2">
             <span className="text-sm font-semibold">MediaX</span>

@@ -78,7 +78,7 @@ const sessions: Record<PlatformId, Session> = {
     "https://baijiahao.baidu.com",
     ["BDUSS"],
   ),
-  toutiao: known("https://mp.toutiao.com/auth/page/login", "https://mp.toutiao.com", [
+  toutiao: known("https://mp.toutiao.com/profile_v4/index", "https://mp.toutiao.com", [
     "sessionid",
     "sso_uid_tt",
   ]),

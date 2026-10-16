@@ -1,5 +1,9 @@
 import React from "react";
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
+import { cleanup } from "@testing-library/react";
+
+// Unmount while jsdom globals still exist so layout observers and timers stop.
+afterEach(cleanup);
 
 // jsdom cannot run NumberFlow's custom-element animation lifecycle. Keep numeric
 // content in app workflow tests; exercise the animation in the real desktop UI.

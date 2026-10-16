@@ -149,13 +149,51 @@ body {
   flex-shrink: 0;
 }
 .browser-chrome .toolbar-navigation {
-  gap: 6px;
+  gap: 0;
+  height: 32px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow:
+    0 0 0 1px var(--border-subtle),
+    0 4px 16px #0000000d;
 }
-.browser-chrome .toolbar-navigation [data-slot="button"],
+.browser-chrome .toolbar-navigation [data-slot="button"] {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+}
+.browser-chrome .toolbar-nav-divider {
+  width: 1px;
+  height: 16px;
+  margin-inline: 4px;
+  background: var(--border);
+  flex-shrink: 0;
+}
 .browser-chrome-actions [data-slot="button"] {
   width: 28px;
   height: 28px;
   border-radius: 8px;
+}
+.browser-chrome-actions .toolbar-outline-plain {
+  border-radius: 999px;
+  border-color: var(--border);
+  background: transparent;
+  color: var(--foreground);
+  box-shadow: none;
+}
+.dark .browser-chrome-actions .toolbar-outline-plain {
+  border-color: rgb(255 255 255 / 15%);
+  background: transparent;
+}
+.browser-chrome-actions .toolbar-outline-plain:hover,
+.browser-chrome-actions .toolbar-outline-plain[aria-expanded="true"] {
+  background: rgb(13 13 13 / 12%);
+  color: var(--foreground);
+}
+.dark .browser-chrome-actions .toolbar-outline-plain:hover,
+.dark .browser-chrome-actions .toolbar-outline-plain[aria-expanded="true"] {
+  background: rgb(255 255 255 / 16%);
 }
 .toolbar-navigation button,
 .toolbar-navigation .toolbar-nav-button {
@@ -176,12 +214,13 @@ body {
   height: 16px;
 }
 .toolbar-omnibox {
+  position: relative;
   flex: 1;
   min-width: 0;
-  height: 28px;
+  height: 32px;
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 36px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--foreground) 5%, transparent);
   box-shadow: none;
@@ -193,25 +232,122 @@ body {
   background: color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 .toolbar-omnibox:focus-within {
-  background: var(--card);
+  background: #0000000d;
   box-shadow: inset 0 0 0 1px var(--border);
+}
+html.dark .toolbar-omnibox:focus-within {
+  background: #ffffff1a;
 }
 .toolbar-omnibox input {
   width: 100%;
+  height: 100%;
   min-width: 0;
   border: 0;
   outline: none;
   background: transparent;
   color: var(--foreground);
   font-size: var(--font-size-control);
-  line-height: var(--line-height-caption);
+  line-height: 32px;
   text-align: center;
+}
+.toolbar-omnibox.is-editing {
+  padding-left: 10px;
 }
 .toolbar-omnibox.is-editing input {
   text-align: start;
 }
+.toolbar-omnibox-external {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--foreground);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 150ms ease,
+    background-color 150ms ease;
+}
+.toolbar-omnibox:hover .toolbar-omnibox-external,
+.toolbar-omnibox:focus-within .toolbar-omnibox-external,
+.toolbar-omnibox.is-editing .toolbar-omnibox-external {
+  opacity: 1;
+  pointer-events: auto;
+}
+.toolbar-omnibox-external:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+.toolbar-omnibox-external:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
 .toolbar-omnibox input::placeholder {
   color: var(--hint);
+}
+.browser-history-panel {
+  width: var(--anchor-width);
+}
+.browser-history {
+  margin: 0;
+  padding: 6px;
+  max-height: 320px;
+  overflow: auto;
+}
+.browser-history-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: start;
+  color: var(--foreground);
+  cursor: default;
+}
+.browser-history-item:hover,
+.browser-history-item[data-active="true"] {
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+.browser-history-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.browser-history-icon,
+.browser-history-fallback {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.browser-history-icon {
+  object-fit: contain;
+}
+.browser-history-fallback {
+  color: var(--muted-foreground);
+}
+.browser-history-title,
+.browser-history-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.browser-history-title {
+  font-size: var(--font-size-control);
+}
+.browser-history-url {
+  font-size: var(--font-size-caption);
+  color: var(--muted-foreground);
 }
 .browser-chrome-actions {
   display: flex;
@@ -245,8 +381,78 @@ body {
   max-height: 320px;
   overflow: auto;
 }
+html.native-popup {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+html.native-popup body,
+html.native-popup #root {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+.native-popup-shell {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.native-popup-card {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 420px;
+  overflow: auto;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-popover);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+.native-popup-menu,
+.native-popup-row {
+  font: inherit;
+  color: inherit;
+}
+.native-popup-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  grid-column: 1 / -1;
+  padding: 4px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+.native-popup-menu button,
+.native-popup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: start;
+  font-size: var(--font-size-control);
+}
+.native-popup-menu button:hover:not(:disabled),
+.native-popup-row:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+.native-popup-menu button:disabled,
+.native-popup-row:disabled {
+  opacity: 0.5;
+}
 .browser-download-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   min-height: 52px;
