@@ -14,6 +14,15 @@ const api: DesktopApi = {
   resolveOmniboxUrl: (input) => call("resolveOmniboxUrl", input),
   webSearchProvider: () => call("webSearchProvider"),
   browserNavigation: (id) => call("browserNavigation", id),
+  onBrowserNavigationChanged: (listener) => {
+    const receive = (
+      _event: Electron.IpcRendererEvent,
+      id: string,
+      navigation: Parameters<typeof listener>[1],
+    ) => listener(id, navigation);
+    ipcRenderer.on("mediax:browser-navigation-changed", receive);
+    return () => ipcRenderer.removeListener("mediax:browser-navigation-changed", receive);
+  },
   browserHistory: (query) => call("browserHistory", query),
   removeBrowserHistory: (url) => call("removeBrowserHistory", url),
   navigateBrowser: (id, url) => call("navigateBrowser", id, url),

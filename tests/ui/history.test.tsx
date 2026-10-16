@@ -82,6 +82,21 @@ it("lists publish records with filters from the reference layout", async () => {
     importLocalFiles: vi.fn().mockResolvedValue({ markdown: null, assets: [], warnings: [] }),
     revealInFolder: vi.fn(),
     openPost: vi.fn().mockResolvedValue(undefined),
+    openWebBrowser: vi.fn().mockResolvedValue(undefined),
+    webSearchProvider: vi.fn().mockResolvedValue({ name: "Bing" }),
+    downloads: vi.fn().mockResolvedValue([]),
+    browserZoom: vi.fn().mockResolvedValue({ factor: 1 }),
+    browserNavigation: vi.fn().mockResolvedValue({
+      url: "https://www.facebook.com/demo/posts/1",
+      title: "文章",
+      canGoBack: false,
+      canGoForward: false,
+    }),
+    onBrowserNavigationChanged: () => () => {},
+    onDownloadsChanged: () => () => {},
+    onNativePopupHostEvent: () => () => {},
+    hideNativePopup: vi.fn().mockResolvedValue(undefined),
+    layoutAccountBrowser: vi.fn().mockResolvedValue(undefined),
     pathForFile: vi.fn(),
     diagnostics: vi.fn().mockResolvedValue({
       generatedAt: "2026-10-13T00:00:00.000Z",
@@ -188,12 +203,8 @@ it("lists publish records with filters from the reference layout", async () => {
   expect(screen.getByText("成功")).toBeTruthy();
   expect(screen.getByText("1 账号 · 1 任务")).toBeTruthy();
   expect(screen.getByRole("button", { name: "新增发布" })).toBeTruthy();
-  const openPost = screen.getByRole("button", { name: "打开", exact: true });
+  const openPost = screen.getByRole("button", { name: "打开文章", exact: true });
   expect(openPost.querySelector("svg")).toBeTruthy();
-  fireEvent.click(openPost);
-  await waitFor(() =>
-    expect(window.desktop.openPost).toHaveBeenCalledWith("https://www.facebook.com/demo/posts/1"),
-  );
   let finishRepublish!: () => void;
   window.desktop.republish = vi.fn(
     () =>
@@ -223,10 +234,58 @@ it("lists publish records with filters from the reference layout", async () => {
       .querySelector("svg")
       ?.classList.contains("animate-spin"),
   ).toBe(false);
-  const openAccount = screen.getByRole("button", { name: "打开账号", exact: true });
-  expect(openAccount.querySelector("svg")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "打开账号", exact: true })).toBeNull();
   fireEvent.change(screen.getByLabelText("搜索作品描述或任务标题"), {
     target: { value: "不存在的标题" },
   });
   expect(screen.getByText("没有匹配的发布记录")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("搜索作品描述或任务标题"), { target: { value: "" } });
+  fireEvent.click(screen.getByRole("button", { name: "打开文章", exact: true }));
+  await waitFor(() =>
+    expect(window.desktop.openWebBrowser).toHaveBeenCalledWith(
+      expect.stringMatching(/^web-/),
+      "https://www.facebook.com/demo/posts/1",
+    ),
+  );
+  expect(window.desktop.openPost).not.toHaveBeenCalled();
+  fireEvent.click(screen.getAllByRole("tab", { name: "发布记录", exact: true })[0]);
+  const history = await window.desktop.history();
+  const first = history.targets[0];
+  vi.mocked(window.desktop.history).mockResolvedValue({
+    ...history,
+    targets: [
+      first,
+      {
+        ...first,
+        id: "target-2",
+        accountId: "account-2",
+        name: "知乎",
+        url: "https://www.zhihu.com/question/1/answer/2",
+      },
+      { ...first, id: "target-3", name: "重复链接" },
+      { ...first, id: "target-4", name: "没有链接", url: null },
+    ],
+  });
+  await waitFor(() => expect(screen.getByText("2 账号 · 4 任务")).toBeTruthy(), { timeout: 3000 });
+  vi.mocked(window.desktop.openWebBrowser).mockClear();
+  expect(screen.getAllByRole("button", { name: "打开文章", exact: true })).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "打开文章", exact: true }));
+  await waitFor(() => expect(window.desktop.openWebBrowser).toHaveBeenCalledTimes(2));
+  expect(window.desktop.openWebBrowser).toHaveBeenCalledWith(
+    expect.stringMatching(/^web-/),
+    first.url,
+  );
+  expect(window.desktop.openWebBrowser).toHaveBeenCalledWith(
+    expect.stringMatching(/^web-/),
+    "https://www.zhihu.com/question/1/answer/2",
+  );
+  fireEvent.click(screen.getAllByRole("tab", { name: "发布记录", exact: true })[0]);
+  vi.mocked(window.desktop.history).mockResolvedValue({
+    ...history,
+    targets: [{ ...first, url: null }],
+  });
+  await waitFor(() => expect(screen.getByText("1 账号 · 1 任务")).toBeTruthy(), { timeout: 3000 });
+  expect(
+    (screen.getByRole("button", { name: "打开文章", exact: true }) as HTMLButtonElement).disabled,
+  ).toBe(true);
 });

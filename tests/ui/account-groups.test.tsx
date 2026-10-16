@@ -161,3 +161,46 @@ it.each([1024, 600])(
     expect(save).toHaveBeenLastCalledWith("a", []);
   },
 );
+
+it("can return from a lower status option to all statuses in the non-draggable popup", async () => {
+  window.desktop = { accountGroups: async () => [] } as unknown as typeof window.desktop;
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const user = userEvent.setup();
+  render(
+    <QueryClientProvider client={client}>
+      <TooltipProvider>
+        <AccountManagement
+          accounts={[
+            { id: "a", name: "正常账号", platform: "zhihu", login: "logged_in", targets: [] },
+            {
+              id: "b",
+              name: "验证账号",
+              platform: "toutiao",
+              login: "needs_verification",
+              targets: [],
+            },
+          ]}
+          busy={false}
+          onAuthorize={vi.fn()}
+          onOpen={vi.fn()}
+          onRefresh={vi.fn(async () => {})}
+          onDelete={vi.fn()}
+        />
+      </TooltipProvider>
+    </QueryClientProvider>,
+  );
+  const trigger = screen.getByRole("combobox", { name: "登录状态" });
+  await user.click(trigger);
+  await user.click(await screen.findByRole("option", { name: "需要验证" }));
+  await waitFor(() => expect(screen.queryByRole("heading", { name: "正常账号" })).toBeNull());
+  expect(screen.getByRole("heading", { name: "验证账号" })).toBeTruthy();
+  await user.click(trigger);
+  const all = await screen.findByRole("option", { name: "全部状态" });
+  const popup = all.closest('[data-slot="select-content"]')!;
+  expect(popup.classList.contains("window-no-drag")).toBe(true);
+  expect(popup.parentElement!.classList.contains("window-no-drag")).toBe(true);
+  expect(popup.getAttribute("data-align-trigger")).toBe("true");
+  await user.click(all);
+  await waitFor(() => expect(screen.getByRole("heading", { name: "正常账号" })).toBeTruthy());
+  expect(screen.getByRole("heading", { name: "验证账号" })).toBeTruthy();
+});

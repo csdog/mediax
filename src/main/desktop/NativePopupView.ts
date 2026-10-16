@@ -1,4 +1,5 @@
-import { BrowserWindow, type WebContents } from "electron";
+import { log } from "../logging";
+import { WebContentsView, type BrowserWindow, type WebContents } from "electron";
 import { join } from "node:path";
 import type {
   NativePopupAction,
@@ -13,7 +14,6 @@ export function parseNativePopup(value: unknown): NativePopupRequest {
   const popup = value as NativePopupRequest;
   if (!kinds.has(popup.kind)) throw new Error("无效弹层");
   if (popup.theme !== "light" && popup.theme !== "dark") throw new Error("无效弹层");
-  if (typeof popup.focus !== "boolean") throw new Error("无效弹层");
   for (const key of ["x", "y", "width"] as const) {
     if (typeof popup[key] !== "number" || !Number.isFinite(popup[key])) throw new Error("无效弹层");
   }
@@ -62,90 +62,88 @@ export function parseNativePopupAction(value: unknown): NativePopupAction | null
   }
 }
 
-// A child window stacks above the account WebContentsView, so the popup can cover the page.
-export class NativePopupWindow {
-  private window: BrowserWindow | null = null;
+// A local native view stacks above external account pages without a separate inactive window.
+export class NativePopupView {
+  private view: WebContentsView | null = null;
   private ready = false;
   private pending: NativePopupRequest | null = null;
   private height = 160;
   private kind: NativePopupRequest["kind"] | null = null;
-  private openedAt = 0;
 
   constructor(
     private parent: BrowserWindow,
     private emit: (event: NativePopupHostEvent) => void,
-  ) {}
+  ) {
+    const dismiss = () => this.hide(true);
+    parent.on("blur", dismiss);
+    parent.on("move", dismiss);
+    parent.on("resize", dismiss);
+    parent.once("closed", () => {
+      if (this.view && !this.view.webContents.isDestroyed()) this.view.webContents.close();
+      this.view = null;
+    });
+  }
 
   show(request: NativePopupRequest) {
-    const win = this.ensure();
+    if (this.parent.isDestroyed()) return;
+    const view = this.ensure();
     if (request.kind !== this.kind) {
       this.height = request.kind === "extensions" ? 132 : 220;
       this.kind = request.kind;
     }
     this.pending = request;
-    this.place(win, request);
-    // Stay key on the parent via showInactive(); focusable so macOS tracks hover inside the popup.
-    win.setFocusable(true);
-    if (this.ready && !win.webContents.isDestroyed()) {
-      win.webContents.send("mediax:native-popup", request);
+    this.place(view, request);
+    // Re-adding an existing child raises it above the active external page.
+    this.parent.contentView.addChildView(view);
+    if (this.ready) {
+      view.webContents.send("mediax:native-popup", request);
+      view.setVisible(true);
     }
-    if (!win.isVisible()) {
-      this.openedAt = Date.now();
-      win.showInactive();
-      return;
+  }
+
+  rendererReady() {
+    const view = this.view;
+    if (!view || view.webContents.isDestroyed() || this.parent.isDestroyed()) return;
+    this.ready = true;
+    if (this.pending) {
+      view.webContents.send("mediax:native-popup", this.pending);
+      view.setVisible(true);
     }
+    log.debug("Native popup renderer ready", { pending: this.pending?.kind });
   }
 
   resize(height: number) {
     const next = Math.max(48, Math.min(640, Math.round(height)));
-    if (!this.pending || !this.window || Math.abs(next - this.height) < 2) return;
+    if (!this.pending || !this.view || Math.abs(next - this.height) < 2) return;
     this.height = next;
-    this.place(this.window, this.pending);
+    this.place(this.view, this.pending);
   }
 
   owns(contents: WebContents) {
-    return this.window?.webContents === contents;
+    return this.view?.webContents === contents;
   }
 
   hide(notify = false) {
-    const wasOpen = this.pending !== null || Boolean(this.window?.isVisible());
-    if (!wasOpen) return;
+    const wasOpen = this.pending !== null;
     this.pending = null;
     this.kind = null;
-    const win = this.window;
-    if (win && !win.isDestroyed() && win.isVisible()) win.hide();
-    if (notify) this.emit({ type: "closed" });
+    if (this.view && !this.view.webContents.isDestroyed()) this.view.setVisible(false);
+    if (wasOpen && notify) this.emit({ type: "closed" });
   }
 
-  private place(win: BrowserWindow, request: NativePopupRequest) {
-    if (this.parent.isDestroyed() || win.isDestroyed()) return;
-    const content = this.parent.getContentBounds();
-    win.setBounds({
-      x: Math.round(content.x + request.x),
-      y: Math.round(content.y + request.y),
+  private place(view: WebContentsView, request: NativePopupRequest) {
+    if (this.parent.isDestroyed() || view.webContents.isDestroyed()) return;
+    view.setBounds({
+      x: Math.round(request.x),
+      y: Math.round(request.y),
       width: Math.round(request.width),
       height: this.height,
     });
   }
 
   private ensure() {
-    if (this.window && !this.window.isDestroyed()) return this.window;
-    const win = new BrowserWindow({
-      parent: this.parent,
-      frame: false,
-      transparent: true,
-      hasShadow: false,
-      resizable: false,
-      movable: false,
-      minimizable: false,
-      maximizable: false,
-      fullscreenable: false,
-      closable: false,
-      skipTaskbar: true,
-      show: false,
-      roundedCorners: false,
-      acceptFirstMouse: true,
-      backgroundColor: "#00000000",
+    if (this.view && !this.view.webContents.isDestroyed()) return this.view;
+    const view = new WebContentsView({
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -154,30 +152,45 @@ export class NativePopupWindow {
         preload: join(__dirname, "../preload/nativePopup.js"),
       },
     });
-    const dismiss = () => {
-      if (Date.now() - this.openedAt < 200) return;
-      this.hide(true);
-    };
-    win.on("blur", dismiss);
-    this.parent.on("blur", dismiss);
-    this.parent.on("move", dismiss);
-    this.parent.on("resize", dismiss);
-    win.webContents.on("did-finish-load", () => {
-      this.ready = true;
-      if (this.pending && !win.webContents.isDestroyed()) {
-        win.webContents.send("mediax:native-popup", this.pending);
-      }
+    this.view = view;
+    this.ready = false;
+    view.setVisible(false);
+    view.setBackgroundColor("#00000000");
+    this.parent.contentView.addChildView(view);
+    view.webContents.on("did-start-loading", () => {
+      this.ready = false;
     });
+    view.webContents.on("focus", () => {
+      if (this.kind !== "history" || !this.pending || this.parent.isDestroyed()) return;
+      // A native child can take OS focus even when DOM mousedown is prevented.
+      // History suggestions belong to the omnibox, which remains the keyboard owner.
+      this.parent.webContents.focus();
+      this.emit({ type: "focus-omnibox" });
+    });
+    view.webContents.on("before-input-event", (event, input) => {
+      if (input.type !== "keyDown") return;
+      if (
+        this.kind === "history" &&
+        (input.control || input.meta) &&
+        input.key.toLowerCase() === "a"
+      ) {
+        event.preventDefault();
+        return;
+      }
+      if (input.key !== "Escape") return;
+      event.preventDefault();
+      this.hide(true);
+      if (!this.parent.isDestroyed()) this.parent.webContents.focus();
+    });
+    view.webContents.on("preload-error", (_event, _path, error) =>
+      log.error("Native popup preload failed", error),
+    );
     if (process.env.ELECTRON_RENDERER_URL) {
       const url = new URL("native-popup.html", process.env.ELECTRON_RENDERER_URL);
-      void win.loadURL(url.toString());
+      void view.webContents.loadURL(url.toString());
     } else {
-      void win.loadFile(join(__dirname, "../renderer/native-popup.html"));
+      void view.webContents.loadFile(join(__dirname, "../renderer/native-popup.html"));
     }
-    this.parent.once("closed", () => {
-      if (!win.isDestroyed()) win.destroy();
-    });
-    this.window = win;
-    return win;
+    return view;
   }
 }

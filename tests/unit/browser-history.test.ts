@@ -74,3 +74,30 @@ describe("browser history", () => {
     ]);
   });
 });
+
+it("returns older history entries beyond the first eight for scrolling", () => {
+  const entries = Array.from({ length: 30 }, (_, index) => ({
+    url: `https://example.com/${index}`,
+    title: `Page ${index}`,
+    visitedAt: index,
+  }));
+  const matched = matchBrowserHistory(entries, "");
+  expect(matched).toHaveLength(30);
+  expect(matched[29].url).toBe("https://example.com/0");
+});
+
+it("clears a previous account badge when revisited without that session", () => {
+  const entries = rememberVisit(
+    [],
+    "https://example.com",
+    "Page",
+    1,
+    true,
+    undefined,
+    "acct-1",
+    "Account",
+  );
+  const revisited = rememberVisit(entries, "https://example.com", "Page", 2, true);
+  expect(revisited[0].accountId).toBeUndefined();
+  expect(revisited[0].accountLabel).toBeUndefined();
+});

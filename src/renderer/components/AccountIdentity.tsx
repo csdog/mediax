@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { UserRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { platformIcons } from "@/assets/platformIcons";
 import { cn } from "cn";
@@ -41,7 +42,9 @@ export function AccountIdentity({
     <div className={cn("account-identity", className)}>
       <Avatar className="size-10">
         {avatar ? <AvatarImage src={avatar} alt={`${name} 头像`} /> : null}
-        <AvatarFallback>{name.slice(0, 1)}</AvatarFallback>
+        <AvatarFallback className="bg-transparent text-foreground">
+          <UserRound className="size-6" strokeWidth={2} aria-hidden />
+        </AvatarFallback>
       </Avatar>
       <div className="min-w-0">
         <h2 className="flex min-w-0 items-center gap-1.5 font-medium">

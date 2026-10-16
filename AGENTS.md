@@ -113,3 +113,16 @@ mise exec -- pnpm run fmt
 4. 确认构建成功、Release 已发布、安装包上传完整且版本一致后，才报告发版完成。失败时处理同一次发版，不为重试反复升版本号。
 
 仅推送 `main` 不会发版；只改版本号、只打标签或只建 Release 都不算完成发版。用户明确要求「直推 / 不要 PR」时才直推，并自行写清 Release 正文；无论哪种流程，正式发版都要完成版本号、tag、Release 和安装包验证。
+
+### 标签（tag）
+
+- 本仓库 GitHub 为 **`csdog/mediax`**；本地目录名 `mediax-desktop` 与远程仓名无关。外层 `mediax/` 若并列 `mediax-agent/`，打 tag 或 `git push` 前必须 **`git -C <本仓绝对路径>`** 并核对 **`git remote get-url --push origin`**，避免误推到 sibling 仓。
+- 在 **`main` 上、且 `package.json` 的 `version` 已是发布号** 的提交打 tag（常见为发版 PR 合并后的 `chore(release): bump …`）；版本 `X.Y.Z` → 标签 **`vX.Y.Z`**，与 `package.json` 一致。
+- 推送 `v*` 触发 `.github/workflows/build.yml` 与 GitHub Release；**推送 tag 不等于发版完成**，须等 Actions 成功且安装包上传完整后再向用户报告。
+- 标签打在错误提交或推错远程：仅在用户确认后删除该次 **GitHub Release** 与 **远程 tag**，再在正确提交上重打**同号** tag；不为重试 CI 反复升版本号。
+
+### 分支清理
+
+- **`feat/*`、`fix/*` 等在 PR 合并进 `main` 后通常不必保留**；历史在 merge commit、PR 页面与 tag 上，不依赖长期留着分支名。
+- 合并 PR 时优先勾选 **Delete branch**；若远程仍在，本地 `git fetch -p origin` 后：`git branch -d <branch>`，必要时 `git push origin --delete <branch>`。
+- 用户说「清理分支」，或在 **PR 合并 / 正式发版收尾** 时，可对**已合并**分支做上述清理；勿删未合并分支，勿动 `main` 及团队约定的长期 release 线（若有）。

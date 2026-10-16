@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { EvilGradientAreaChart } from "@/components/charts/EvilGradientAreaChart";
-import { RadialGauge } from "@/components/charts/RadialGauge";
+import { EvilRadialChart } from "@/components/evilcharts/charts/recharts-radial-chart";
+import type { ChartConfig as RadialChartConfig } from "@/components/evilcharts/ui/recharts-chart";
 import { DocumentPage } from "@/components/workspace/DocumentPage";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -28,7 +29,8 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { analyticsOptions } from "@/app/queries";
+import { accountsOptions, analyticsOptions } from "@/app/queries";
+import { AccountIdentity } from "@/components/AccountIdentity";
 import { platformIcons } from "@/assets/platformIcons";
 import { platformInfo } from "../../shared/platforms";
 import type { AnalyticsQuery, PlatformId } from "../../shared/models";
@@ -75,6 +77,7 @@ export function AnalyticsPage() {
   const [draftRange, setDraftRange] = useState<DateRange | undefined>();
   const query = useMemo(() => queryFromMode(mode), [mode]);
   const { data, isLoading, isFetching, refetch } = useQuery(analyticsOptions(query));
+  const { data: accounts = [] } = useQuery(accountsOptions);
 
   const dailyChart = useMemo(
     () =>
@@ -102,27 +105,33 @@ export function AnalyticsPage() {
   const successPct =
     data?.successRate == null ? null : Math.round(Math.max(0, Math.min(1, data.successRate)) * 100);
 
-  const gauges = useMemo(
-    () =>
-      accountRank.slice(0, 8).map((row, index) => {
-        const rate = row.targets > 0 ? Math.round((row.verified / row.targets) * 100) : 0;
-        const colors = [
-          ACCENTS.tasks,
-          ACCENTS.verified,
-          ACCENTS.awaiting,
-          ACCENTS.failed,
-          ACCENTS.targets,
-        ];
-        return {
-          key: row.accountId,
-          label: row.name,
-          sublabel: platformInfo[row.platform]?.label ?? row.platform,
-          value: rate,
-          color: colors[index % colors.length],
-        };
-      }),
-    [accountRank],
-  );
+  const accountHealth = useMemo(() => {
+    const palette = [
+      ["#3b82f6", "#60a5fa"],
+      ["#10b981", "#34d399"],
+      ["#f59e0b", "#fbbf24"],
+      ["#8b5cf6", "#a78bfa"],
+      ["#ec4899", "#f472b6"],
+      ["#06b6d4", "#22d3ee"],
+      ["#f97316", "#fb923c"],
+      ["#6b7280", "#9ca3af"],
+    ];
+    const config: RadialChartConfig = {};
+    const rows = accountRank.filter((row) => row.targets > 0).slice(0, 8);
+    const data = rows.map((row, index) => {
+      const account = `account-${index}`;
+      const [light, dark] = palette[index]!;
+      config[account] = {
+        label: `${row.name} · ${platformInfo[row.platform]?.label ?? row.platform}`,
+        colors: { light: [light!], dark: [dark!] },
+      };
+      return {
+        account,
+        successRate: Math.round(Math.max(0, Math.min(1, row.verified / row.targets)) * 100),
+      };
+    });
+    return { data, config };
+  }, [accountRank]);
 
   return (
     <DocumentPage>
@@ -341,6 +350,8 @@ export function AnalyticsPage() {
                 ) : (
                   <RankTable
                     rows={accountRank.map((row, index) => ({
+                      kind: "account" as const,
+                      avatar: accounts.find((account) => account.id === row.accountId)?.avatar,
                       key: row.accountId,
                       rank: index + 1,
                       platform: row.platform,
@@ -363,64 +374,90 @@ export function AnalyticsPage() {
               }
             />
 
-            <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-              <Card className="min-w-0 bg-card shadow-sm">
-                <CardHeader className="border-b">
-                  <CardTitle>发布完成度</CardTitle>
-                  <CardDescription>成功目标占全部目标的比例</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4 pt-5">
-                  <div className="flex min-w-0 items-end justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-3xl font-semibold tracking-tight tabular-nums">
-                        {data.totals.verified}
-                        <span className="ml-1 text-base font-normal text-muted-foreground">
-                          / {data.totals.targets}
-                        </span>
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">已成功验证的目标</p>
-                    </div>
-                    <p className="shrink-0 font-mono text-2xl font-semibold tabular-nums text-[color:var(--chart-2)]">
-                      {successPct == null ? "—" : `${successPct}%`}
+            <Card className="min-w-0 shrink-0 bg-card shadow-sm">
+              <CardHeader className="border-b">
+                <CardTitle>发布完成度</CardTitle>
+                <CardDescription>成功目标占全部目标的比例</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-5">
+                <div className="flex min-w-0 items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                      {data.totals.verified}
+                      <span className="ml-1 text-base font-normal text-muted-foreground">
+                        / {data.totals.targets}
+                      </span>
                     </p>
+                    <p className="mt-1 text-xs text-muted-foreground">已成功验证的目标</p>
                   </div>
-                  <div className="h-3 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full transition-[width] duration-500 ease-out"
-                      style={{
-                        width: `${successPct ?? 0}%`,
-                        background: `linear-gradient(90deg, ${ACCENTS.verified}, color-mix(in oklab, ${ACCENTS.verified} 55%, white))`,
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+                  <p className="shrink-0 font-mono text-2xl font-semibold tabular-nums text-[color:var(--chart-2)]">
+                    {successPct == null ? "—" : `${successPct}%`}
+                  </p>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full transition-[width] duration-500 ease-out"
+                    style={{
+                      width: `${successPct ?? 0}%`,
+                      background: `linear-gradient(90deg, ${ACCENTS.verified}, color-mix(in oklab, ${ACCENTS.verified} 55%, white))`,
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card className="min-w-0 bg-card shadow-sm">
-                <CardHeader className="border-b">
-                  <CardTitle>账号健康度</CardTitle>
-                  <CardDescription>各账号成功率（最多 8 个）</CardDescription>
-                </CardHeader>
-                <CardContent className="min-w-0 pt-5">
-                  {!gauges.length ? (
-                    <ChartEmpty compact />
-                  ) : (
-                    <div className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-4 sm:grid-cols-4">
-                      {gauges.map((g) => (
-                        <RadialGauge
-                          key={g.key}
-                          value={g.value}
-                          label={g.label}
-                          sublabel={g.sublabel}
-                          color={g.color}
-                          className="min-w-0"
-                        />
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+            <AnalyticsSection
+              title="账号健康度"
+              description="各账号发布成功率 · 图中最多展示 8 个账号，满圈为 100%"
+              chart={
+                accountHealth.data.length ? (
+                  <EvilRadialChart
+                    className="h-80 w-full p-4 [&_.recharts-legend-wrapper>div]:flex-wrap [&_.recharts-legend-wrapper>div]:gap-y-1"
+                    data={accountHealth.data}
+                    nameKey="account"
+                    config={accountHealth.config}
+                    variant="full"
+                    max={100}
+                  >
+                    <EvilRadialChart.Legend isClickable />
+                    <EvilRadialChart.Tooltip />
+                    <EvilRadialChart.RadialBar dataKey="successRate" isClickable />
+                  </EvilRadialChart>
+                ) : (
+                  <ChartEmpty />
+                )
+              }
+              rankTitle="账号健康度明细"
+              rankDescription="当前时间范围内全部账号的发布结果"
+              rank={
+                accountRank.length ? (
+                  <RankTable
+                    rows={accountRank.map((row, index) => ({
+                      kind: "account" as const,
+                      avatar: accounts.find((account) => account.id === row.accountId)?.avatar,
+                      key: row.accountId,
+                      rank: index + 1,
+                      platform: row.platform,
+                      name: row.name,
+                      cols: [
+                        { label: "目标", value: row.targets },
+                        { label: "成功", value: row.verified },
+                        { label: "失败", value: row.failed },
+                        {
+                          label: "成功率",
+                          value:
+                            row.targets > 0
+                              ? `${Math.round((row.verified / row.targets) * 100)}%`
+                              : "—",
+                        },
+                      ],
+                    }))}
+                  />
+                ) : (
+                  <ChartEmpty compact />
+                )
+              }
+            />
           </>
         )}
       </div>
@@ -464,9 +501,11 @@ function AnalyticsSection({
 }
 
 type RankRow = {
+  kind?: "account";
+  avatar?: string | null;
   key: string;
   rank: number;
-  platform: PlatformId | string;
+  platform: PlatformId;
   name: string;
   cols: Array<{ label: string; value: string | number }>;
 };
@@ -496,10 +535,14 @@ function RankTable({ rows }: { rows: RankRow[] }) {
                   {row.rank}
                 </td>
                 <td className="py-2.5 pr-2">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <PlatformBadge platform={row.platform} icon={icon} />
-                    <span className="truncate font-medium">{row.name}</span>
-                  </div>
+                  {row.kind === "account" ? (
+                    <AccountIdentity name={row.name} platform={row.platform} avatar={row.avatar} />
+                  ) : (
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <PlatformBadge platform={row.platform} icon={icon} />
+                      <span className="truncate font-medium">{row.name}</span>
+                    </div>
+                  )}
                 </td>
                 {row.cols.map((col) => (
                   <td
