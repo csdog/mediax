@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { matchBrowserHistory, rememberVisit } from "../../src/main/browser/BrowserHistoryStore";
+import {
+  matchBrowserHistory,
+  rememberVisit,
+  removeHistoryEntry,
+} from "../../src/main/browser/BrowserHistoryStore";
 
 describe("browser history", () => {
   it("keeps http visits and ignores other schemes", () => {
@@ -15,6 +19,24 @@ describe("browser history", () => {
     expect(again[0]).toEqual({ url: "https://example.com/a", title: "Updated", visitedAt: 40 });
   });
 
+  it("stores the visiting account on each entry", () => {
+    const first = rememberVisit(
+      [],
+      "https://example.com/a",
+      "Example",
+      10,
+      true,
+      undefined,
+      "acct-1",
+      "主账号",
+    );
+    expect(first[0]).toMatchObject({
+      url: "https://example.com/a",
+      accountId: "acct-1",
+      accountLabel: "主账号",
+    });
+  });
+
   it("stores a site icon without counting it as a new visit", () => {
     const icon = "data:image/png;base64,abc";
     const first = rememberVisit([], "https://example.com/a", "Example", 10, true);
@@ -27,6 +49,12 @@ describe("browser history", () => {
       visitedAt: 10,
       icon,
     });
+  });
+
+  it("removes a visit by url", () => {
+    const entries = rememberVisit([], "https://example.com/a", "Example", 10, true);
+    const next = removeHistoryEntry(entries, "https://example.com/a");
+    expect(next).toEqual([]);
   });
 
   it("filters suggestions by title or url", () => {

@@ -190,7 +190,9 @@ export type NativePopupAction =
   | { type: "clear-data" }
   | { type: "show-downloads" }
   | { type: "settings" }
-  | { type: "open-history"; url: string };
+  | { type: "open-history"; url: string }
+  | { type: "submit-omnibox"; value: string }
+  | { type: "remove-history"; url: string };
 export type NativePopupRequest = {
   kind: NativePopupKind;
   theme: "light" | "dark";
@@ -201,6 +203,7 @@ export type NativePopupRequest = {
   downloads?: BrowserDownload[];
   historyEntries?: BrowserHistoryEntry[];
   historyIndex?: number;
+  historySearchQuery?: string;
   pageReady?: boolean;
   zoomPercent?: number;
 };
@@ -219,6 +222,9 @@ export type BrowserHistoryEntry = {
   title: string;
   visitedAt: number;
   icon?: string;
+  accountId?: string;
+  accountLabel?: string;
+  accountAvatar?: string;
 };
 export type WebSearchProvider = {
   id: string;
@@ -257,6 +263,7 @@ export interface DesktopApi {
   webSearchProvider(): Promise<WebSearchProvider>;
   browserNavigation(id: string): Promise<BrowserNavigation>;
   browserHistory(query: string): Promise<BrowserHistoryEntry[]>;
+  removeBrowserHistory(url: string): Promise<void>;
   navigateBrowser(id: string, url: string): Promise<BrowserNavigation>;
   goBackBrowser(id: string): Promise<BrowserNavigation>;
   goForwardBrowser(id: string): Promise<BrowserNavigation>;

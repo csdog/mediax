@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContentsView, type Session } from "electron";
+import { BrowserWindow, WebContentsView, type Session, type WebContents } from "electron";
 import { CdpBridge } from "./CdpBridge";
 import { installBrowserContextMenu } from "./contextMenu";
 import { loadFavicon } from "./favicon";
@@ -11,11 +11,19 @@ export class AccountBrowserManager {
   private bounds?: BrowserBounds;
   private bridge = new CdpBridge();
   private connected = false;
+  private pageInteraction?: () => void;
+  private wiredPageInteraction = new WeakSet<WebContents>();
   constructor(
     private host?: BrowserWindow,
     private endpoint?: string,
     private onSession?: (session: Session) => void,
-    private onVisit?: (url: string, title: string, touch: boolean, icon?: string) => void,
+    private onVisit?: (
+      accountId: string,
+      url: string,
+      title: string,
+      touch: boolean,
+      icon?: string,
+    ) => void,
   ) {
     if (!host) return;
     host.on("resize", () => this.layout());
@@ -53,6 +61,20 @@ export class AccountBrowserManager {
   }
   get(id: string) {
     return this.views.get(id);
+  }
+  setPageInteraction(handler: () => void) {
+    this.pageInteraction = handler;
+    for (const view of this.views.values()) this.wirePageInteraction(view);
+  }
+  private wirePageInteraction(view: WebContentsView) {
+    const contents = view.webContents;
+    if (this.wiredPageInteraction.has(contents)) return;
+    this.wiredPageInteraction.add(contents);
+    const notify = () => this.pageInteraction?.();
+    contents.on("focus", notify);
+    contents.on("input-event", (_event, input) => {
+      if (input.type === "mouseDown") notify();
+    });
   }
   show(id: string) {
     if (this.host) {
@@ -127,6 +149,7 @@ export class AccountBrowserManager {
   ): Promise<WebContentsView> {
     const existing = this.views.get(accountId);
     if (existing) {
+      this.wirePageInteraction(existing);
       if (!existing.webContents.isDestroyed()) this.onSession?.(existing.webContents.session);
       if (url && !existing.webContents.isDestroyed()) {
         const current = existing.webContents.getURL();
@@ -157,7 +180,13 @@ export class AccountBrowserManager {
     view.webContents.setBackgroundThrottling(false);
     const remember = (touch: boolean, icon?: string) => {
       if (view.webContents.isDestroyed()) return;
-      this.onVisit?.(view.webContents.getURL(), view.webContents.getTitle(), touch, icon);
+      this.onVisit?.(
+        accountId,
+        view.webContents.getURL(),
+        view.webContents.getTitle(),
+        touch,
+        icon,
+      );
     };
     view.webContents.on("did-navigate", () => remember(true));
     view.webContents.on("did-navigate-in-page", (_event, _url, isMainFrame) => {
@@ -168,7 +197,7 @@ export class AccountBrowserManager {
       const page = view.webContents;
       void loadFavicon(page.session, favicons).then((icon) => {
         if (!icon || page.isDestroyed()) return;
-        this.onVisit?.(page.getURL(), page.getTitle(), false, icon);
+        this.onVisit?.(accountId, page.getURL(), page.getTitle(), false, icon);
       });
     });
     void installBrowserContextMenu(view.webContents, (url) => {
@@ -205,6 +234,7 @@ export class AccountBrowserManager {
     }
     win.contentView.addChildView(view);
     this.views.set(accountId, view);
+    this.wirePageInteraction(view);
     view.webContents.setWindowOpenHandler(({ url }) => {
       // Account links often use target=_blank (e.g. Zhihu's creator center).
       // Keep navigation in this view so it retains the account's partition.

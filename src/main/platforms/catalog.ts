@@ -141,6 +141,25 @@ export function partitionName(platform: PlatformId, id: string) {
   return `persist:${platform}-${id}`;
 }
 
+export function sessionCookieNames(platform: PlatformId) {
+  return sessions[platform].cookies;
+}
+
+export function platformForUrl(url: string): PlatformId | null {
+  try {
+    const host = new URL(url).hostname;
+    for (const [platform, cookieUrl] of Object.entries(platformCookieUrl)) {
+      const cookieHost = new URL(cookieUrl).hostname;
+      if (host === cookieHost || host.endsWith(`.${cookieHost}`)) {
+        return platform as PlatformId;
+      }
+    }
+  } catch {
+    /* Ignore invalid URLs. */
+  }
+  return null;
+}
+
 export function hasPlatformSession(platform: PlatformId, cookies: { name: string }[], url = "") {
   if (platform === "channels" && url && !isChannelsPlatformUrl(url)) return false;
   const names = sessions[platform].cookies;

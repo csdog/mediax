@@ -8,8 +8,10 @@ import {
   needsVerification,
   partitionName,
   platformCookieUrl,
+  platformForUrl,
   platformHome,
   keepsClosedSession,
+  sessionCookieNames,
   sessionOwner,
   urlLooksLoggedIn,
 } from "../platforms/catalog";
@@ -20,6 +22,7 @@ import { discoveredAccountName, shouldAdoptAccountName, usableAccountName } from
 import { isCreatorPlatform, readCreatorProfile } from "./creatorProfile";
 import { Database } from "../storage/Database";
 import { AccountBrowserManager } from "../browser/AccountBrowserManager";
+import type { BrowserHistoryStore } from "../browser/BrowserHistoryStore";
 
 const logins = new Set<AccountInfo["login"]>([
   "unchecked",
@@ -34,7 +37,36 @@ export class AccountService {
   constructor(
     private db: Database,
     private browsers: AccountBrowserManager,
+    private browserHistory?: BrowserHistoryStore,
   ) {}
+  async rememberBrowserVisit(
+    viewAccountId: string,
+    url: string,
+    title: string,
+    touch: boolean,
+    icon?: string,
+  ) {
+    if (!this.browserHistory) return;
+    const view = this.browsers.get(viewAccountId);
+    const pageUrl =
+      url.trim() || (view && !view.webContents.isDestroyed() ? view.webContents.getURL() : "");
+    const resolved =
+      view && !view.webContents.isDestroyed()
+        ? await this.resolveHistoryAccount(viewAccountId, pageUrl, view.webContents.session)
+        : null;
+    this.browserHistory.remember(
+      url,
+      title,
+      touch,
+      icon,
+      resolved?.id,
+      resolved?.name,
+      resolved?.avatar,
+    );
+  }
+  setBrowserPageInteraction(handler: () => void) {
+    this.browsers.setPageInteraction(handler);
+  }
   list() {
     return this.db.accounts().map((account) => {
       const info = this.states.get(account.id) ?? this.stored(account.id);
@@ -178,6 +210,57 @@ export class AccountService {
     await contents.session.clearStorageData();
     await contents.session.clearCache();
     contents.reload();
+  }
+  private async resolveHistoryAccount(
+    viewAccountId: string,
+    pageUrl: string,
+    partition: Electron.Session,
+  ) {
+    const platform = viewAccountId.startsWith("web-")
+      ? platformForUrl(pageUrl)
+      : this.db.account(viewAccountId).platform;
+    if (!platform) return null;
+    const cookieUrl = platformCookieUrl[platform];
+    const cookies = await partition.cookies.get({ url: cookieUrl });
+    if (!hasPlatformSession(platform, cookies, pageUrl) && !urlLooksLoggedIn(platform, pageUrl)) {
+      return null;
+    }
+    const owner =
+      sessionOwner(platform, cookies, pageUrl) ??
+      (urlLooksLoggedIn(platform, pageUrl) ? platform : null);
+    if (!owner) return null;
+    const matchedId = await this.matchAccountByCookies(platform, owner, cookies, cookieUrl);
+    if (!matchedId) return null;
+    const info = this.states.get(matchedId) ?? this.stored(matchedId);
+    if (info.login !== "logged_in") return null;
+    return {
+      id: matchedId,
+      name: info.name,
+      avatar: info.avatar ?? this.cachedAvatar(matchedId)?.image,
+    };
+  }
+  private async matchAccountByCookies(
+    platform: PlatformId,
+    owner: string,
+    referenceCookies: Electron.Cookie[],
+    cookieUrl: string,
+  ) {
+    const signature = this.sessionSignature(platform, referenceCookies);
+    for (const account of this.db.accounts()) {
+      if (account.platform !== platform) continue;
+      const cookies = await session
+        .fromPartition(partitionName(platform, account.id))
+        .cookies.get({ url: cookieUrl });
+      if (sessionOwner(platform, cookies) !== owner) continue;
+      if (this.sessionSignature(platform, cookies) === signature) return account.id;
+    }
+    return null;
+  }
+  private sessionSignature(platform: PlatformId, cookies: Electron.Cookie[]) {
+    const names = sessionCookieNames(platform);
+    return names
+      .map((name) => cookies.find((cookie) => cookie.name === name)?.value ?? "")
+      .join("\0");
   }
   private cachedAvatar(id: string) {
     const value = this.db.setting(`avatar:${id}`) as {

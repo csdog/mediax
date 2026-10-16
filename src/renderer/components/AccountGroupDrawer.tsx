@@ -1,15 +1,20 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Save, Monitor } from "lucide-react";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from "@/components/ui/sheet";
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerClose,
+} from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Field, FieldContent, FieldLabel, FieldTitle } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
@@ -17,7 +22,7 @@ import { AccountIdentity } from "@/components/AccountIdentity";
 import { userErrorMessage } from "../../shared/userError";
 import type { AccountGroup, AccountInfo } from "../../shared/models";
 
-export function AccountGroupSheet({
+export function AccountGroupDrawer({
   account,
   groups,
   onClose,
@@ -29,6 +34,7 @@ export function AccountGroupSheet({
   onOpen(account: AccountInfo): void;
 }) {
   const client = useQueryClient();
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(true), []);
   const close = () => setOpen(false);
@@ -45,8 +51,10 @@ export function AccountGroupSheet({
     onError: (error) => toast.error(userErrorMessage(error, "账号分组保存失败，请重试。")),
   });
   return (
-    <Sheet
+    <Drawer
       open={open}
+      showSwipeHandle={isMobile}
+      swipeDirection={isMobile ? "down" : "right"}
       onOpenChange={(open) => {
         if (!open && !save.isPending) close();
       }}
@@ -54,14 +62,10 @@ export function AccountGroupSheet({
         if (!open) onClose();
       }}
     >
-      <SheetContent
-        side="right"
-        className="data-[side=right]:w-full data-[side=right]:sm:max-w-lg"
-        showCloseButton={!save.isPending}
-      >
-        <SheetHeader className="border-b pr-14">
-          <SheetTitle>账号设置</SheetTitle>
-          <SheetDescription>查看账号信息并设置所属分组。</SheetDescription>
+      <DrawerContent className="data-[swipe-axis=x]:[--drawer-content-width:calc(100%-1rem)] data-[swipe-axis=x]:sm:[--drawer-content-width:32rem]">
+        <DrawerHeader>
+          <DrawerTitle>账号设置</DrawerTitle>
+          <DrawerDescription>查看账号信息并设置所属分组。</DrawerDescription>
           <div className="pt-4">
             <AccountIdentity
               name={account.name}
@@ -69,8 +73,8 @@ export function AccountGroupSheet({
               avatar={account.avatar}
             />
           </div>
-        </SheetHeader>
-        <div className="flex-1 overflow-y-auto p-6">
+        </DrawerHeader>
+        <div className="flex-1 scroll-fade overflow-y-auto p-4">
           <h3 className="text-sm font-medium">所属分组</h3>
           <p className="mt-1 text-xs text-muted-foreground">
             可选择多个分组，取消全部选择即移出所有分组。
@@ -78,24 +82,28 @@ export function AccountGroupSheet({
           {groups.length ? (
             <div className="mt-4 flex flex-col gap-2">
               {groups.map((group) => (
-                <label
-                  key={group.id}
-                  className="flex cursor-pointer items-center gap-3 rounded-xl border p-3 hover:bg-muted"
-                >
-                  <Checkbox
-                    aria-label={`所属分组 ${group.name}`}
-                    checked={selected.includes(group.id)}
-                    disabled={save.isPending}
-                    onCheckedChange={(checked) =>
-                      setSelected((old) =>
-                        checked
-                          ? [...new Set([...old, group.id])]
-                          : old.filter((id) => id !== group.id),
-                      )
-                    }
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm">{group.name}</span>
-                </label>
+                <FieldLabel key={group.id} htmlFor={`account-group-${group.id}`}>
+                  <Field orientation="horizontal" data-disabled={save.isPending || undefined}>
+                    <FieldContent>
+                      <FieldTitle>{group.name}</FieldTitle>
+                    </FieldContent>
+                    <Checkbox
+                      nativeButton
+                      render={<button type="button" />}
+                      id={`account-group-${group.id}`}
+                      aria-label={`所属分组 ${group.name}`}
+                      checked={selected.includes(group.id)}
+                      disabled={save.isPending}
+                      onCheckedChange={(checked) =>
+                        setSelected((old) =>
+                          checked
+                            ? [...new Set([...old, group.id])]
+                            : old.filter((id) => id !== group.id),
+                        )
+                      }
+                    />
+                  </Field>
+                </FieldLabel>
               ))}
             </div>
           ) : (
@@ -109,7 +117,7 @@ export function AccountGroupSheet({
             </Empty>
           )}
         </div>
-        <SheetFooter className="flex-row justify-end border-t">
+        <DrawerFooter>
           <Button
             variant="outline"
             disabled={save.isPending}
@@ -121,15 +129,19 @@ export function AccountGroupSheet({
             <Monitor />
             打开账号
           </Button>
-          <Button variant="outline" disabled={save.isPending} onClick={close}>
-            取消
-          </Button>
           <Button disabled={save.isPending} onClick={() => save.mutate()}>
             <Save />
             {save.isPending ? "保存中…" : "保存配置"}
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          <DrawerClose
+            render={
+              <Button variant="outline" disabled={save.isPending}>
+                取消
+              </Button>
+            }
+          />
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   );
 }

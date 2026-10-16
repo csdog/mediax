@@ -15,6 +15,7 @@ const api: DesktopApi = {
   webSearchProvider: () => call("webSearchProvider"),
   browserNavigation: (id) => call("browserNavigation", id),
   browserHistory: (query) => call("browserHistory", query),
+  removeBrowserHistory: (url) => call("removeBrowserHistory", url),
   navigateBrowser: (id, url) => call("navigateBrowser", id, url),
   goBackBrowser: (id) => call("goBackBrowser", id),
   goForwardBrowser: (id) => call("goForwardBrowser", id),

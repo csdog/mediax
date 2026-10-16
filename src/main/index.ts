@@ -242,14 +242,18 @@ async function start(): Promise<void> {
   const browserHistory = new BrowserHistoryStore(
     join(app.getPath("userData"), "browser-history.json"),
   );
-  const accounts = new AccountService(
+  let accounts: AccountService;
+  accounts = new AccountService(
     db,
     new AccountBrowserManager(
       win,
       endpoint,
       (session) => downloads.watch(session),
-      (url, title, touch, icon) => browserHistory.remember(url, title, touch, icon),
+      (accountId, url, title, touch, icon) => {
+        void accounts.rememberBrowserVisit(accountId, url, title, touch, icon);
+      },
     ),
+    browserHistory,
   );
   accounts.applyBandwidthLimit();
   app.on("will-quit", () => {

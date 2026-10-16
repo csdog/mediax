@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from "react";
 import {
   ChevronRight,
   EllipsisVertical,
@@ -8,9 +8,16 @@ import {
   Minus,
   Plus,
   RotateCcw,
+  Search,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { BrowserDownload, NativePopupAction, NativePopupRequest } from "../../shared/models";
+import type {
+  BrowserDownload,
+  BrowserHistoryEntry,
+  NativePopupAction,
+  NativePopupRequest,
+} from "../../shared/models";
 
 function revealLabel() {
   const platform = window.desktopPlatform;
@@ -48,10 +55,50 @@ function act(action: NativePopupAction) {
   window.desktop.notifyNativePopup({ type: "action", action });
 }
 
+// macOS child windows may not apply :hover until tracked explicitly.
+const rowHover: HTMLAttributes<HTMLElement> = {
+  onMouseEnter: (event) => {
+    event.currentTarget.dataset.hover = "true";
+  },
+  onMouseLeave: (event) => {
+    delete event.currentTarget.dataset.hover;
+  },
+};
+
 function HistoryIcon({ src }: { src?: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) return <Globe className="browser-history-fallback" aria-hidden />;
   return <img className="browser-history-icon" src={src} alt="" onError={() => setFailed(true)} />;
+}
+
+function formatHistoryUrl(url: string) {
+  try {
+    const page = new URL(url);
+    const path = page.pathname !== "/" ? page.pathname.replace(/\/$/, "") : "";
+    return `${page.hostname}${path}`;
+  } catch {
+    return url;
+  }
+}
+
+function AccountAvatar({ entry }: { entry: BrowserHistoryEntry }) {
+  const label = entry.accountLabel?.trim();
+  const initial = label ? [...label][0]?.toUpperCase() : "";
+  if (entry.accountAvatar) {
+    return (
+      <img
+        className="browser-history-account-avatar"
+        src={entry.accountAvatar}
+        alt={label ? `${label} 头像` : ""}
+      />
+    );
+  }
+  if (!initial) return null;
+  return (
+    <span className="browser-history-account-avatar fallback" aria-hidden>
+      {initial}
+    </span>
+  );
 }
 
 function DownloadPanel({ items }: { items: BrowserDownload[] }) {
@@ -75,7 +122,7 @@ function DownloadPanel({ items }: { items: BrowserDownload[] }) {
           {items.map((item) => {
             const revealable = item.state === "completed";
             return (
-              <li key={item.id} className="browser-download-item">
+              <li key={item.id} className="browser-download-item" {...rowHover}>
                 <div className="browser-download-icon" aria-hidden>
                   <FileText />
                 </div>
@@ -109,24 +156,28 @@ function DownloadPanel({ items }: { items: BrowserDownload[] }) {
                     <button
                       type="button"
                       disabled={!revealable}
+                      {...rowHover}
                       onClick={() => act({ type: "reveal-download", id: item.id })}
                     >
                       {label}
                     </button>
                     <button
                       type="button"
+                      {...rowHover}
                       onClick={() => act({ type: "copy-download-url", id: item.id })}
                     >
                       复制地址
                     </button>
                     <button
                       type="button"
+                      {...rowHover}
                       onClick={() => act({ type: "copy-download-path", id: item.id })}
                     >
                       复制路径
                     </button>
                     <button
                       type="button"
+                      {...rowHover}
                       onClick={() => act({ type: "remove-download", id: item.id })}
                     >
                       从列表中移除
@@ -147,28 +198,80 @@ function DownloadPanel({ items }: { items: BrowserDownload[] }) {
 function HistoryPanel({ popup }: { popup: NativePopupRequest }) {
   const entries = popup.historyEntries ?? [];
   const selected = popup.historyIndex ?? -1;
+  const searchQuery = popup.historySearchQuery?.trim();
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
+  useEffect(() => {
+    const syncHover = (event: PointerEvent) => {
+      const row = document
+        .elementFromPoint(event.clientX, event.clientY)
+        ?.closest<HTMLElement>("[data-history-row]");
+      setHoverKey(row?.dataset.historyRow ?? null);
+    };
+    const clearHover = () => setHoverKey(null);
+    document.addEventListener("pointermove", syncHover);
+    document.addEventListener("pointerleave", clearHover);
+    return () => {
+      document.removeEventListener("pointermove", syncHover);
+      document.removeEventListener("pointerleave", clearHover);
+    };
+  }, []);
   return (
     <div className="browser-history" role="listbox" aria-label="历史记录">
       {entries.map((entry, index) => (
-        <button
+        <div
           key={entry.url}
-          type="button"
           role="option"
           aria-selected={index === selected}
           className="browser-history-item"
+          data-history-row={entry.url}
+          data-hover={hoverKey === entry.url ? "true" : undefined}
           data-active={index === selected ? "true" : undefined}
+        >
+          <button
+            type="button"
+            className="browser-history-main"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              act({ type: "open-history", url: entry.url });
+            }}
+          >
+            <HistoryIcon src={entry.icon} />
+            <span className="browser-history-line">
+              <span className="browser-history-title">{entry.title}</span>
+              <span className="browser-history-sep"> — </span>
+              <span className="browser-history-url">{formatHistoryUrl(entry.url)}</span>
+            </span>
+            <AccountAvatar entry={entry} />
+          </button>
+          <button
+            type="button"
+            className="browser-history-remove"
+            aria-label="从历史记录中删除"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              act({ type: "remove-history", url: entry.url });
+            }}
+          >
+            <X aria-hidden />
+          </button>
+        </div>
+      ))}
+      {searchQuery ? (
+        <button
+          type="button"
+          className="browser-history-item browser-history-search"
+          data-history-row="search"
+          data-hover={hoverKey === "search" ? "true" : undefined}
           onMouseDown={(event) => {
             event.preventDefault();
-            act({ type: "open-history", url: entry.url });
+            act({ type: "submit-omnibox", value: searchQuery });
           }}
         >
-          <HistoryIcon src={entry.icon} />
-          <span className="browser-history-copy">
-            <span className="browser-history-title">{entry.title}</span>
-            <span className="browser-history-url">{entry.url}</span>
-          </span>
+          <Search className="browser-history-search-icon" aria-hidden />
+          <span className="browser-history-line">{searchQuery}</span>
         </button>
-      ))}
+      ) : null}
     </div>
   );
 }
@@ -183,7 +286,13 @@ function MenuRow({
   onClick?: () => void;
 }) {
   return (
-    <button type="button" className="native-popup-row" disabled={disabled} onClick={onClick}>
+    <button
+      type="button"
+      className="native-popup-row"
+      disabled={disabled}
+      {...rowHover}
+      onClick={onClick}
+    >
       {children}
     </button>
   );

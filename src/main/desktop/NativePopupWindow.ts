@@ -49,6 +49,14 @@ export function parseNativePopupAction(value: unknown): NativePopupAction | null
       return typeof action.url === "string" && /^https?:\/\//i.test(action.url)
         ? { type: "open-history", url: action.url }
         : null;
+    case "submit-omnibox":
+      return typeof action.value === "string"
+        ? { type: "submit-omnibox", value: action.value }
+        : null;
+    case "remove-history":
+      return typeof action.url === "string" && /^https?:\/\//i.test(action.url)
+        ? { type: "remove-history", url: action.url }
+        : null;
     default:
       return null;
   }
@@ -76,18 +84,16 @@ export class NativePopupWindow {
     }
     this.pending = request;
     this.place(win, request);
-    win.setFocusable(request.focus);
+    // Stay key on the parent via showInactive(); focusable so macOS tracks hover inside the popup.
+    win.setFocusable(true);
     if (this.ready && !win.webContents.isDestroyed()) {
       win.webContents.send("mediax:native-popup", request);
     }
     if (!win.isVisible()) {
       this.openedAt = Date.now();
-      if (request.focus) win.show();
-      else win.showInactive();
+      win.showInactive();
       return;
     }
-    if (request.focus) win.focus();
-    else if (!this.parent.isDestroyed()) this.parent.focus();
   }
 
   resize(height: number) {
@@ -128,7 +134,7 @@ export class NativePopupWindow {
       parent: this.parent,
       frame: false,
       transparent: true,
-      hasShadow: true,
+      hasShadow: false,
       resizable: false,
       movable: false,
       minimizable: false,
@@ -137,7 +143,8 @@ export class NativePopupWindow {
       closable: false,
       skipTaskbar: true,
       show: false,
-      roundedCorners: true,
+      roundedCorners: false,
+      acceptFirstMouse: true,
       backgroundColor: "#00000000",
       webPreferences: {
         nodeIntegration: false,
@@ -147,14 +154,12 @@ export class NativePopupWindow {
         preload: join(__dirname, "../preload/nativePopup.js"),
       },
     });
-    win.on("blur", () => {
-      if (!this.pending?.focus || Date.now() - this.openedAt < 200) return;
-      this.hide(true);
-    });
     const dismiss = () => {
       if (Date.now() - this.openedAt < 200) return;
       this.hide(true);
     };
+    win.on("blur", dismiss);
+    this.parent.on("blur", dismiss);
     this.parent.on("move", dismiss);
     this.parent.on("resize", dismiss);
     win.webContents.on("did-finish-load", () => {

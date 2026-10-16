@@ -28,7 +28,6 @@ export function BrowserChrome() {
   const queryClient = useQueryClient();
   const {
     activeBrowserViewId,
-    isNewTab,
     submitOmnibox,
     goBackBrowser,
     goForwardBrowser,
@@ -62,6 +61,11 @@ export function BrowserChrome() {
     queryFn: () => window.desktop.webSearchProvider(),
     staleTime: 60_000,
   });
+  const accounts = useQuery({
+    queryKey: ["desktop", "accounts"],
+    queryFn: () => window.desktop.accounts(),
+    staleTime: 30_000,
+  });
   const downloads = useQuery({
     queryKey: ["desktop", "downloads"],
     queryFn: () => window.desktop.downloads(),
@@ -92,10 +96,6 @@ export function BrowserChrome() {
     if (editingAddress) return;
     setAddress(activeBrowserViewId ? currentUrl : "");
   }, [activeBrowserViewId, currentUrl, editingAddress]);
-  useEffect(() => {
-    if (!isNewTab) return;
-    inputRef.current?.focus();
-  }, [isNewTab]);
   useEffect(() => {
     if (!findOpen) return;
     findRef.current?.focus();
@@ -199,16 +199,35 @@ export function BrowserChrome() {
       return;
     }
     if (action.type === "open-history") goToAddress(action.url);
+    if (action.type === "submit-omnibox") goToAddress(action.value);
+    if (action.type === "remove-history") {
+      void run(async () => {
+        await window.desktop.removeBrowserHistory(action.url);
+        await queryClient.invalidateQueries({ queryKey: ["desktop", "browser-history"] });
+        setHistoryIndex(-1);
+      });
+    }
   };
   useEffect(() => {
     return window.desktop.onNativePopupHostEvent((event) => {
       if (event.type === "closed") {
-        setPopup((current) => (current === "history" ? current : null));
+        setPopup(null);
         return;
       }
       onPopupAction(event.action);
     });
   });
+  useEffect(() => {
+    if (!popup) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (document.querySelector("[data-browser-chrome]")?.contains(target)) return;
+      setPopup(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [popup]);
   useEffect(() => {
     if (popup === "history" && !history.isFetched) return;
     if (popup === "history" && suggestions.length === 0) {
@@ -223,6 +242,18 @@ export function BrowserChrome() {
     if (popup === "history") {
       const rect = omniboxRef.current?.getBoundingClientRect();
       if (!rect) return;
+      const searchQuery =
+        historyQuery !== null && historyQuery.trim() ? historyQuery.trim() : undefined;
+      const historyEntries = suggestions.slice(0, 8).map((entry) => {
+        if (entry.accountAvatar) return entry;
+        const account = accounts.data?.find((item) => item.id === entry.accountId);
+        if (!account?.avatar && !account?.name) return entry;
+        return {
+          ...entry,
+          accountLabel: entry.accountLabel ?? account?.name,
+          accountAvatar: account?.avatar ?? entry.accountAvatar,
+        };
+      });
       void window.desktop.showNativePopup({
         kind: "history",
         theme,
@@ -230,8 +261,9 @@ export function BrowserChrome() {
         x: Math.max(8, Math.round(rect.x)),
         y: Math.round(rect.bottom + 8),
         width: Math.max(160, Math.round(rect.width)),
-        historyEntries: suggestions.slice(0, 8),
+        historyEntries,
         historyIndex,
+        historySearchQuery: searchQuery,
       });
       return;
     }
@@ -247,7 +279,7 @@ export function BrowserChrome() {
     void window.desktop.showNativePopup({
       kind: popup,
       theme,
-      focus: true,
+      focus: false,
       x: Math.max(8, Math.round(rect.right - width)),
       y: Math.round(rect.bottom + 8),
       width,
@@ -259,7 +291,9 @@ export function BrowserChrome() {
     popup,
     history.data,
     history.isFetched,
+    historyQuery,
     historyIndex,
+    accounts.data,
     downloads.data,
     pageReady,
     zoom.data?.percent,
@@ -276,7 +310,7 @@ export function BrowserChrome() {
     if (activeBrowserViewId) void window.desktop.stopFindInBrowser(activeBrowserViewId);
   };
   return (
-    <div className="browser-chrome-stack">
+    <div className="browser-chrome-stack" data-browser-chrome>
       <div className="browser-chrome">
         <div className="toolbar-navigation" role="group" aria-label="导航">
           <Tooltip>
@@ -340,11 +374,16 @@ export function BrowserChrome() {
           className={editingAddress ? "toolbar-omnibox is-editing" : "toolbar-omnibox"}
           onSubmit={onSubmitAddress}
         >
+          {editingAddress && !address.trim() ? (
+            <span className="toolbar-omnibox-ghost-hint" aria-hidden>
+              {hint}
+            </span>
+          ) : null}
           <input
             ref={inputRef}
             name="url"
             aria-label={hint}
-            placeholder={hint}
+            placeholder={editingAddress ? "" : hint}
             value={address}
             spellCheck={false}
             autoCapitalize="off"
@@ -359,7 +398,8 @@ export function BrowserChrome() {
               setPopup("history");
               setHistoryQuery(null);
               setHistoryIndex(-1);
-              event.currentTarget.select();
+              const input = event.currentTarget;
+              input.setSelectionRange(0, 0);
             }}
             onBlur={() => {
               setEditingAddress(false);

@@ -1,5 +1,5 @@
 import { useState, type MouseEvent, type KeyboardEvent } from "react";
-import { AccountGroupSheet } from "./AccountGroupSheet";
+import { AccountGroupDrawer } from "./AccountGroupDrawer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { userErrorMessage } from "../../shared/userError";
@@ -195,7 +195,7 @@ export function AccountManagement({
   return (
     <section className="account-management" aria-label="账号管理工作区">
       {editingAccount && (
-        <AccountGroupSheet
+        <AccountGroupDrawer
           key={editingAccount.id}
           account={accounts.find((a) => a.id === editingAccount.id) ?? editingAccount}
           groups={groups}

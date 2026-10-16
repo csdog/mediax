@@ -114,6 +114,7 @@ export function registerIpc(
   const nativePopup = new NativePopupWindow(window, (event) => {
     if (!window.isDestroyed()) window.webContents.send("mediax:native-popup-event", event);
   });
+  accounts.setBrowserPageInteraction(() => nativePopup.hide(true));
   const publishing = new PublishService(db, accounts, join(app.getPath("userData"), "task-assets"));
   publishing.startScheduler();
   app.once("will-quit", () => publishing.stopScheduler());
@@ -329,6 +330,10 @@ export function registerIpc(
   on("webSearchProvider", () => systemSearchProvider());
   on("browserNavigation", (id) => accounts.browserNavigation(text(id)));
   on("browserHistory", (query) => browserHistory.search(typeof query === "string" ? query : ""));
+  on("removeBrowserHistory", (url) => {
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url.trim())) throw new Error("无效网址");
+    browserHistory.remove(url.trim());
+  });
   on("navigateBrowser", (id, url) => accounts.navigateBrowser(text(id), text(url)));
   on("goBackBrowser", (id) => accounts.goBackBrowser(text(id)));
   on("goForwardBrowser", (id) => accounts.goForwardBrowser(text(id)));
