@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { useState, type MouseEvent, type KeyboardEvent } from "react";
+import { AccountGroupDrawer } from "./AccountGroupDrawer";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { userErrorMessage } from "../../shared/userError";
 import {
   Layers,
   Search,
@@ -82,20 +86,63 @@ export function AccountManagement({
   onRefresh,
   onDelete,
 }: Props) {
+  const queryClient = useQueryClient();
+  const groupsQuery = useQuery({
+    queryKey: ["account-groups"],
+    queryFn: () => window.desktop.accountGroups(),
+  });
+  const groups = groupsQuery.data ?? [];
+  const [groupId, setGroupId] = useState<string | null>(null);
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupAccountIds, setGroupAccountIds] = useState<string[]>([]);
+  const createGroup = useMutation({
+    mutationFn: () =>
+      window.desktop.createAccountGroup({ name: groupName, accountIds: groupAccountIds }),
+    onSuccess: async (created) => {
+      await queryClient.invalidateQueries({ queryKey: ["account-groups"] });
+      setGroupId(created.id);
+      setGroupDialogOpen(false);
+      setGroupName("");
+      setGroupAccountIds([]);
+      toast.success("分组已创建");
+    },
+    onError: (error) => toast.error(userErrorMessage(error, "分组保存失败，请重试。")),
+  });
+  const activeGroup = groups.find((group) => group.id === groupId);
   const [query, setQuery] = useState("");
   const [platformQuery, setPlatformQuery] = useState("");
   const [platform, setPlatform] = useState("all");
   const [status, setStatus] = useState("all");
   const [view, setView] = useState<"list" | "grid">("list");
   const [selected, setSelected] = useState<string[]>([]);
+  const [editingAccount, setEditingAccount] = useState<AccountInfo | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AccountInfo | null>(null);
   const [refreshingIds, setRefreshingIds] = useState<string[]>([]);
   const filtered = accounts.filter(
     (a) =>
+      (!activeGroup || activeGroup.accountIds.includes(a.id)) &&
       a.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) &&
       (platform === "all" || platformOf(a) === platform) &&
       (status === "all" || a.login === status),
   );
+  const openAccountSettings = (account: AccountInfo) => {
+    if (groupsQuery.isPending) return;
+    if (groupsQuery.isError) {
+      toast.error("分组加载失败，请先重试。");
+      return;
+    }
+    setEditingAccount(account);
+  };
+  const onAccountRowClick = (event: MouseEvent<HTMLElement>, account: AccountInfo) => {
+    if ((event.target as Element).closest("button, input, a, [role='checkbox']")) return;
+    openAccountSettings(account);
+  };
+  const onAccountRowKey = (event: KeyboardEvent<HTMLElement>, account: AccountInfo) => {
+    if (event.target !== event.currentTarget || !["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    openAccountSettings(account);
+  };
   const chosen = selected.filter((id) => accounts.some((a) => a.id === id));
   const allSelected = filtered.length > 0 && filtered.every((a) => chosen.includes(a.id));
   const toggle = (id: string, checked: boolean) =>
@@ -147,6 +194,97 @@ export function AccountManagement({
   };
   return (
     <section className="account-management" aria-label="账号管理工作区">
+      {editingAccount && (
+        <AccountGroupDrawer
+          key={editingAccount.id}
+          account={accounts.find((a) => a.id === editingAccount.id) ?? editingAccount}
+          groups={groups}
+          onClose={() => setEditingAccount(null)}
+          onOpen={onOpen}
+        />
+      )}
+      <Dialog
+        open={groupDialogOpen}
+        onOpenChange={(open) => {
+          if (createGroup.isPending) return;
+          setGroupDialogOpen(open);
+          if (!open) {
+            setGroupName("");
+            setGroupAccountIds([]);
+          }
+        }}
+      >
+        <DialogContent>
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              createGroup.mutate();
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>新建分组</DialogTitle>
+              <DialogDescription>为分组命名，并选择要放入的账号。</DialogDescription>
+            </DialogHeader>
+            <label className="flex flex-col gap-2 text-sm">
+              分组名称
+              <Input
+                autoFocus
+                value={groupName}
+                maxLength={40}
+                placeholder="例如：工作账号"
+                disabled={createGroup.isPending}
+                onChange={(event) => setGroupName(event.target.value)}
+              />
+            </label>
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-2 text-sm">选择账号（可选）</legend>
+              <div className="max-h-64 space-y-1 overflow-y-auto">
+                {accounts.map((account) => (
+                  <label
+                    key={account.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 hover:bg-muted"
+                  >
+                    <Checkbox
+                      aria-label={`加入分组 ${account.name}`}
+                      disabled={createGroup.isPending}
+                      checked={groupAccountIds.includes(account.id)}
+                      onCheckedChange={(checked) =>
+                        setGroupAccountIds((old) =>
+                          checked
+                            ? [...new Set([...old, account.id])]
+                            : old.filter((id) => id !== account.id),
+                        )
+                      }
+                    />
+                    <span className="truncate text-sm">{account.name}</span>
+                  </label>
+                ))}
+                {!accounts.length && (
+                  <p className="text-xs text-muted-foreground">暂无账号，可以先创建空分组。</p>
+                )}
+              </div>
+            </fieldset>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={createGroup.isPending}
+                onClick={() => {
+                  setGroupDialogOpen(false);
+                  setGroupName("");
+                  setGroupAccountIds([]);
+                }}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={!groupName.trim() || createGroup.isPending}>
+                {createGroup.isPending ? "保存中…" : "创建分组"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={pendingDelete !== null}
         onOpenChange={(open) => {
@@ -234,15 +372,82 @@ export function AccountManagement({
               ))}
           </div>
           <div className="account-filter-section account-groups">
-            <h2>分组</h2>
-            <div className="account-filter-item account-group-all">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="mb-0!">分组</h2>
+              {groups.length > 0 && (
+                <ActionIconButton
+                  label="新建分组"
+                  disabled={busy}
+                  onClick={() => setGroupDialogOpen(true)}
+                >
+                  <Plus />
+                </ActionIconButton>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              className="account-filter-item"
+              aria-label={`全部分组，${accounts.length} 个账号`}
+              aria-pressed={!activeGroup}
+              onClick={() => setGroupId(null)}
+            >
               <Folder />
-              全部分组
-              <span>
+              <span className="min-w-0 flex-1 truncate text-left">全部分组</span>
+              <span className="shrink-0 tabular-nums">
                 <NumberFlow value={accounts.length} />
               </span>
-            </div>
-            <p>暂无分组</p>
+            </Button>
+            {groups.map((group) => (
+              <Button
+                key={group.id}
+                variant="ghost"
+                className="account-filter-item"
+                aria-label={`${group.name}，${accounts.filter((a) => group.accountIds.includes(a.id)).length} 个账号`}
+                aria-pressed={group.id === groupId}
+                onClick={() => setGroupId(group.id)}
+              >
+                <Folder />
+                <span className="min-w-0 flex-1 truncate text-left">{group.name}</span>
+                <span className="shrink-0 tabular-nums">
+                  <NumberFlow
+                    value={accounts.filter((a) => group.accountIds.includes(a.id)).length}
+                  />
+                </span>
+              </Button>
+            ))}
+            {groupsQuery.isError ? (
+              <Empty className="gap-3 px-2 py-5">
+                <EmptyHeader>
+                  <EmptyTitle className="text-sm">分组加载失败</EmptyTitle>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button variant="outline" size="sm" onClick={() => void groupsQuery.refetch()}>
+                    重试
+                  </Button>
+                </EmptyContent>
+              </Empty>
+            ) : !groupsQuery.isPending && !groups.length ? (
+              <Empty className="mt-3 gap-3 px-2 py-5">
+                <EmptyHeader className="gap-1.5">
+                  <EmptyMedia variant="icon" className="mb-1 size-8 text-muted-foreground">
+                    <Folder className="size-4" />
+                  </EmptyMedia>
+                  <EmptyTitle className="text-sm font-medium">暂无分组</EmptyTitle>
+                  <EmptyDescription className="text-xs">用分组整理你的账号</EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => setGroupDialogOpen(true)}
+                  >
+                    <Plus />
+                    新建分组
+                  </Button>
+                </EmptyContent>
+              </Empty>
+            ) : null}
           </div>
         </aside>
         <div className="account-results">
@@ -382,6 +587,12 @@ export function AccountManagement({
                   {filtered.map((a) => (
                     <TableRow
                       key={a.id}
+                      tabIndex={0}
+                      aria-label={`${a.name} 账号信息`}
+                      aria-haspopup="dialog"
+                      className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      onClick={(event) => onAccountRowClick(event, a)}
+                      onKeyDown={(event) => onAccountRowKey(event, a)}
                       data-state={chosen.includes(a.id) ? "selected" : undefined}
                     >
                       <TableCell className="account-checkbox-cell">
@@ -417,7 +628,14 @@ export function AccountManagement({
                 {filtered.map((a) => (
                   <article className="account-grid-item" key={a.id}>
                     <div className="account-grid-heading">
-                      {identity(a)}
+                      <button
+                        type="button"
+                        className="min-w-0 text-left"
+                        aria-label={`设置 ${a.name}`}
+                        onClick={() => openAccountSettings(a)}
+                      >
+                        {identity(a)}
+                      </button>
                       <Checkbox
                         aria-label={`选择账号 ${a.name}`}
                         checked={chosen.includes(a.id)}

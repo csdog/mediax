@@ -14,7 +14,7 @@ export type KindEditor = {
   files: EditorFiles;
 };
 
-const publishNames = ["发布", "发表", "立即投稿", "Post", "Share", "分享", "发帖"];
+const publishNames = ["发布", "发表", "立即投稿", "Post", "Share", "分享", "发帖", "发想法"];
 
 function filesFor(task: Task, mode: EditorFiles) {
   if (mode === "none") return [];
@@ -27,6 +27,12 @@ function filesFor(task: Task, mode: EditorFiles) {
 export async function openKindEditor(page: Page, task: Task, spec: KindEditor) {
   await page.goto(spec.url, { waitUntil: "domcontentloaded", timeout: 90000 });
   if (spec.loggedOut(page.url())) throw new NeedsUser(spec.hint);
+  if (task.contentKind === "moment" && new URL(spec.url).hostname === "www.zhihu.com") {
+    // Zhihu mounts its real editable body only after expanding the home composer.
+    const trigger = page.getByText("分享此刻的想法...", { exact: true });
+    await trigger.waitFor({ state: "visible", timeout: 30000 });
+    await trigger.click();
+  }
   const files = filesFor(task, spec.files);
   if ((spec.files === "video" || spec.files === "audio") && !files.length)
     throw new NeedsUser(spec.files === "video" ? "请先选择一个视频文件" : "请先选择一个音频文件");
@@ -53,14 +59,26 @@ export async function openKindEditor(page: Page, task: Task, spec: KindEditor) {
         "[contenteditable='true']:not([placeholder*='标题']):not([name='title']), textarea:not([placeholder*='标题']):not([name='title'])",
       )
       .first();
-    if (await body.count()) await replaceText(page, body, task.body);
+    try {
+      await body.waitFor({ state: "visible", timeout: 30000 });
+    } catch {
+      throw new NeedsUser("未找到正文编辑器，请在账号浏览器中打开发布编辑器后继续");
+    }
+    await replaceText(page, body, task.body);
   }
 }
 
 export async function submitKindEditor(page: Page, markSubmitted: () => void) {
   for (const name of publishNames) {
     const button = page.getByRole("button", { name, exact: true }).first();
-    if (await button.count()) {
+    if ((await button.count()) && (await button.isVisible())) {
+      try {
+        // Trial waits for actionability without submitting; async editor validation may
+        // briefly disable the button after the body is filled.
+        await button.click({ trial: true, timeout: 30000 });
+      } catch {
+        throw new NeedsUser("发布按钮暂不可用，请在账号浏览器中检查正文和发布要求");
+      }
       markSubmitted();
       await button.click();
       return;

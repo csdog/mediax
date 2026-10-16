@@ -46,7 +46,7 @@ export class ChannelsAdapter implements Publisher {
     const page = await this.page();
     // Login polling can run during the QR handoff. Never navigate away from it.
     if (!isChannelsPlatformUrl(page.url())) return [];
-    return discoverProfile(page, accountId, "视频号", loggedOut);
+    return discoverProfile(page, accountId, "视频号", loggedOut, "channels");
   }
 
   async prepare(task: Task, _target: TaskTarget) {

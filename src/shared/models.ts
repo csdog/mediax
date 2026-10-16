@@ -60,6 +60,7 @@ export type PlatformId = (typeof platforms)[number];
 export function isPlatform(value: unknown): value is PlatformId {
   return typeof value === "string" && (platforms as readonly string[]).includes(value);
 }
+export type AccountGroup = { id: string; name: string; accountIds: string[] };
 export type Account = { id: string; name: string; platform: PlatformId };
 export type Target = {
   accountId: string;
@@ -174,12 +175,56 @@ export type ToastOverlay = {
   height: number;
   toasts: ToastOverlayItem[];
 };
+export type NativePopupKind = "downloads" | "extensions" | "history" | "browser-menu";
+export type NativePopupAction =
+  | { type: "open-downloads-folder" }
+  | { type: "reveal-download"; id: string }
+  | { type: "copy-download-url"; id: string }
+  | { type: "copy-download-path"; id: string }
+  | { type: "remove-download"; id: string }
+  | { type: "find" }
+  | { type: "print" }
+  | { type: "zoom"; delta: number }
+  | { type: "zoom-reset" }
+  | { type: "screenshot" }
+  | { type: "clear-data" }
+  | { type: "show-downloads" }
+  | { type: "settings" }
+  | { type: "open-history"; url: string }
+  | { type: "submit-omnibox"; value: string }
+  | { type: "remove-history"; url: string };
+export type NativePopupRequest = {
+  kind: NativePopupKind;
+  theme: "light" | "dark";
+  focus: boolean;
+  x: number;
+  y: number;
+  width: number;
+  downloads?: BrowserDownload[];
+  historyEntries?: BrowserHistoryEntry[];
+  historyIndex?: number;
+  historySearchQuery?: string;
+  pageReady?: boolean;
+  zoomPercent?: number;
+};
+export type NativePopupHostEvent =
+  | { type: "closed" }
+  | { type: "action"; action: NativePopupAction };
 export type BrowserPreview = { title: string; hostname: string; image: string | null };
 export type BrowserNavigation = {
   url: string;
   title: string;
   canGoBack: boolean;
   canGoForward: boolean;
+};
+export type BrowserHistoryEntry = {
+  url: string;
+  title: string;
+  visitedAt: number;
+  icon?: string;
+  accountId?: string;
+  accountLabel?: string;
+  accountAvatar?: string;
 };
 export type WebSearchProvider = {
   id: string;
@@ -217,6 +262,8 @@ export interface DesktopApi {
   resolveOmniboxUrl(input: string): Promise<string | null>;
   webSearchProvider(): Promise<WebSearchProvider>;
   browserNavigation(id: string): Promise<BrowserNavigation>;
+  browserHistory(query: string): Promise<BrowserHistoryEntry[]>;
+  removeBrowserHistory(url: string): Promise<void>;
   navigateBrowser(id: string, url: string): Promise<BrowserNavigation>;
   goBackBrowser(id: string): Promise<BrowserNavigation>;
   goForwardBrowser(id: string): Promise<BrowserNavigation>;
@@ -237,6 +284,11 @@ export interface DesktopApi {
   hideTabPreview?(): Promise<void>;
   showToastOverlay?(overlay: ToastOverlay): Promise<void>;
   hideToastOverlay?(): Promise<void>;
+  showNativePopup(popup: NativePopupRequest): Promise<void>;
+  hideNativePopup(): Promise<void>;
+  onNativePopup(listener: (popup: NativePopupRequest) => void): () => void;
+  onNativePopupHostEvent(listener: (event: NativePopupHostEvent) => void): () => void;
+  notifyNativePopup(event: { type: "resize"; height: number } | NativePopupHostEvent): void;
   closeAccountBrowser(id: string): Promise<void>;
   shortcutSettings(): Promise<ShortcutSettings>;
   setGlobalShortcut(accelerator: string): Promise<ShortcutSettings>;
@@ -329,6 +381,9 @@ export interface DesktopApi {
   openAtLogin(): Promise<{ openAtLogin: boolean; detail: string | null }>;
   setOpenAtLogin(openAtLogin: boolean): Promise<{ openAtLogin: boolean; detail: string | null }>;
   onCommand(listener: (command: DesktopCommand) => void): () => void;
+  accountGroups(): Promise<AccountGroup[]>;
+  setAccountGroups(accountId: string, groupIds: string[]): Promise<AccountGroup[]>;
+  createAccountGroup(input: { name: string; accountIds: string[] }): Promise<AccountGroup>;
   accounts(): Promise<AccountInfo[]>;
   addAccount(name: string, platform: PlatformId): Promise<AccountInfo>;
   openAccount(id: string, url?: string): Promise<void>;

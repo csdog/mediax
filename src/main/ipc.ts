@@ -7,6 +7,7 @@ import {
   nativeImage,
   shell as electronShell,
 } from "electron";
+import { readAccountGroups, createAccountGroup, setAccountGroups } from "./accounts/groups";
 import { log } from "./logging";
 import { readFile, stat } from "node:fs/promises";
 import { extname, basename, join } from "node:path";
@@ -45,9 +46,15 @@ import {
 import { readAutoUpdateEnabled } from "../shared/autoUpdateSettings";
 import type { DesktopShell } from "./desktop/DesktopShell";
 import type { DownloadStore } from "./desktop/DownloadStore";
+import type { BrowserHistoryStore } from "./browser/BrowserHistoryStore";
 import type { AppUpdater } from "./desktop/AppUpdater";
 import { TabPreviewWindow } from "./desktop/TabPreviewWindow";
 import { ToastOverlayWindow } from "./desktop/ToastOverlayWindow";
+import {
+  NativePopupWindow,
+  parseNativePopup,
+  parseNativePopupAction,
+} from "./desktop/NativePopupWindow";
 import {
   buildDiagnosticReport,
   exportDiagnosticReport,
@@ -88,6 +95,7 @@ export function registerIpc(
   shell: DesktopShell,
   updater: AppUpdater,
   downloads: DownloadStore,
+  browserHistory: BrowserHistoryStore,
 ) {
   const stopLogging = db.onTargetChange((target) => {
     const write = ["failed", "unknown", "awaiting_user"].includes(target.status)
@@ -103,6 +111,10 @@ export function registerIpc(
   const images = new Map<string, ImageAsset>();
   const tabPreview = new TabPreviewWindow(window);
   const toastOverlay = new ToastOverlayWindow(window);
+  const nativePopup = new NativePopupWindow(window, (event) => {
+    if (!window.isDestroyed()) window.webContents.send("mediax:native-popup-event", event);
+  });
+  accounts.setBrowserPageInteraction(() => nativePopup.hide(true));
   const publishing = new PublishService(db, accounts, join(app.getPath("userData"), "task-assets"));
   publishing.startScheduler();
   app.once("will-quit", () => publishing.stopScheduler());
@@ -301,6 +313,9 @@ export function registerIpc(
     if (!dataUrl.startsWith("data:image/png;base64,")) throw new Error("无法读取这张图片");
     return dataUrl;
   });
+  on("accountGroups", () => readAccountGroups(db));
+  on("setAccountGroups", (id, groupIds) => setAccountGroups(db, id, groupIds));
+  on("createAccountGroup", (input) => createAccountGroup(db, input));
   on("accounts", () => accounts.list());
   on("addAccount", (name, platform) => {
     if (!isPlatform(platform)) throw new Error("暂不支持该平台");
@@ -314,6 +329,11 @@ export function registerIpc(
   on("resolveOmniboxUrl", (input) => resolveOmniboxUrl(text(input), systemSearchUrl));
   on("webSearchProvider", () => systemSearchProvider());
   on("browserNavigation", (id) => accounts.browserNavigation(text(id)));
+  on("browserHistory", (query) => browserHistory.search(typeof query === "string" ? query : ""));
+  on("removeBrowserHistory", (url) => {
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url.trim())) throw new Error("无效网址");
+    browserHistory.remove(url.trim());
+  });
   on("navigateBrowser", (id, url) => accounts.navigateBrowser(text(id), text(url)));
   on("goBackBrowser", (id) => accounts.goBackBrowser(text(id)));
   on("goForwardBrowser", (id) => accounts.goForwardBrowser(text(id)));
@@ -364,6 +384,35 @@ export function registerIpc(
     toastOverlay.show(toastOverlayPayload(value, window.getContentSize()[0])),
   );
   on("hideToastOverlay", () => toastOverlay.hide());
+  const fromMainRenderer = (sender: Electron.WebContents) =>
+    sender === window.webContents && !window.isDestroyed();
+  ipcMain.on("mediax:native-popup-host-show", (event, value) => {
+    if (!fromMainRenderer(event.sender)) return;
+    try {
+      nativePopup.show(parseNativePopup(value));
+    } catch (error) {
+      log.warn("Native popup show failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+  ipcMain.on("mediax:native-popup-host-hide", (event) => {
+    if (!fromMainRenderer(event.sender)) return;
+    nativePopup.hide();
+  });
+  ipcMain.on("mediax:native-popup-notify", (event, value) => {
+    if (!nativePopup.owns(event.sender)) return;
+    if (!value || typeof value !== "object") return;
+    if (value.type === "resize" && typeof value.height === "number") {
+      nativePopup.resize(value.height);
+      return;
+    }
+    if (value.type === "action") {
+      const action = parseNativePopupAction(value.action);
+      if (!action || window.isDestroyed()) return;
+      window.webContents.send("mediax:native-popup-event", { type: "action", action });
+    }
+  });
   on("refreshAccount", (id) => accounts.refresh(text(id)));
   on("deleteAccount", (id) => accounts.remove(text(id)));
   on("importMarkdown", async () => {
@@ -577,6 +626,7 @@ export function registerIpc(
   on("verifyTarget", (id, url) =>
     publishing.verify(text(id), url === undefined ? undefined : text(url)),
   );
+  return publishing;
 }
 
 function toastOverlayPayload(value: unknown, windowWidth: number): ToastOverlay {

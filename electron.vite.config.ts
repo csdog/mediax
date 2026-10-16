@@ -27,14 +27,32 @@ export default defineConfig(({ mode }) => {
       },
     },
     // Sandboxed preloads cannot require npm packages; bundle the logging bridge.
-    preload: { envDir, plugins: [externalizeDepsPlugin({ exclude: ["electron-log"] })] },
+    preload: {
+      envDir,
+      plugins: [externalizeDepsPlugin({ exclude: ["electron-log"] })],
+      build: {
+        rollupOptions: {
+          input: {
+            index: resolve("src/preload/index.ts"),
+            nativePopup: resolve("src/preload/native-popup.ts"),
+          },
+        },
+      },
+    },
     renderer: {
       envDir,
       server: { host: "127.0.0.1", port, strictPort: true },
       resolve: { alias: { "@": resolve("src/renderer") } },
       plugins: [tailwindcss()],
       root: "src/renderer",
-      build: { rollupOptions: { input: resolve("src/renderer/index.html") } },
+      build: {
+        rollupOptions: {
+          input: {
+            index: resolve("src/renderer/index.html"),
+            nativePopup: resolve("src/renderer/native-popup.html"),
+          },
+        },
+      },
     },
   };
 });

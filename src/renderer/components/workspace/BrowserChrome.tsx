@@ -1,76 +1,33 @@
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { ChevronDown, ChevronUp, RotateCw, X } from "lucide-react";
 import {
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  Download,
-  EllipsisVertical,
-  FileText,
-  FolderOpen,
-  Minus,
-  Plus,
-  Puzzle,
-  RotateCcw,
-  RotateCw,
-  X,
-} from "lucide-react";
-import { CodexArrowLeftIcon } from "./CodexNavigationIcons";
+  CodexArrowLeftIcon,
+  CodexArrowUpRightIcon,
+  CodexDownloadIcon,
+  CodexEllipsisHorizontalIcon,
+  CodexPuzzleIcon,
+} from "./CodexNavigationIcons";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useWorkspace } from "@/app/WorkspaceContext";
-import type { BrowserDownload } from "../../../shared/models";
+import type {
+  NativePopupAction,
+  NativePopupKind,
+  NativePopupRequest,
+} from "../../../shared/models";
 
-function revealInFolderLabel() {
-  const platform = window.desktopPlatform;
-  if (platform === "darwin") return "在访达中显示";
-  if (platform === "win32") return "在资源管理器中显示";
-  return "在文件夹中显示";
-}
+type ChromePopup = NativePopupKind | null;
 
-function formatClock(ms: number) {
-  return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-}
-
-function formatBytes(bytes: number) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
-
-function downloadStatusText(item: BrowserDownload) {
-  const clock = formatClock(item.endedAt ?? item.startedAt);
-  if (item.state === "progressing") {
-    const received = formatBytes(item.receivedBytes);
-    const total = formatBytes(item.totalBytes);
-    if (received && total) return `下载中 · ${received} / ${total}`;
-    if (received) return `下载中 · ${received}`;
-    return "下载中";
-  }
-  if (item.state === "completed") return `已完成 · ${clock}`;
-  return `已停止 · ${clock}`;
-}
-
-function canRevealDownload(item: BrowserDownload) {
-  return item.state === "completed";
+function popupTheme(): NativePopupRequest["theme"] {
+  return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
 export function BrowserChrome() {
   const queryClient = useQueryClient();
   const {
     activeBrowserViewId,
-    isNewTab,
     submitOmnibox,
     goBackBrowser,
     goForwardBrowser,
@@ -79,8 +36,13 @@ export function BrowserChrome() {
     setSettingsOpen,
   } = useWorkspace();
   const inputRef = useRef<HTMLInputElement>(null);
+  const omniboxRef = useRef<HTMLFormElement>(null);
+  const extensionsAnchorRef = useRef<HTMLDivElement>(null);
+  const downloadsAnchorRef = useRef<HTMLDivElement>(null);
+  const menuAnchorRef = useRef<HTMLDivElement>(null);
+  const historyBlurTimer = useRef(0);
   const findRef = useRef<HTMLInputElement>(null);
-  const [downloadsOpen, setDownloadsOpen] = useState(false);
+  const [popup, setPopup] = useState<ChromePopup>(null);
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
   const navigation = useQuery({
@@ -99,6 +61,11 @@ export function BrowserChrome() {
     queryFn: () => window.desktop.webSearchProvider(),
     staleTime: 60_000,
   });
+  const accounts = useQuery({
+    queryKey: ["desktop", "accounts"],
+    queryFn: () => window.desktop.accounts(),
+    staleTime: 30_000,
+  });
   const downloads = useQuery({
     queryKey: ["desktop", "downloads"],
     queryFn: () => window.desktop.downloads(),
@@ -114,17 +81,21 @@ export function BrowserChrome() {
   const currentUrl = navigation.data?.url ?? "";
   const [address, setAddress] = useState("");
   const [editingAddress, setEditingAddress] = useState(false);
+  const [historyQuery, setHistoryQuery] = useState<string | null>(null);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const historyOpen = popup === "history";
+  const history = useQuery({
+    queryKey: ["desktop", "browser-history", historyQuery ?? ""],
+    enabled: historyOpen,
+    queryFn: () => window.desktop.browserHistory(historyQuery ?? ""),
+  });
+  const suggestions = history.data ?? [];
   const pageReady = Boolean(activeBrowserViewId);
   const downloadItems = downloads.data ?? [];
-  const revealLabel = revealInFolderLabel();
   useEffect(() => {
     if (editingAddress) return;
     setAddress(activeBrowserViewId ? currentUrl : "");
   }, [activeBrowserViewId, currentUrl, editingAddress]);
-  useEffect(() => {
-    if (!isNewTab) return;
-    inputRef.current?.focus();
-  }, [isNewTab]);
   useEffect(() => {
     if (!findOpen) return;
     findRef.current?.focus();
@@ -135,8 +106,12 @@ export function BrowserChrome() {
     setFindOpen(false);
     setFindQuery("");
   }, [activeBrowserViewId]);
+  const externalLabel = "在外部浏览器中打开";
+  const externalTarget = (editingAddress ? address : currentUrl).trim();
   const goToAddress = (value: string) => {
     setEditingAddress(false);
+    setPopup(null);
+    setHistoryIndex(-1);
     void run(() => submitOmnibox(value));
   };
   const onSubmitAddress = (event: FormEvent<HTMLFormElement>) => {
@@ -155,9 +130,174 @@ export function BrowserChrome() {
     await window.desktop.setBrowserZoom(activeBrowserViewId, next);
     await refreshZoom();
   };
-  const keepMenuOpen = (event: Event | MouseEvent) => {
-    event.preventDefault();
+  const onPopupAction = (action: NativePopupAction) => {
+    if (action.type === "open-downloads-folder") {
+      void run(() => window.desktop.openDownloadsFolder());
+      return;
+    }
+    if (action.type === "reveal-download") {
+      void run(() => window.desktop.revealDownload(action.id));
+      return;
+    }
+    if (action.type === "copy-download-url") {
+      void run(() => window.desktop.copyDownloadUrl(action.id));
+      return;
+    }
+    if (action.type === "copy-download-path") {
+      void run(() => window.desktop.copyDownloadPath(action.id));
+      return;
+    }
+    if (action.type === "remove-download") {
+      void run(() => window.desktop.removeDownload(action.id));
+      return;
+    }
+    if (action.type === "find") {
+      setPopup(null);
+      setFindOpen(true);
+      return;
+    }
+    if (action.type === "print") {
+      setPopup(null);
+      if (!activeBrowserViewId) return;
+      void run(() => window.desktop.printBrowser(activeBrowserViewId));
+      return;
+    }
+    if (action.type === "zoom") {
+      void run(() => changeZoom((zoom.data?.factor ?? 1) + action.delta));
+      return;
+    }
+    if (action.type === "zoom-reset") {
+      void run(() => changeZoom(1));
+      return;
+    }
+    if (action.type === "screenshot") {
+      setPopup(null);
+      if (!activeBrowserViewId) return;
+      void run(async () => {
+        const path = await window.desktop.screenshotBrowser(activeBrowserViewId);
+        if (path) toast.success(`截图已保存：${path}`);
+        else toast.error("截图失败");
+      });
+      return;
+    }
+    if (action.type === "clear-data") {
+      setPopup(null);
+      if (!activeBrowserViewId) return;
+      void run(async () => {
+        await window.desktop.clearBrowserData(activeBrowserViewId);
+        toast.success("已清除当前标签页的浏览数据");
+      });
+      return;
+    }
+    if (action.type === "show-downloads") {
+      setPopup("downloads");
+      return;
+    }
+    if (action.type === "settings") {
+      setPopup(null);
+      setSettingsOpen(true);
+      return;
+    }
+    if (action.type === "open-history") goToAddress(action.url);
+    if (action.type === "submit-omnibox") goToAddress(action.value);
+    if (action.type === "remove-history") {
+      void run(async () => {
+        await window.desktop.removeBrowserHistory(action.url);
+        await queryClient.invalidateQueries({ queryKey: ["desktop", "browser-history"] });
+        setHistoryIndex(-1);
+      });
+    }
   };
+  useEffect(() => {
+    return window.desktop.onNativePopupHostEvent((event) => {
+      if (event.type === "closed") {
+        setPopup(null);
+        return;
+      }
+      onPopupAction(event.action);
+    });
+  });
+  useEffect(() => {
+    if (!popup) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (document.querySelector("[data-browser-chrome]")?.contains(target)) return;
+      setPopup(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [popup]);
+  useEffect(() => {
+    if (popup === "history" && !history.isFetched) return;
+    if (popup === "history" && suggestions.length === 0) {
+      void window.desktop.hideNativePopup();
+      return;
+    }
+    if (!popup) {
+      void window.desktop.hideNativePopup();
+      return;
+    }
+    const theme = popupTheme();
+    if (popup === "history") {
+      const rect = omniboxRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const searchQuery =
+        historyQuery !== null && historyQuery.trim() ? historyQuery.trim() : undefined;
+      const historyEntries = suggestions.slice(0, 8).map((entry) => {
+        if (entry.accountAvatar) return entry;
+        const account = accounts.data?.find((item) => item.id === entry.accountId);
+        if (!account?.avatar && !account?.name) return entry;
+        return {
+          ...entry,
+          accountLabel: entry.accountLabel ?? account?.name,
+          accountAvatar: account?.avatar ?? entry.accountAvatar,
+        };
+      });
+      void window.desktop.showNativePopup({
+        kind: "history",
+        theme,
+        focus: false,
+        x: Math.max(8, Math.round(rect.x)),
+        y: Math.round(rect.bottom + 8),
+        width: Math.max(160, Math.round(rect.width)),
+        historyEntries,
+        historyIndex,
+        historySearchQuery: searchQuery,
+      });
+      return;
+    }
+    const anchor =
+      popup === "downloads"
+        ? downloadsAnchorRef.current
+        : popup === "extensions"
+          ? extensionsAnchorRef.current
+          : menuAnchorRef.current;
+    const rect = anchor?.getBoundingClientRect();
+    if (!rect) return;
+    const width = popup === "downloads" ? 320 : popup === "extensions" ? 288 : 256;
+    void window.desktop.showNativePopup({
+      kind: popup,
+      theme,
+      focus: false,
+      x: Math.max(8, Math.round(rect.right - width)),
+      y: Math.round(rect.bottom + 8),
+      width,
+      downloads: popup === "downloads" ? downloadItems.slice(0, 50) : undefined,
+      pageReady,
+      zoomPercent: zoom.data?.percent ?? 100,
+    });
+  }, [
+    popup,
+    history.data,
+    history.isFetched,
+    historyQuery,
+    historyIndex,
+    accounts.data,
+    downloads.data,
+    pageReady,
+    zoom.data?.percent,
+  ]);
   const runFind = (forward = true, findNext = true) => {
     if (!activeBrowserViewId) return;
     void run(() =>
@@ -170,330 +310,235 @@ export function BrowserChrome() {
     if (activeBrowserViewId) void window.desktop.stopFindInBrowser(activeBrowserViewId);
   };
   return (
-    <div className="browser-chrome-stack">
+    <div className="browser-chrome-stack" data-browser-chrome>
       <div className="browser-chrome">
-        <div className="toolbar-navigation">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="toolbar-nav-button"
-            aria-label="后退"
-            disabled={!navigation.data?.canGoBack}
-            onClick={() => void run(() => goBackBrowser())}
-          >
-            <CodexArrowLeftIcon className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="toolbar-nav-button"
-            aria-label="前进"
-            disabled={!navigation.data?.canGoForward}
-            onClick={() => void run(() => goForwardBrowser())}
-          >
-            <CodexArrowLeftIcon className="size-4 -scale-x-100" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="toolbar-nav-button"
-            aria-label="刷新"
-            disabled={!pageReady}
-            onClick={() => void run(() => reloadBrowser())}
-          >
-            <RotateCw className="size-4" />
-          </Button>
+        <div className="toolbar-navigation" role="group" aria-label="导航">
+          <Tooltip>
+            <TooltipTrigger
+              delay={400}
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="toolbar-nav-button"
+                  aria-label="后退"
+                  disabled={!navigation.data?.canGoBack}
+                  onClick={() => void run(() => goBackBrowser())}
+                >
+                  <CodexArrowLeftIcon className="size-4" />
+                </Button>
+              }
+            />
+            <TooltipContent side="bottom">后退</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              delay={400}
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="toolbar-nav-button"
+                  aria-label="前进"
+                  disabled={!navigation.data?.canGoForward}
+                  onClick={() => void run(() => goForwardBrowser())}
+                >
+                  <CodexArrowLeftIcon className="size-4 -scale-x-100" />
+                </Button>
+              }
+            />
+            <TooltipContent side="bottom">前进</TooltipContent>
+          </Tooltip>
+          <span className="toolbar-nav-divider" aria-hidden="true" />
+          <Tooltip>
+            <TooltipTrigger
+              delay={400}
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="toolbar-nav-button"
+                  aria-label="刷新"
+                  disabled={!pageReady}
+                  onClick={() => void run(() => reloadBrowser())}
+                >
+                  <RotateCw className="size-4" />
+                </Button>
+              }
+            />
+            <TooltipContent side="bottom">刷新</TooltipContent>
+          </Tooltip>
         </div>
         <form
+          ref={omniboxRef}
           className={editingAddress ? "toolbar-omnibox is-editing" : "toolbar-omnibox"}
           onSubmit={onSubmitAddress}
         >
+          {editingAddress && !address.trim() ? (
+            <span className="toolbar-omnibox-ghost-hint" aria-hidden>
+              {hint}
+            </span>
+          ) : null}
           <input
             ref={inputRef}
             name="url"
             aria-label={hint}
-            placeholder={hint}
+            placeholder={editingAddress ? "" : hint}
             value={address}
             spellCheck={false}
             autoCapitalize="off"
             autoCorrect="off"
-            onFocus={() => setEditingAddress(true)}
-            onBlur={() => setEditingAddress(false)}
-            onChange={(event) => {
+            role="combobox"
+            aria-expanded={historyOpen && suggestions.length > 0}
+            aria-controls="browser-history"
+            aria-autocomplete="list"
+            onFocus={(event) => {
+              window.clearTimeout(historyBlurTimer.current);
               setEditingAddress(true);
+              setPopup("history");
+              setHistoryQuery(null);
+              setHistoryIndex(-1);
+              const input = event.currentTarget;
+              input.setSelectionRange(0, 0);
+            }}
+            onBlur={() => {
+              setEditingAddress(false);
+              historyBlurTimer.current = window.setTimeout(() => {
+                setPopup((current) => (current === "history" ? null : current));
+                setHistoryIndex(-1);
+              }, 180);
+            }}
+            onChange={(event) => {
+              window.clearTimeout(historyBlurTimer.current);
+              setEditingAddress(true);
+              setPopup("history");
+              setHistoryQuery(event.target.value);
+              setHistoryIndex(-1);
               setAddress(event.target.value);
             }}
             onKeyDown={(event) => {
+              if (event.key === "ArrowDown" && suggestions.length) {
+                event.preventDefault();
+                setPopup("history");
+                setHistoryIndex((index) => Math.min(suggestions.length - 1, index + 1));
+                return;
+              }
+              if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setHistoryIndex((index) => Math.max(-1, index - 1));
+                return;
+              }
+              if (event.key === "Escape") {
+                if (popup !== "history") return;
+                event.preventDefault();
+                setPopup(null);
+                setHistoryIndex(-1);
+                return;
+              }
               if (event.key !== "Enter") return;
               event.preventDefault();
-              goToAddress(event.currentTarget.value);
+              const picked = historyIndex >= 0 ? suggestions[historyIndex] : undefined;
+              goToAddress(picked?.url ?? event.currentTarget.value);
             }}
           />
+          <Tooltip>
+            <TooltipTrigger
+              delay={400}
+              render={
+                <button
+                  type="button"
+                  className="toolbar-omnibox-external"
+                  aria-label={externalLabel}
+                  disabled={!externalTarget}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClick={() => {
+                    const raw = (
+                      editingAddress ? (inputRef.current?.value ?? address) : currentUrl
+                    ).trim();
+                    if (!raw) return;
+                    void run(async () => {
+                      const url = /^https?:\/\//i.test(raw)
+                        ? raw
+                        : await window.desktop.resolveOmniboxUrl(raw);
+                      if (!url) throw new Error("无法在外部浏览器中打开");
+                      await window.desktop.openExternalUrl(url);
+                    });
+                  }}
+                >
+                  <CodexArrowUpRightIcon className="size-4" />
+                </button>
+              }
+            />
+            <TooltipContent>{externalLabel}</TooltipContent>
+          </Tooltip>
         </form>
         <div className="browser-chrome-actions">
-          <Popover>
+          <div ref={extensionsAnchorRef} className="inline-flex">
             <Tooltip>
               <TooltipTrigger
                 delay={400}
                 render={
-                  <PopoverTrigger
-                    render={
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="toolbar-nav-button"
-                        aria-label="扩展"
-                      >
-                        <Puzzle />
-                      </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="toolbar-outline-plain"
+                    aria-label="扩展"
+                    onClick={() =>
+                      setPopup((current) => (current === "extensions" ? null : "extensions"))
                     }
-                  />
+                  >
+                    <CodexPuzzleIcon className="size-4" />
+                  </Button>
                 }
               />
               <TooltipContent>扩展</TooltipContent>
             </Tooltip>
-            <PopoverContent align="end" sideOffset={8} className="browser-chrome-panel w-72 p-0">
-              <div className="browser-chrome-panel-header">
-                <span>扩展</span>
-              </div>
-              <p className="browser-chrome-panel-empty">暂未支持浏览器扩展</p>
-            </PopoverContent>
-          </Popover>
-
-          <Popover open={downloadsOpen} onOpenChange={setDownloadsOpen}>
+          </div>
+          <div ref={downloadsAnchorRef} className="inline-flex">
             <Tooltip>
               <TooltipTrigger
                 delay={400}
                 render={
-                  <PopoverTrigger
-                    render={
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="toolbar-nav-button"
-                        aria-label="下载"
-                      >
-                        <Download />
-                      </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="toolbar-outline-plain"
+                    aria-label="下载"
+                    onClick={() =>
+                      setPopup((current) => (current === "downloads" ? null : "downloads"))
                     }
-                  />
+                  >
+                    <CodexDownloadIcon className="size-4" />
+                  </Button>
                 }
               />
               <TooltipContent>下载</TooltipContent>
             </Tooltip>
-            <PopoverContent align="end" sideOffset={8} className="browser-chrome-panel w-80 p-0">
-              <div className="browser-chrome-panel-header">
-                <span>下载</span>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="打开下载文件夹"
-                  onClick={() => void run(() => window.desktop.openDownloadsFolder())}
-                >
-                  <FolderOpen />
-                </Button>
-              </div>
-              {downloadItems.length ? (
-                <ul className="browser-download-list">
-                  {downloadItems.map((item) => {
-                    const revealable = canRevealDownload(item);
-                    return (
-                      <li key={item.id} className="browser-download-item">
-                        <div className="browser-download-icon" aria-hidden>
-                          <FileText />
-                        </div>
-                        <div className="browser-download-meta">
-                          <p className="browser-download-name" title={item.filename}>
-                            {item.filename}
-                          </p>
-                          <p className="browser-download-status">{downloadStatusText(item)}</p>
-                        </div>
-                        <div className="browser-download-actions">
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            aria-label={revealLabel}
-                            disabled={!revealable}
-                            onClick={() => void run(() => window.desktop.revealDownload(item.id))}
-                          >
-                            <FolderOpen />
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              render={
-                                <Button variant="ghost" size="icon-xs" aria-label="下载项选项">
-                                  <EllipsisVertical />
-                                </Button>
-                              }
-                            />
-                            <DropdownMenuContent align="end" className="min-w-44">
-                              <DropdownMenuItem
-                                disabled={!revealable}
-                                onClick={() =>
-                                  void run(() => window.desktop.revealDownload(item.id))
-                                }
-                              >
-                                {revealLabel}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  void run(() => window.desktop.copyDownloadUrl(item.id))
-                                }
-                              >
-                                复制地址
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  void run(() => window.desktop.copyDownloadPath(item.id))
-                                }
-                              >
-                                复制路径
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  void run(() => window.desktop.removeDownload(item.id))
-                                }
-                              >
-                                从列表中移除
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="browser-chrome-panel-empty">暂无下载内容</p>
-              )}
-            </PopoverContent>
-          </Popover>
-
-          <DropdownMenu>
+          </div>
+          <div ref={menuAnchorRef} className="inline-flex">
             <Tooltip>
               <TooltipTrigger
                 delay={400}
                 render={
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="toolbar-nav-button"
-                        aria-label="浏览器选项"
-                      >
-                        <EllipsisVertical />
-                      </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="toolbar-outline-plain"
+                    aria-label="浏览器选项"
+                    onClick={() =>
+                      setPopup((current) => (current === "browser-menu" ? null : "browser-menu"))
                     }
-                  />
+                  >
+                    <CodexEllipsisHorizontalIcon className="size-4" />
+                  </Button>
                 }
               />
               <TooltipContent>浏览器选项</TooltipContent>
             </Tooltip>
-            <DropdownMenuContent align="end" className="browser-options-menu min-w-64">
-              <DropdownMenuItem
-                disabled={!pageReady}
-                onClick={() => {
-                  setFindOpen(true);
-                }}
-              >
-                在页面中查找
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!pageReady}
-                onClick={() => {
-                  if (!activeBrowserViewId) return;
-                  void run(() => window.desktop.printBrowser(activeBrowserViewId));
-                }}
-              >
-                打印
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <div
-                className="browser-zoom-row"
-                onClick={keepMenuOpen}
-                onPointerDown={keepMenuOpen}
-                onKeyDown={(event) => event.stopPropagation()}
-              >
-                <span>缩放</span>
-                <div className="browser-zoom-controls">
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="缩小"
-                    disabled={!pageReady}
-                    onClick={() => void run(() => changeZoom((zoom.data?.factor ?? 1) - 0.1))}
-                  >
-                    <Minus />
-                  </Button>
-                  <span className="browser-zoom-value">{zoom.data?.percent ?? 100}%</span>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="放大"
-                    disabled={!pageReady}
-                    onClick={() => void run(() => changeZoom((zoom.data?.factor ?? 1) + 0.1))}
-                  >
-                    <Plus />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="重置缩放"
-                    disabled={!pageReady}
-                    onClick={() => void run(() => changeZoom(1))}
-                  >
-                    <RotateCcw />
-                  </Button>
-                </div>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled className="justify-between opacity-50">
-                Device toolbar
-                <ChevronRight className="size-4" />
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!pageReady}
-                onClick={() => {
-                  if (!activeBrowserViewId) return;
-                  void run(async () => {
-                    const path = await window.desktop.screenshotBrowser(activeBrowserViewId);
-                    if (path) toast.success(`截图已保存：${path}`);
-                    else toast.error("截图失败");
-                  });
-                }}
-              >
-                截取屏幕截图
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled className="opacity-50">
-                导入 Cookie 和密码…
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled className="justify-between opacity-50">
-                密码和自动填充
-                <ChevronRight className="size-4" />
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDownloadsOpen(true)}>下载</DropdownMenuItem>
-              <DropdownMenuItem disabled className="opacity-50" title="浏览历史将在后续版本提供">
-                历史记录
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!pageReady}
-                onClick={() => {
-                  if (!activeBrowserViewId) return;
-                  void run(async () => {
-                    await window.desktop.clearBrowserData(activeBrowserViewId);
-                    toast.success("已清除当前标签页的浏览数据");
-                  });
-                }}
-              >
-                清除浏览数据
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setSettingsOpen(true)}>浏览器设置</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          </div>
         </div>
       </div>
       {findOpen ? (

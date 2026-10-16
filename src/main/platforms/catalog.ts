@@ -78,7 +78,7 @@ const sessions: Record<PlatformId, Session> = {
     "https://baijiahao.baidu.com",
     ["BDUSS"],
   ),
-  toutiao: known("https://mp.toutiao.com/auth/page/login", "https://mp.toutiao.com", [
+  toutiao: known("https://mp.toutiao.com/profile_v4/index", "https://mp.toutiao.com", [
     "sessionid",
     "sso_uid_tt",
   ]),
@@ -139,6 +139,25 @@ export const platformCookieUrl = Object.fromEntries(
 
 export function partitionName(platform: PlatformId, id: string) {
   return `persist:${platform}-${id}`;
+}
+
+export function sessionCookieNames(platform: PlatformId) {
+  return sessions[platform].cookies;
+}
+
+export function platformForUrl(url: string): PlatformId | null {
+  try {
+    const host = new URL(url).hostname;
+    for (const [platform, cookieUrl] of Object.entries(platformCookieUrl)) {
+      const cookieHost = new URL(cookieUrl).hostname;
+      if (host === cookieHost || host.endsWith(`.${cookieHost}`)) {
+        return platform as PlatformId;
+      }
+    }
+  } catch {
+    /* Ignore invalid URLs. */
+  }
+  return null;
 }
 
 export function hasPlatformSession(platform: PlatformId, cookies: { name: string }[], url = "") {

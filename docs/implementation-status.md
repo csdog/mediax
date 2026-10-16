@@ -2,7 +2,7 @@
 
 ## 多平台本地发布（2026-10-13）
 
-创作页支持文章、动态、视频和音频。可发布类型见 `src/shared/content.ts`。发布仍走应用内账号浏览器。正文保持纯文本和 Markdown 导入，不含定时发布。排期日历、数据分析、Public API / n8n / MCP 等见 [TODO.md](TODO.md)「排期与自动化」。
+创作页支持文章、动态、视频和音频。可发布类型见 `src/shared/content.ts`。发布仍走应用内账号浏览器。正文保持纯文本和 Markdown 导入，支持本机定时发布、日历和发布结果汇总。Agent 控制面与 CLI 已接通，见 [control-api.md](control-api.md)；Public API / n8n / MCP 等后续计划见 [TODO.md](TODO.md)。
 
 ## Facebook 本地发布（2026-10-13）
 

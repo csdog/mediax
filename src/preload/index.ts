@@ -14,6 +14,8 @@ const api: DesktopApi = {
   resolveOmniboxUrl: (input) => call("resolveOmniboxUrl", input),
   webSearchProvider: () => call("webSearchProvider"),
   browserNavigation: (id) => call("browserNavigation", id),
+  browserHistory: (query) => call("browserHistory", query),
+  removeBrowserHistory: (url) => call("removeBrowserHistory", url),
   navigateBrowser: (id, url) => call("navigateBrowser", id, url),
   goBackBrowser: (id) => call("goBackBrowser", id),
   goForwardBrowser: (id) => call("goForwardBrowser", id),
@@ -30,6 +32,27 @@ const api: DesktopApi = {
   hideTabPreview: () => call("hideTabPreview"),
   showToastOverlay: (overlay) => call("showToastOverlay", overlay),
   hideToastOverlay: () => call("hideToastOverlay"),
+  showNativePopup: (popup) => {
+    ipcRenderer.send("mediax:native-popup-host-show", popup);
+    return Promise.resolve();
+  },
+  hideNativePopup: () => {
+    ipcRenderer.send("mediax:native-popup-host-hide");
+    return Promise.resolve();
+  },
+  onNativePopup: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, popup: Parameters<typeof listener>[0]) =>
+      listener(popup);
+    ipcRenderer.on("mediax:native-popup", receive);
+    return () => ipcRenderer.removeListener("mediax:native-popup", receive);
+  },
+  onNativePopupHostEvent: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, event: Parameters<typeof listener>[0]) =>
+      listener(event);
+    ipcRenderer.on("mediax:native-popup-event", receive);
+    return () => ipcRenderer.removeListener("mediax:native-popup-event", receive);
+  },
+  notifyNativePopup: (event) => ipcRenderer.send("mediax:native-popup-notify", event),
   closeAccountBrowser: (id) => call("closeAccountBrowser", id),
   shortcutSettings: () => call("shortcutSettings"),
   setGlobalShortcut: (accelerator) => call("setGlobalShortcut", accelerator),
@@ -79,6 +102,9 @@ const api: DesktopApi = {
       ipcRenderer.removeListener("mediax:command", receive);
     };
   },
+  accountGroups: () => call("accountGroups"),
+  setAccountGroups: (id, groupIds) => call("setAccountGroups", id, groupIds),
+  createAccountGroup: (input) => call("createAccountGroup", input),
   accounts: () => call("accounts"),
   addAccount: (n, platform) => call("addAccount", n, platform),
   openAccount: (id, url) => call("openAccount", id, url),

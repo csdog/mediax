@@ -16,10 +16,15 @@ it.each([
 });
 
 it("discovers a Channels identity once the platform workspace has loaded", async () => {
-  const page = { url: () => "https://channels.weixin.qq.com/platform", goto: vi.fn() };
+  const page = {
+    url: () => "https://channels.weixin.qq.com/platform",
+    goto: vi.fn(),
+    waitForFunction: vi.fn(async () => {}),
+    evaluate: vi.fn(async () => ({ name: "asir", href: null })),
+  };
   const adapter = new ChannelsAdapter(async () => page as unknown as Page);
   expect(await adapter.discover("account-1")).toEqual([
-    { accountId: "account-1", identityId: "1", name: "视频号", kind: "profile" },
+    { accountId: "account-1", identityId: "1", name: "asir", kind: "profile" },
   ]);
   expect(page.goto).not.toHaveBeenCalled();
 });

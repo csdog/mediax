@@ -15,7 +15,7 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
   return (
     <AppErrorView
       variant="full"
-      className="min-h-0 w-full flex-1"
+      className="min-h-svh w-full"
       title="这里暂时走不通了"
       description={"可以重试当前页面，或先回到账号继续其他工作。详情已写入本地日志。"}
       error={error}

@@ -158,3 +158,24 @@ it.each([...platforms, undefined])(
     );
   },
 );
+
+it("opens account popup links in the same view to preserve the logged-in session", async () => {
+  view.webContents.loadURL.mockResolvedValue(undefined);
+  await manager().open("account-1", "https://www.zhihu.com/", { focus: false });
+  const handler = view.webContents.setWindowOpenHandler.mock.calls[0][0];
+  view.webContents.loadURL.mockClear();
+  expect(handler({ url: "https://www.zhihu.com/creator" })).toEqual({ action: "deny" });
+  expect(view.webContents.loadURL).toHaveBeenCalledWith("https://www.zhihu.com/creator");
+});
+
+it.each(["javascript:alert(1)", "file:///tmp/test.html", "invalid", "about:blank"])(
+  "does not load unsafe or unsupported popup URL %s",
+  async (url) => {
+    view.webContents.loadURL.mockResolvedValue(undefined);
+    await manager().open("account-1", "https://www.zhihu.com/", { focus: false });
+    const handler = view.webContents.setWindowOpenHandler.mock.calls[0][0];
+    view.webContents.loadURL.mockClear();
+    expect(handler({ url })).toEqual({ action: "deny" });
+    expect(view.webContents.loadURL).not.toHaveBeenCalled();
+  },
+);
