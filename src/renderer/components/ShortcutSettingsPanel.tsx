@@ -40,7 +40,15 @@ export function ShortcutSettingsPanel() {
   return (
     <div className="shortcut-settings">
       <div className="shortcut-settings-header">
-        <h2>键盘快捷键</h2>
+        <div className="shortcut-settings-search">
+          <Search className="size-4 text-muted-foreground" aria-hidden />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索快捷键"
+            aria-label="搜索快捷键"
+          />
+        </div>
         <Button
           type="button"
           variant="outline"
@@ -53,15 +61,6 @@ export function ShortcutSettingsPanel() {
         >
           全部重置为默认值
         </Button>
-      </div>
-      <div className="shortcut-settings-search">
-        <Search className="size-4 text-muted-foreground" aria-hidden />
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索快捷键"
-          aria-label="搜索快捷键"
-        />
       </div>
       <div className="shortcut-settings-list" role="list">
         {items.map((item) => {

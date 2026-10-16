@@ -334,7 +334,8 @@ export function SettingsLayout({
       <div className="settings-scroll-area" key={category}>
         <div className="settings-page">
           <PanelErrorBoundary title={`${current.title}暂时无法显示`}>
-            {category === "shortcuts" ? children : <h2>{current.title}</h2>}
+            <h2>{current.title}</h2>
+            {category === "shortcuts" ? children : null}
             {category === "general" && (
               <ProfileSection
                 name={profileName}
