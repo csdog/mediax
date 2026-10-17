@@ -105,7 +105,7 @@ async function start(): Promise<void> {
   const splashAssets = app.isPackaged ? process.resourcesPath : join(__dirname, "../../build");
   const splashIcon = join(splashAssets, "icon.png");
   const startupSplash = new StartupSplash();
-  if (!startHidden) startupSplash.open(splashIcon);
+  if (!startHidden) startupSplash.open(splashIcon, screen.getPrimaryDisplay().workArea);
   const endpoint = `http://127.0.0.1:${port}`;
   const cdpReady = waitForCdp(endpoint);
   if (process.env.MEDIAX_FIXTURE) {
@@ -196,6 +196,7 @@ async function start(): Promise<void> {
       ...screen.getAllDisplays().filter((d) => d.id !== screen.getPrimaryDisplay().id),
     ].map((d) => d.workArea),
   );
+  if (!startHidden) startupSplash.align(bounds);
   // Dev + `--watch` restarts the process on main/preload edits; avoid stealing editor focus.
   const revealInactive = !app.isPackaged;
   mark("mediax/willCreateWindow");
@@ -231,7 +232,18 @@ async function start(): Promise<void> {
   mark("mediax/didCreateWindow");
   if (startHidden) log.info("Started hidden after login launch");
   observeWindowLogging(win);
-  installWindowBackdrop(win);
+  const windowBackdrop = installWindowBackdrop(win);
+  mark("mediax/willLoadWindow");
+  const revealMainWindow = () => {
+    if (startHidden || win.isDestroyed()) return;
+    startupSplash.close();
+    if (revealInactive) win.showInactive();
+    else win.show();
+  };
+  win.once("ready-to-show", revealMainWindow);
+  const loadPromise = process.env.ELECTRON_RENDERER_URL
+    ? win.loadURL(process.env.ELECTRON_RENDERER_URL)
+    : win.loadFile(join(__dirname, "../renderer/index.html"));
   const shell = new DesktopShell(win, db);
   deepLinkHandler = (url) => shell.handleDeepLink(url);
   openFilesHandler = (paths) => shell.handleOpenFiles(paths);
@@ -269,7 +281,10 @@ async function start(): Promise<void> {
     db,
     accounts,
     win,
-    () => shell.rendererReady(),
+    () => {
+      shell.rendererReady();
+      windowBackdrop.endStartup();
+    },
     shell,
     updater,
     downloads,
@@ -277,17 +292,6 @@ async function start(): Promise<void> {
   );
   if (maximized) win.maximize();
   app.on("will-quit", () => db.close());
-  mark("mediax/willLoadWindow");
-  const revealMainWindow = () => {
-    if (startHidden || win.isDestroyed()) return;
-    startupSplash.close();
-    if (revealInactive) win.showInactive();
-    else win.show();
-  };
-  win.once("ready-to-show", revealMainWindow);
-  const loadPromise = process.env.ELECTRON_RENDERER_URL
-    ? win.loadURL(process.env.ELECTRON_RENDERER_URL)
-    : win.loadFile(join(__dirname, "../renderer/index.html"));
   // Paint the UI while CDP becomes ready; account publishing still awaits connect later.
   await Promise.all([cdpReady, loadPromise]);
   mark("mediax/didLoadWindow");

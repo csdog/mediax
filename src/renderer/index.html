@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <title>MediaX</title>
     <style>
+      html,
+      body {
+        margin: 0;
+        background: transparent;
+      }
       #mediax-startup-splash {
         position: fixed;
         inset: 0;
@@ -11,13 +16,10 @@
         display: grid;
         place-items: center;
         margin: 0;
-        background: #f9f9f9;
+        background: transparent;
         -webkit-user-select: none;
         user-select: none;
         transition: opacity 180ms ease;
-      }
-      html.dark #mediax-startup-splash {
-        background: #000000;
       }
       #mediax-startup-splash img {
         width: 96px;

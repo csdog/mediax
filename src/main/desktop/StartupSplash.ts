@@ -1,23 +1,19 @@
-import { BrowserWindow, nativeTheme, screen } from "electron";
+import { BrowserWindow, nativeTheme, type Rectangle } from "electron";
 import { pathToFileURL } from "node:url";
 import { startupSplashHtml } from "./startupSplashPage";
 
-const SPLASH_SIZE = 280;
-
-/** Frameless splash shown while the main window is still starting. */
+/** Full-size transparent splash while the main window is still starting. */
 export class StartupSplash {
   private window: BrowserWindow | null = null;
 
-  open(iconPath: string) {
-    if (this.window) return;
-    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-    const dark = nativeTheme.shouldUseDarkColors;
-    const backgroundColor = dark ? "#000000" : "#f9f9f9";
+  open(iconPath: string, bounds: Rectangle) {
+    if (this.window) {
+      this.align(bounds);
+      return;
+    }
+    const material = process.platform === "darwin" && !nativeTheme.prefersReducedTransparency;
     this.window = new BrowserWindow({
-      width: SPLASH_SIZE,
-      height: SPLASH_SIZE,
-      x: Math.round((width - SPLASH_SIZE) / 2),
-      y: Math.round((height - SPLASH_SIZE) / 2),
+      ...bounds,
       frame: false,
       resizable: false,
       movable: false,
@@ -25,19 +21,34 @@ export class StartupSplash {
       maximizable: false,
       closable: false,
       fullscreenable: false,
-      alwaysOnTop: true,
       skipTaskbar: true,
       focusable: false,
       show: false,
-      backgroundColor,
-      ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const } : {}),
+      backgroundColor: material
+        ? "#00000000"
+        : nativeTheme.shouldUseDarkColors
+          ? "#000000"
+          : "#f9f9f9",
+      ...(process.platform === "darwin"
+        ? {
+            titleBarStyle: "hidden" as const,
+            ...(material
+              ? { vibrancy: "menu" as const, visualEffectState: "active" as const }
+              : {}),
+          }
+        : {}),
     });
     const iconUrl = pathToFileURL(iconPath).href;
-    const html = startupSplashHtml(iconUrl, dark);
+    const html = startupSplashHtml(iconUrl);
     void this.window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
     this.window.once("ready-to-show", () => {
       if (this.window && !this.window.isDestroyed()) this.window.showInactive();
     });
+  }
+
+  align(bounds: Rectangle) {
+    if (!this.window || this.window.isDestroyed()) return;
+    this.window.setBounds(bounds);
   }
 
   close() {

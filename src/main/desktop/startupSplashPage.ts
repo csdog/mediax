@@ -1,17 +1,16 @@
-/** Minimal splash document: centered app icon on a theme-matched surface. */
-export function startupSplashHtml(iconFileUrl: string, dark: boolean): string {
-  const background = dark ? "#000000" : "#f9f9f9";
+/** Minimal splash document: centered app icon on a transparent surface (native vibrancy shows through). */
+export function startupSplashHtml(iconFileUrl: string): string {
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="color-scheme" content="${dark ? "dark" : "light"}" />
+<meta name="color-scheme" content="light dark" />
 <style>
   html, body {
     margin: 0;
     width: 100%;
     height: 100%;
-    background: ${background};
+    background: transparent;
     -webkit-user-select: none;
     user-select: none;
   }
