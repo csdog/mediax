@@ -24,6 +24,7 @@ import { AppLifecycle } from "./desktop/appLifecycle";
 import { invalidateCodeCacheIfNeeded } from "./desktop/codeCache";
 import { mark, measure, startupPerfSnapshot } from "./desktop/perfMarks";
 import { migrateLegacyUserData } from "./desktop/migrateLegacyPaths";
+import { StartupSplash } from "./desktop/StartupSplash";
 
 app.setName(productName);
 // Skip Chromium's default menu allocation before we install our own (Electron performance checklist).
@@ -100,6 +101,11 @@ async function start(): Promise<void> {
   app.commandLine.appendSwitch("remote-debugging-port", String(port));
   await app.whenReady();
   mark("mediax/didReady");
+  const startHidden = shouldStartHidden();
+  const splashAssets = app.isPackaged ? process.resourcesPath : join(__dirname, "../../build");
+  const splashIcon = join(splashAssets, "icon.png");
+  const startupSplash = new StartupSplash();
+  if (!startHidden) startupSplash.open(splashIcon);
   const endpoint = `http://127.0.0.1:${port}`;
   const cdpReady = waitForCdp(endpoint);
   if (process.env.MEDIAX_FIXTURE) {
@@ -190,14 +196,10 @@ async function start(): Promise<void> {
       ...screen.getAllDisplays().filter((d) => d.id !== screen.getPrimaryDisplay().id),
     ].map((d) => d.workArea),
   );
-  const startHidden = shouldStartHidden();
   // Dev + `--watch` restarts the process on main/preload edits; avoid stealing editor focus.
   const revealInactive = !app.isPackaged;
   mark("mediax/willCreateWindow");
-  const windowIcon = join(
-    app.isPackaged ? process.resourcesPath : join(__dirname, "../../build"),
-    "icon.png",
-  );
+  const windowIcon = splashIcon;
   const win = new BrowserWindow({
     ...bounds,
     // Always create hidden; reveal after first paint so showInactive can keep focus in the IDE.
@@ -276,6 +278,13 @@ async function start(): Promise<void> {
   if (maximized) win.maximize();
   app.on("will-quit", () => db.close());
   mark("mediax/willLoadWindow");
+  const revealMainWindow = () => {
+    if (startHidden || win.isDestroyed()) return;
+    startupSplash.close();
+    if (revealInactive) win.showInactive();
+    else win.show();
+  };
+  win.once("ready-to-show", revealMainWindow);
   const loadPromise = process.env.ELECTRON_RENDERER_URL
     ? win.loadURL(process.env.ELECTRON_RENDERER_URL)
     : win.loadFile(join(__dirname, "../renderer/index.html"));
@@ -285,10 +294,8 @@ async function start(): Promise<void> {
   measure("mediax/windowLoad", "mediax/willLoadWindow", "mediax/didLoadWindow");
   measure("mediax/startup", "mediax/willStart", "mediax/didLoadWindow");
   log.info("Application window loaded");
-  if (!startHidden) {
-    if (revealInactive) win.showInactive();
-    else win.show();
-  }
+  if (!startHidden && !win.isVisible()) revealMainWindow();
+  else if (startHidden) startupSplash.close();
   lifecycle.markRestored();
   // Eventually phase: account sync + updater + Agent control API after first paint settles.
   lifecycle.whenEventually(() => {

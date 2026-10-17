@@ -1,15 +1,49 @@
 <!doctype html>
 <html lang="zh-CN">
-  <meta charset="UTF-8" /><title>MediaX</title>
-  <script>
-    (() => {
-      const preference = localStorage.getItem("themePreference") || "system";
-      const dark =
-        preference === "dark" ||
-        (preference !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-      document.documentElement.classList.toggle("dark", dark);
-    })();
-  </script>
-  <div id="root"></div>
-  <script type="module" src="/src.tsx"></script>
+  <head>
+    <meta charset="UTF-8" />
+    <title>MediaX</title>
+    <style>
+      #mediax-startup-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483646;
+        display: grid;
+        place-items: center;
+        margin: 0;
+        background: #f9f9f9;
+        -webkit-user-select: none;
+        user-select: none;
+        transition: opacity 180ms ease;
+      }
+      html.dark #mediax-startup-splash {
+        background: #000000;
+      }
+      #mediax-startup-splash img {
+        width: 96px;
+        height: 96px;
+        display: block;
+      }
+      #mediax-startup-splash.mediax-startup-splash--hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+    <script>
+      (() => {
+        const preference = localStorage.getItem("themePreference") || "system";
+        const dark =
+          preference === "dark" ||
+          (preference !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="mediax-startup-splash" role="status" aria-live="polite" aria-label="正在加载 MediaX">
+      <img src="./mediax-startup-icon.png" width="96" height="96" alt="" draggable="false" />
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src.tsx"></script>
+  </body>
 </html>
