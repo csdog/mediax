@@ -24,6 +24,7 @@ import { AppLifecycle } from "./desktop/appLifecycle";
 import { invalidateCodeCacheIfNeeded } from "./desktop/codeCache";
 import { mark, measure, startupPerfSnapshot } from "./desktop/perfMarks";
 import { migrateLegacyUserData } from "./desktop/migrateLegacyPaths";
+import { StartupSplash } from "./desktop/StartupSplash";
 
 app.setName(productName);
 // Skip Chromium's default menu allocation before we install our own (Electron performance checklist).
@@ -80,6 +81,45 @@ async function waitForCdp(endpoint: string) {
   throw new Error("CDP endpoint unavailable");
 }
 
+function quitDevelopmentInstance() {
+  log.info("Development instance replaced; quitting");
+  app.quit();
+  // Close is ignored while the window is only hiding; force the leftover out.
+  setTimeout(() => app.exit(0), 1500);
+}
+
+async function acquireInstanceLock() {
+  if (!app.isPackaged) {
+    app.on("second-instance", () => quitDevelopmentInstance());
+  }
+  if (app.requestSingleInstanceLock()) return true;
+  if (app.isPackaged) {
+    log.info("Existing instance detected; handing off");
+    // Exit immediately: app.quit() during early init can SIGTRAP on Chrome_IOThread.
+    app.exit(0);
+    return false;
+  }
+  log.info("Replacing leftover development instance");
+  for (let attempt = 0; attempt < 30; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (app.requestSingleInstanceLock()) return true;
+  }
+  log.info("Existing instance detected; handing off");
+  app.exit(0);
+  return false;
+}
+
+function quitWhenDevelopmentParentExits() {
+  if (app.isPackaged) return;
+  const parent = process.ppid;
+  const timer = setInterval(() => {
+    if (process.ppid === parent) return;
+    clearInterval(timer);
+    quitDevelopmentInstance();
+  }, 1000);
+  timer.unref();
+}
+
 async function start(): Promise<void> {
   mark("mediax/willStart");
   if (process.env.MEDIAX_USER_DATA) app.setPath("userData", process.env.MEDIAX_USER_DATA);
@@ -89,17 +129,19 @@ async function start(): Promise<void> {
     migrateLegacyUserData();
   }
   initializeLogging();
-  if (!app.requestSingleInstanceLock()) {
-    log.info("Existing instance detected; handing off");
-    // Exit immediately: app.quit() during early init can SIGTRAP on Chrome_IOThread.
-    app.exit(0);
-    return;
-  }
+  if (!(await acquireInstanceLock())) return;
+  quitWhenDevelopmentParentExits();
   const port = await unusedPort();
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
   app.commandLine.appendSwitch("remote-debugging-port", String(port));
   await app.whenReady();
   mark("mediax/didReady");
+  const startHidden = shouldStartHidden();
+  const splashAssets = app.isPackaged ? process.resourcesPath : join(__dirname, "../../build");
+  const splashIcon = join(splashAssets, "icon.png");
+  const startupSplash = new StartupSplash();
+  app.once("before-quit", () => startupSplash.close());
+  if (!startHidden) startupSplash.open(splashIcon, screen.getPrimaryDisplay().workArea);
   const endpoint = `http://127.0.0.1:${port}`;
   const cdpReady = waitForCdp(endpoint);
   if (process.env.MEDIAX_FIXTURE) {
@@ -190,14 +232,11 @@ async function start(): Promise<void> {
       ...screen.getAllDisplays().filter((d) => d.id !== screen.getPrimaryDisplay().id),
     ].map((d) => d.workArea),
   );
-  const startHidden = shouldStartHidden();
+  if (!startHidden) startupSplash.align(bounds);
   // Dev + `--watch` restarts the process on main/preload edits; avoid stealing editor focus.
   const revealInactive = !app.isPackaged;
   mark("mediax/willCreateWindow");
-  const windowIcon = join(
-    app.isPackaged ? process.resourcesPath : join(__dirname, "../../build"),
-    "icon.png",
-  );
+  const windowIcon = splashIcon;
   const win = new BrowserWindow({
     ...bounds,
     // Always create hidden; reveal after first paint so showInactive can keep focus in the IDE.
@@ -229,7 +268,18 @@ async function start(): Promise<void> {
   mark("mediax/didCreateWindow");
   if (startHidden) log.info("Started hidden after login launch");
   observeWindowLogging(win);
-  installWindowBackdrop(win);
+  const windowBackdrop = installWindowBackdrop(win);
+  mark("mediax/willLoadWindow");
+  const revealMainWindow = () => {
+    if (startHidden || win.isDestroyed()) return;
+    startupSplash.close();
+    if (revealInactive) win.showInactive();
+    else win.show();
+  };
+  win.once("ready-to-show", revealMainWindow);
+  const loadPromise = process.env.ELECTRON_RENDERER_URL
+    ? win.loadURL(process.env.ELECTRON_RENDERER_URL)
+    : win.loadFile(join(__dirname, "../renderer/index.html"));
   const shell = new DesktopShell(win, db);
   deepLinkHandler = (url) => shell.handleDeepLink(url);
   openFilesHandler = (paths) => shell.handleOpenFiles(paths);
@@ -267,7 +317,10 @@ async function start(): Promise<void> {
     db,
     accounts,
     win,
-    () => shell.rendererReady(),
+    () => {
+      shell.rendererReady();
+      windowBackdrop.endStartup();
+    },
     shell,
     updater,
     downloads,
@@ -275,20 +328,14 @@ async function start(): Promise<void> {
   );
   if (maximized) win.maximize();
   app.on("will-quit", () => db.close());
-  mark("mediax/willLoadWindow");
-  const loadPromise = process.env.ELECTRON_RENDERER_URL
-    ? win.loadURL(process.env.ELECTRON_RENDERER_URL)
-    : win.loadFile(join(__dirname, "../renderer/index.html"));
   // Paint the UI while CDP becomes ready; account publishing still awaits connect later.
   await Promise.all([cdpReady, loadPromise]);
   mark("mediax/didLoadWindow");
   measure("mediax/windowLoad", "mediax/willLoadWindow", "mediax/didLoadWindow");
   measure("mediax/startup", "mediax/willStart", "mediax/didLoadWindow");
   log.info("Application window loaded");
-  if (!startHidden) {
-    if (revealInactive) win.showInactive();
-    else win.show();
-  }
+  if (!startHidden && !win.isVisible()) revealMainWindow();
+  else if (startHidden) startupSplash.close();
   lifecycle.markRestored();
   // Eventually phase: account sync + updater + Agent control API after first paint settles.
   lifecycle.whenEventually(() => {

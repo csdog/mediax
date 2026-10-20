@@ -17,7 +17,7 @@ describe("TaskPowerSave", () => {
     stop.mockClear();
   });
 
-  it("starts and stops display/app blockers with active publish targets", async () => {
+  it("starts and stops the idle-sleep blocker with active publish targets", async () => {
     const { TaskPowerSave } = await import("../../src/main/desktop/TaskPowerSave");
     const db = new Database(":memory:");
     const account = db.addAccount("Keeper");
@@ -29,7 +29,7 @@ describe("TaskPowerSave", () => {
     const target = db.targets()[0]!;
     let enabled = true;
     const saver = new TaskPowerSave(db, () => enabled);
-    expect(start).toHaveBeenCalledWith("prevent-display-sleep");
+    expect(start).toHaveBeenCalledTimes(1);
     expect(start).toHaveBeenCalledWith("prevent-app-suspension");
 
     start.mockClear();

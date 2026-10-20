@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, ChevronUp, RotateCw, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, RotateCw, X } from "lucide-react";
 import {
   CodexArrowLeftIcon,
   CodexArrowUpRightIcon,
@@ -35,6 +35,7 @@ export function BrowserChrome() {
     goBackBrowser,
     goForwardBrowser,
     reloadBrowser,
+    browserNavAction,
     run,
     setSettingsOpen,
   } = useWorkspace();
@@ -100,6 +101,9 @@ export function BrowserChrome() {
   const hasSearchSuggestion = Boolean(historyQuery?.trim());
   const suggestionCount = suggestions.length + (hasSearchSuggestion ? 1 : 0);
   const pageReady = Boolean(activeBrowserViewId);
+  const pageLoading = Boolean(browserNavAction) || Boolean(navigation.data?.loading);
+  const backLoading = browserNavAction === "back";
+  const forwardLoading = browserNavAction === "forward";
   const downloadItems = downloads.data ?? [];
   useEffect(() => {
     if (editingAddress || submittingAddress) return;
@@ -364,10 +368,15 @@ export function BrowserChrome() {
                   size="icon"
                   className="toolbar-nav-button"
                   aria-label="后退"
+                  aria-busy={backLoading || undefined}
                   disabled={!navigation.data?.canGoBack}
                   onClick={() => void run(() => goBackBrowser())}
                 >
-                  <CodexArrowLeftIcon className="size-4" />
+                  {backLoading ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <CodexArrowLeftIcon className="size-4" />
+                  )}
                 </Button>
               }
             />
@@ -382,10 +391,15 @@ export function BrowserChrome() {
                   size="icon"
                   className="toolbar-nav-button"
                   aria-label="前进"
+                  aria-busy={forwardLoading || undefined}
                   disabled={!navigation.data?.canGoForward}
                   onClick={() => void run(() => goForwardBrowser())}
                 >
-                  <CodexArrowLeftIcon className="size-4 -scale-x-100" />
+                  {forwardLoading ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <CodexArrowLeftIcon className="size-4 -scale-x-100" />
+                  )}
                 </Button>
               }
             />
@@ -401,10 +415,15 @@ export function BrowserChrome() {
                   size="icon"
                   className="toolbar-nav-button"
                   aria-label="刷新"
+                  aria-busy={pageLoading || undefined}
                   disabled={!pageReady}
                   onClick={() => void run(() => reloadBrowser())}
                 >
-                  <RotateCw className="size-4" />
+                  {pageLoading ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <RotateCw className="size-4" />
+                  )}
                 </Button>
               }
             />

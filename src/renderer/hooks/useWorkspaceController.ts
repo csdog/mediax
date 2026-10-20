@@ -16,6 +16,7 @@ import type {
   TabAction,
 } from "../../shared/models";
 import { useTabPreview } from "./useTabPreview";
+import { useBrowserNavigation } from "./useBrowserNavigation";
 import { useAccountBrowserLayout } from "./useAccountBrowserLayout";
 import { usePublishSettings } from "./usePublishSettings";
 import { preferredPageForFiles, supportedKinds } from "../../shared/content";
@@ -27,9 +28,11 @@ import { publishKindMeta } from "@/lib/publishKindMeta";
 type BrowserTab = { icon?: string } & (
   | { id: string; name: string; kind?: undefined }
   | { id: string; name: string; kind: "new" }
+  | { id: string; name: string; kind: "page"; page: DesktopPage }
   | { id: string; name: string; kind: "compose"; contentKind: ContentKind }
   | { id: string; name: string; kind: "web"; url: string }
 );
+type BrowserNavAction = "back" | "forward" | "reload";
 
 const emptyAccounts: AccountInfo[] = [];
 const emptyRecords: { tasks: Task[]; targets: TaskTarget[] } = { tasks: [], targets: [] };
@@ -37,24 +40,10 @@ export function useWorkspaceController() {
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const navigate = useNavigate();
-  const [lastPage, setLastPage] = useState<DesktopPage>("accounts");
+  const [workspacePage, setWorkspacePage] = useState<DesktopPage>("accounts");
   const settingsOpen = pathname === "/settings";
   const routePage = desktopPages.find((item) => pathname === `/${item.id}`)?.id;
-  const page = routePage ?? lastPage;
   const selectKindRef = useRef<(kind: ContentKind) => void>(() => {});
-  const setPage = (next: DesktopPage, opts?: { kind?: ContentKind }) => {
-    setLastPage(next);
-    if (opts?.kind) selectKindRef.current(opts.kind);
-    else if (next === "compose") selectKindRef.current("moment");
-    else if (next === "video") selectKindRef.current("video");
-    void navigate({ to: `/${next}` });
-  };
-  const setSettingsOpen = (open: boolean) => {
-    if (open) {
-      setLastPage(page);
-      void navigate({ to: "/settings" });
-    } else void navigate({ to: `/${page}` });
-  };
   const [initialized, setInitialized] = useState(false);
   const accountsQuery = useQuery({
     ...accountsOptions,
@@ -113,8 +102,45 @@ export function useWorkspaceController() {
   const [activeBrowser, setActiveBrowser] = useState<string | null>(null);
   const activeTab = browserTabs.find((tab) => tab.id === activeBrowser);
   const isNewTab = activeTab?.kind === "new";
+  const isPageTab = activeTab?.kind === "page";
   const isComposeTab = activeTab?.kind === "compose";
-  const activeBrowserViewId = !activeBrowser || isNewTab || isComposeTab ? null : activeBrowser;
+  const activeBrowserViewId =
+    !activeBrowser || isNewTab || isPageTab || isComposeTab ? null : activeBrowser;
+  const page =
+    activeTab?.kind === "page"
+      ? activeTab.page
+      : activeBrowser
+        ? workspacePage
+        : (routePage ?? workspacePage);
+  const setPage = (next: DesktopPage, opts?: { kind?: ContentKind }) => {
+    setWorkspacePage(next);
+    if (opts?.kind) selectKindRef.current(opts.kind);
+    else if (next === "compose") selectKindRef.current("moment");
+    else if (next === "video") selectKindRef.current("video");
+    void navigate({ to: `/${next}` });
+  };
+  const setSettingsOpen = (open: boolean) => {
+    if (open) void navigate({ to: "/settings" });
+    else
+      void navigate({
+        to: `/${activeTab?.kind === "page" ? activeTab.page : workspacePage}`,
+      });
+  };
+  const openAppPage = (next: DesktopPage) => {
+    if (isNewTab && activeBrowser) {
+      const id = activeBrowser;
+      const title = desktopPages.find((item) => item.id === next)?.title ?? "页面";
+      setBrowserTabs((tabs) =>
+        tabs.map((tab) =>
+          tab.id === id ? { id, name: title, kind: "page" as const, page: next } : tab,
+        ),
+      );
+      void navigate({ to: `/${next}` });
+      return;
+    }
+    setActiveBrowser(null);
+    setPage(next);
+  };
   const authorizingAccountId =
     activeBrowserViewId &&
     !activeBrowserViewId.startsWith("web-") &&
@@ -211,7 +237,8 @@ export function useWorkspaceController() {
     (id: string, nav: Pick<BrowserNavigation, "url" | "title" | "icon">) => {
       setBrowserTabs((tabs) =>
         tabs.map((tab) => {
-          if (tab.id !== id || tab.kind === "new" || tab.kind === "compose") return tab;
+          if (tab.id !== id || tab.kind === "new" || tab.kind === "page" || tab.kind === "compose")
+            return tab;
           let name = nav.title.trim() || tab.name;
           try {
             if (!nav.title.trim()) name = new URL(nav.url).hostname;
@@ -235,21 +262,52 @@ export function useWorkspaceController() {
     }
     await openWebBrowser(url);
   };
-  const goBackBrowser = async () => {
+  const [browserNavAction, setBrowserNavAction] = useState<BrowserNavAction | null>(null);
+  const sawBrowserLoading = useRef(false);
+  const browserNavigationQuery = useBrowserNavigation(activeBrowserViewId);
+  useEffect(() => {
+    const loading = Boolean(browserNavigationQuery.data?.loading);
+    if (loading) sawBrowserLoading.current = true;
+    else if (sawBrowserLoading.current) {
+      sawBrowserLoading.current = false;
+      setBrowserNavAction(null);
+    }
+  }, [browserNavigationQuery.data?.loading]);
+  const primeBrowserLoading = () => {
     if (!activeBrowserViewId) return;
-    const nav = await window.desktop.goBackBrowser(activeBrowserViewId);
-    syncWebTab(activeBrowserViewId, nav);
+    queryClient.setQueryData<BrowserNavigation>(
+      ["desktop", "browser-navigation", activeBrowserViewId],
+      (current) => (current ? { ...current, loading: true } : current),
+    );
   };
-  const goForwardBrowser = async () => {
+  const finishBrowserNav = async (
+    action: BrowserNavAction,
+    runNav: () => Promise<BrowserNavigation>,
+  ) => {
     if (!activeBrowserViewId) return;
-    const nav = await window.desktop.goForwardBrowser(activeBrowserViewId);
-    syncWebTab(activeBrowserViewId, nav);
+    const id = activeBrowserViewId;
+    setBrowserNavAction(action);
+    primeBrowserLoading();
+    try {
+      const nav = await runNav();
+      queryClient.setQueryData(["desktop", "browser-navigation", id], nav);
+      syncWebTab(id, nav);
+      if (!nav.loading) {
+        sawBrowserLoading.current = false;
+        setBrowserNavAction(null);
+      }
+    } catch (error) {
+      sawBrowserLoading.current = false;
+      setBrowserNavAction(null);
+      throw error;
+    }
   };
-  const reloadBrowser = async () => {
-    if (!activeBrowserViewId) return;
-    const nav = await window.desktop.reloadBrowser(activeBrowserViewId);
-    syncWebTab(activeBrowserViewId, nav);
-  };
+  const goBackBrowser = () =>
+    finishBrowserNav("back", () => window.desktop.goBackBrowser(activeBrowserViewId!));
+  const goForwardBrowser = () =>
+    finishBrowserNav("forward", () => window.desktop.goForwardBrowser(activeBrowserViewId!));
+  const reloadBrowser = () =>
+    finishBrowserNav("reload", () => window.desktop.reloadBrowser(activeBrowserViewId!));
   const {
     publishSettings,
     silentPublish,
@@ -288,6 +346,14 @@ export function useWorkspaceController() {
       if (saved && Array.isArray(saved.tabs)) {
         const restored: BrowserTab[] = saved.tabs.flatMap((tab) => {
           if (tab.kind === "new") return [{ id: tab.id, name: "新标签页", kind: "new" as const }];
+          if (
+            tab.kind === "page" &&
+            tab.page &&
+            desktopPages.some((item) => item.id === tab.page)
+          ) {
+            const title = desktopPages.find((item) => item.id === tab.page)?.title ?? "发布记录";
+            return [{ id: tab.id, name: title, kind: "page" as const, page: tab.page }];
+          }
           if (tab.kind === "web" && typeof tab.url === "string") {
             let name = tab.url;
             try {
@@ -318,7 +384,7 @@ export function useWorkspaceController() {
         setBrowserTabs(restored);
         setPage(saved.page);
         for (const tab of restored) {
-          if (tab.kind === "new" || tab.kind === "compose") continue;
+          if (tab.kind === "new" || tab.kind === "page" || tab.kind === "compose") continue;
           try {
             if (tab.kind === "web") await window.desktop.openWebBrowser(tab.id, tab.url);
             else await window.desktop.openAccount(tab.id);
@@ -353,16 +419,26 @@ export function useWorkspaceController() {
       .saveWorkspaceSession?.({
         tabs: browserTabs.map((tab) => {
           if (tab.kind === "new") return { id: tab.id, kind: "new" as const };
+          if (tab.kind === "page") return { id: tab.id, kind: "page" as const, page: tab.page };
           if (tab.kind === "compose")
             return { id: tab.id, kind: "compose" as const, contentKind: tab.contentKind };
           if (tab.kind === "web") return { id: tab.id, kind: "web" as const, url: tab.url };
           return { id: tab.id };
         }),
         activeId: activeBrowser,
-        page,
+        page: workspacePage,
       })
       ?.catch((error) => toast.error(userErrorMessage(error, "标签页未能保存，请稍后重试。")));
-  }, [initialized, browserTabs, activeBrowser, page]);
+  }, [initialized, browserTabs, activeBrowser, workspacePage]);
+  useEffect(() => {
+    if (!initialized || settingsOpen) return;
+    if (activeTab?.kind === "page") {
+      if (pathname !== `/${activeTab.page}`) void navigate({ to: `/${activeTab.page}` });
+      return;
+    }
+    if (activeBrowser) return;
+    if (pathname !== `/${workspacePage}`) void navigate({ to: `/${workspacePage}` });
+  }, [initialized, settingsOpen, activeBrowser, activeTab, workspacePage, pathname, navigate]);
   useEffect(() => {
     if (!initialized) return;
     return window.desktop.onCommand?.((command) => {
@@ -434,7 +510,7 @@ export function useWorkspaceController() {
   const closeBrowserTab = async (id: string) => {
     setHoveredTab(null);
     const tab = browserTabs.find((item) => item.id === id);
-    if (tab && tab.kind !== "new" && tab.kind !== "compose")
+    if (tab && tab.kind !== "new" && tab.kind !== "page" && tab.kind !== "compose")
       await window.desktop.closeAccountBrowser(id);
     const index = browserTabs.findIndex((item) => item.id === id);
     const closed = browserTabs[index];
@@ -460,7 +536,7 @@ export function useWorkspaceController() {
     } else if (operation === "reopen") {
       const tab = closedTabs.current.pop();
       if (!tab) return;
-      if (tab.kind === "new" || tab.kind === "compose") {
+      if (tab.kind === "new" || tab.kind === "page" || tab.kind === "compose") {
         setBrowserTabs((tabs) => [...tabs, tab]);
         setActiveBrowser(tab.id);
       } else if (tab.kind === "web") void run(() => openWebBrowser(tab.url, tab));
@@ -468,9 +544,13 @@ export function useWorkspaceController() {
     }
   };
   const pageTitle = desktopPages.find((item) => item.id === page)?.title ?? "MediaX";
+  const workspaceTitle = desktopPages.find((item) => item.id === workspacePage)?.title ?? "MediaX";
   return {
     page,
     setPage,
+    openAppPage,
+    workspacePage,
+    workspaceTitle,
     openPublish,
     accounts,
     setAccounts,
@@ -505,6 +585,7 @@ export function useWorkspaceController() {
     setPublishBandwidthLimitKbps,
     concealBrowser,
     isNewTab,
+    isPageTab,
     isComposeTab,
     activeBrowserViewId,
     hoveredTab,
@@ -529,6 +610,7 @@ export function useWorkspaceController() {
     goBackBrowser,
     goForwardBrowser,
     reloadBrowser,
+    browserNavAction,
     removeAccount,
     reload,
     run,

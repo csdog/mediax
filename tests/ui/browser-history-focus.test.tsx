@@ -9,10 +9,20 @@ import { TooltipProvider } from "../../src/renderer/components/ui/tooltip";
 import { BrowserChrome } from "../../src/renderer/components/workspace/BrowserChrome";
 const openBrowser = vi.hoisted(() => vi.fn());
 const submitOmnibox = vi.hoisted(() => vi.fn());
-const workspace = vi.hoisted(() => ({ activeBrowserViewId: null as string | null }));
+const workspace = vi.hoisted(() => ({
+  activeBrowserViewId: null as string | null,
+  browserNavAction: null as null | "back" | "forward" | "reload",
+}));
+const goBackBrowser = vi.hoisted(() => vi.fn(async () => {}));
+const goForwardBrowser = vi.hoisted(() => vi.fn(async () => {}));
+const reloadBrowser = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("../../src/renderer/app/WorkspaceContext", () => ({
   useWorkspace: () => ({
     activeBrowserViewId: workspace.activeBrowserViewId,
+    browserNavAction: workspace.browserNavAction,
+    goBackBrowser,
+    goForwardBrowser,
+    reloadBrowser,
     openBrowser,
     submitOmnibox,
     run: (task: () => unknown) => task(),
@@ -258,4 +268,74 @@ it("keeps omnibox editing and selection across native focus, with keyboard sugge
   expect(input.getAttribute("aria-expanded")).toBe("false");
   unmount();
   workspace.activeBrowserViewId = null;
+});
+
+it("shows a loading state for back, forward, and reload", async () => {
+  workspace.activeBrowserViewId = "web-loading";
+  let navigationChanged!: Parameters<typeof window.desktop.onBrowserNavigationChanged>[0];
+  window.desktop = {
+    webSearchProvider: async () => ({ name: "Bing" }),
+    accounts: async () => [],
+    downloads: async () => [],
+    browserNavigation: async () => ({
+      url: "https://example.com/",
+      title: "Example",
+      canGoBack: true,
+      canGoForward: true,
+      loading: false,
+    }),
+    browserZoom: async () => ({ factor: 1, percent: 100 }),
+    onBrowserNavigationChanged: (listener) => {
+      navigationChanged = listener;
+      return () => {};
+    },
+    onDownloadsChanged: () => () => {},
+    onNativePopupHostEvent: () => () => {},
+    hideNativePopup: async () => {},
+    showNativePopup: async () => {},
+  } as unknown as typeof window.desktop;
+  const busy = (name: string) => screen.getByRole("button", { name }).getAttribute("aria-busy");
+  const mount = (action: typeof workspace.browserNavAction) => {
+    workspace.browserNavAction = action;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <TooltipProvider>
+          <BrowserChrome />
+        </TooltipProvider>
+      </QueryClientProvider>,
+    );
+  };
+  const back = mount("back");
+  await waitFor(() => expect(busy("后退")).toBe("true"));
+  expect(busy("前进")).toBeNull();
+  expect(busy("刷新")).toBe("true");
+  back.unmount();
+  const forward = mount("forward");
+  await waitFor(() => expect(busy("前进")).toBe("true"));
+  expect(busy("后退")).toBeNull();
+  expect(busy("刷新")).toBe("true");
+  forward.unmount();
+  const reload = mount("reload");
+  await waitFor(() => expect(busy("刷新")).toBe("true"));
+  expect(busy("后退")).toBeNull();
+  expect(busy("前进")).toBeNull();
+  reload.unmount();
+  const idle = mount(null);
+  await waitFor(() => expect(busy("刷新")).toBeNull());
+  act(() =>
+    navigationChanged("web-loading", {
+      url: "https://example.com/next",
+      title: "Example",
+      canGoBack: true,
+      canGoForward: true,
+      loading: true,
+    }),
+  );
+  await waitFor(() => expect(busy("刷新")).toBe("true"));
+  expect(busy("后退")).toBeNull();
+  expect(busy("前进")).toBeNull();
+  idle.unmount();
+  workspace.activeBrowserViewId = null;
+  workspace.browserNavAction = null;
 });

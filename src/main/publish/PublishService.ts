@@ -83,14 +83,6 @@ export class PublishService {
     if (!batches.length || batches.every((batch) => !batch.targets.length))
       throw new Error("请填写正文并选择发布目标");
     if (this.running) throw new Error("已有发布任务正在执行");
-    if (
-      this.db
-        .targets()
-        .some(
-          (t) => t.status === "awaiting_user" || t.status === "pending" || t.status === "running",
-        )
-    )
-      throw new Error("请先在发布记录中处理尚未完成的任务");
     const listed = this.accounts.list();
     const known = listed.flatMap((a) => a.targets);
     const resolved: Array<{ title: string | null; body: string; targets: Target[] }> = [];
@@ -172,6 +164,10 @@ export class PublishService {
     const task = this.db.rescheduleTask(taskId, scheduledAt);
     this.schedule.kick();
     return task;
+  }
+  deleteTask(taskId: string) {
+    if (this.running) throw new Error("已有发布任务正在执行，请稍后删除记录");
+    this.db.deleteTask(taskId);
   }
   async retry(id: string) {
     if (this.running) throw new Error("已有发布任务正在执行");

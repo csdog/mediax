@@ -192,6 +192,7 @@ export class AccountBrowserManager {
         icon: this.favicons.get(accountId),
         canGoBack: contents.navigationHistory.canGoBack(),
         canGoForward: contents.navigationHistory.canGoForward(),
+        loading: contents.isLoadingMainFrame(),
       });
     };
     view.webContents.on("did-start-navigation", (_event, url, inPlace, isMainFrame) => {
@@ -207,6 +208,7 @@ export class AccountBrowserManager {
       if (isMainFrame) notifyNavigation(url);
     });
     view.webContents.on("page-title-updated", () => notifyNavigation());
+    view.webContents.on("did-start-loading", () => notifyNavigation());
     view.webContents.on("did-stop-loading", () => notifyNavigation());
     const remember = (touch: boolean, icon?: string) => {
       if (view.webContents.isDestroyed()) return;

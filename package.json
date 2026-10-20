@@ -10,7 +10,7 @@
   },
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev --watch",
+    "dev": "node scripts/patch-electron-dock-name.mjs && electron-vite dev --watch",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit",
     "test:integration": "pnpm run build && node --test --test-concurrency=1 tests/integration/*.test.mjs",

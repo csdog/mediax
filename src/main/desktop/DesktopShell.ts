@@ -47,7 +47,7 @@ export class DesktopShell {
     this.tray.on("double-click", () => this.show());
     this.trayDrop = new TrayDropWindow(this.tray, (paths) => this.handleOpenFiles(paths));
     if (process.platform === "darwin") {
-      if (!app.isPackaged) app.dock?.setIcon(iconPath);
+      if (!app.isPackaged) app.dock?.setIcon(source);
       app.dock?.setMenu(Menu.buildFromTemplate(this.quickActions(false)));
     }
     const attachShortcuts = (contents: Electron.WebContents) => {
@@ -92,6 +92,8 @@ export class DesktopShell {
     window.on("unmaximize", scheduleStateSave);
     app.on("activate", () => this.show());
     app.on("second-instance", (_event, argv) => {
+      // Development relaunch quits this process from the startup lock instead of focusing it.
+      if (!app.isPackaged) return;
       const link = findDeepLinkArg(argv);
       if (link) {
         this.handleDeepLink(link);

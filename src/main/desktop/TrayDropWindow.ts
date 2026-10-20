@@ -139,7 +139,11 @@ export class TrayDropWindow {
         preload: join(__dirname, "../preload/index.js"),
       },
     });
-    this.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // Electron otherwise hides the entire app's Dock icon for fullscreen overlays.
+    this.window.setVisibleOnAllWorkspaces(true, {
+      visibleOnFullScreen: true,
+      skipTransformProcessType: true,
+    });
     this.window.setAlwaysOnTop(true, "pop-up-menu");
     ipcMain.on("mediax:tray-drop-hot", this.onHot);
     ipcMain.on("mediax:tray-drop-files", this.onFiles);

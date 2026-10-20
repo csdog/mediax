@@ -288,4 +288,35 @@ it("lists publish records with filters from the reference layout", async () => {
   expect(
     (screen.getByRole("button", { name: "打开文章", exact: true }) as HTMLButtonElement).disabled,
   ).toBe(true);
-});
+  window.desktop.deleteTask = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(window.desktop.history).mockResolvedValue({
+    ...history,
+    targets: [{ ...first, status: "running" }],
+  });
+  await waitFor(
+    () =>
+      expect(
+        (screen.getByRole("button", { name: "发布完成后可删除记录" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(true),
+    { timeout: 3000 },
+  );
+  vi.mocked(window.desktop.history).mockResolvedValue(history);
+  await waitFor(() => expect(screen.getByRole("button", { name: "删除记录" })).toBeTruthy(), {
+    timeout: 3000,
+  });
+  fireEvent.click(screen.getByRole("button", { name: "网格视图" }));
+  fireEvent.click(screen.getByRole("button", { name: "删除记录" }));
+  const confirmation = await screen.findByRole("alertdialog");
+  expect(within(confirmation).getByText(/不会删除平台上已发布的内容/)).toBeTruthy();
+  fireEvent.click(within(confirmation).getByRole("button", { name: "取消" }));
+  expect(window.desktop.deleteTask).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: "列表视图" }));
+  fireEvent.click(screen.getByRole("button", { name: "删除记录" }));
+  await screen.findByRole("alertdialog");
+  vi.mocked(window.desktop.history).mockResolvedValue({ tasks: [], targets: [] });
+  fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
+  await waitFor(() => expect(window.desktop.deleteTask).toHaveBeenCalledExactlyOnceWith("task-1"));
+  expect(await screen.findByText("暂无发布记录")).toBeTruthy();
+}, 10_000);

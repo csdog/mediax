@@ -24,6 +24,7 @@
   background: transparent;
 }
 .browser-tab {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -32,6 +33,23 @@
   height: 36px;
   border-radius: var(--radius-navigation);
   color: var(--muted-foreground);
+}
+/* A short tick separates neighboring inactive tabs. The active tab and hover already draw their own edge. */
+.browser-tabs
+  > .toolbar-tab[aria-selected="false"]:not(:hover)
+  + .browser-tab:not([data-active="true"]):not(:hover)::before,
+.browser-tabs
+  > .browser-tab:not([data-active="true"]):not(:hover)
+  + .browser-tab:not([data-active="true"]):not(:hover)::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: 50%;
+  width: 1px;
+  height: 16px;
+  transform: translateY(-50%);
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--foreground) 18%, transparent);
 }
 .browser-tab[data-active="true"] {
   background: var(--background);

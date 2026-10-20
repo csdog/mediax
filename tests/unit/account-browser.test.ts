@@ -11,7 +11,7 @@ vi.mock("../../src/main/browser/favicon", () => ({
   loadFavicon: vi.fn(async () => "data:image/png;base64,aWNvbg=="),
 }));
 
-const state = vi.hoisted(() => ({ destroyed: false }));
+const state = vi.hoisted(() => ({ destroyed: false, loading: false }));
 const view = vi.hoisted(() => ({
   setBounds: vi.fn(),
   setVisible: vi.fn(),
@@ -20,6 +20,7 @@ const view = vi.hoisted(() => ({
     isDestroyed: () => state.destroyed,
     getTitle: () => "Example",
     navigationHistory: { canGoBack: () => true, canGoForward: () => false },
+    isLoadingMainFrame: () => state.loading,
     getURL: () => "https://mp.toutiao.com/",
     getUserAgent: () =>
       "Mozilla/5.0 MediaX/0.3.5 Chrome/152.0.7977.130 Electron/44.7.0 Safari/537.36",
@@ -57,6 +58,7 @@ function manager() {
 beforeEach(() => {
   vi.clearAllMocks();
   state.destroyed = false;
+  state.loading = false;
 });
 
 it.each([false, true])(
@@ -242,6 +244,20 @@ it("publishes main-frame navigation and redirects before loading completes", asy
   expect(browsers.favicon("web-test")).toBe("data:image/png;base64,aWNvbg==");
   emit("did-start-navigation", "https://example.com/next", false, true);
   expect(browsers.favicon("web-test")).toBeUndefined();
+  state.loading = true;
+  emit("did-start-loading");
+  expect(send).toHaveBeenLastCalledWith(
+    "mediax:browser-navigation-changed",
+    "web-test",
+    expect.objectContaining({ loading: true }),
+  );
+  state.loading = false;
+  emit("did-stop-loading");
+  expect(send).toHaveBeenLastCalledWith(
+    "mediax:browser-navigation-changed",
+    "web-test",
+    expect.objectContaining({ loading: false }),
+  );
   finish();
   await opening;
 });

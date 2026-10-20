@@ -1,10 +1,9 @@
 import { powerSaveBlocker } from "electron";
 import type { Database } from "../storage/Database";
 
-/** Prevent display sleep / app suspension while publish or scheduled targets are active. */
+/** Prevent idle system sleep while publish or scheduled targets are active. The display may still sleep. */
 export class TaskPowerSave {
   private unsubscribe: () => void;
-  private displayBlocker: number | null = null;
   private appBlocker: number | null = null;
   constructor(
     private db: Database,
@@ -21,15 +20,9 @@ export class TaskPowerSave {
       );
     const want = this.enabled() && active;
     if (want) {
-      if (this.displayBlocker == null)
-        this.displayBlocker = powerSaveBlocker.start("prevent-display-sleep");
       if (this.appBlocker == null)
         this.appBlocker = powerSaveBlocker.start("prevent-app-suspension");
       return;
-    }
-    if (this.displayBlocker != null) {
-      powerSaveBlocker.stop(this.displayBlocker);
-      this.displayBlocker = null;
     }
     if (this.appBlocker != null) {
       powerSaveBlocker.stop(this.appBlocker);
@@ -38,10 +31,6 @@ export class TaskPowerSave {
   }
   dispose() {
     this.unsubscribe();
-    if (this.displayBlocker != null) {
-      powerSaveBlocker.stop(this.displayBlocker);
-      this.displayBlocker = null;
-    }
     if (this.appBlocker != null) {
       powerSaveBlocker.stop(this.appBlocker);
       this.appBlocker = null;

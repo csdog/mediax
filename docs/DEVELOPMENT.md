@@ -30,6 +30,8 @@ mise exec -- pnpm run test:packaged
 
 macOS 开发态 Dock / ⌘-Tab 名称优先看 `.app` **文件夹名**。`pnpm dev` 前与 `postinstall` 会把 `Electron.app` 重命名为 `MediaX.app`；改完后需完全退出旧进程再开。
 
+同一补丁会生成 `MediaX.icns` 并更新应用包及 Helper 的 `CFBundleIconFile`，用于活动监视器等系统界面；`app.dock.setIcon()` 只负责运行时 Dock 图标。活动监视器可能保留已加载的旧图标，替换图标后应通过其菜单「退出活动监视器」完整退出再重新打开，不能只关闭窗口。验证时同时核对 MediaX 的 PID，确认查看的是本次开发进程。
+
 ## 打包
 
 | 命令                        | 产物                               |

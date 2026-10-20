@@ -16,7 +16,18 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -616,8 +627,19 @@ function actionLabel(verb: string, name: string, many: boolean) {
   return many ? `${verb} ${name}` : verb;
 }
 
-function RecordActions({ task: _task, targets }: { task: Task; targets: TaskTarget[] }) {
+function RecordActions({ task, targets }: { task: Task; targets: TaskTarget[] }) {
   const { run, busy, openWebBrowser, reload } = useWorkspace();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const deleting = useMutation({
+    mutationFn: async () => {
+      await window.desktop.deleteTask(task.id);
+      setDeleteOpen(false);
+      await reload();
+    },
+  });
+  const unfinished = targets.some((target) =>
+    ["pending", "running", "awaiting_user", "submitted"].includes(target.status),
+  );
   const republish = useMutation({
     mutationFn: async (id: string) => {
       await window.desktop.republish(id);
@@ -676,6 +698,36 @@ function RecordActions({ task: _task, targets }: { task: Task; targets: TaskTarg
       >
         <Monitor />
       </ActionIconButton>
+      <ActionIconButton
+        label={unfinished ? "发布完成后可删除记录" : "删除记录"}
+        disabled={busy || unfinished || deleting.isPending}
+        className="text-destructive"
+        onClick={() => setDeleteOpen(true)}
+      >
+        <Trash2 />
+      </ActionIconButton>
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除这条发布记录？</AlertDialogTitle>
+            <AlertDialogDescription>
+              删除后无法恢复，仅移除本地记录，不会删除平台上已发布的内容。
+              {targets.some((target) => target.status === "scheduled") &&
+                "这条记录的定时发布也会取消。"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting.isPending}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={busy || unfinished || deleting.isPending}
+              onClick={() => void run(() => deleting.mutateAsync())}
+            >
+              {deleting.isPending ? "正在删除…" : "确认删除"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

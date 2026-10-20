@@ -58,7 +58,7 @@ mise exec -- pnpm run fmt
 - 正文保持纯文本，复用现有 Markdown 导入，不增加富文本编辑器。
 - `createTask` 的目标 `identityId` 必须为数字字符串；站点没有数字 ID 时用 `"1"`，名称仍显示站点账号名。
 - 点击发布前调用 `markSubmitted`。控件缺失或未登录时抛 `NeedsUser`，让任务停在待人工处理，不假装发布成功。
-- 定时任务带 `scheduledAt`，目标状态为 `scheduled`；仅在 MediaX 运行时，由 `ScheduleService` 到点改为 `pending` 并入队。关机不保证发布，可配合「发布/排期时保持唤醒」设置防止休眠与息屏。
+- 定时任务带 `scheduledAt`，目标状态为 `scheduled`；仅在 MediaX 运行时，由 `ScheduleService` 到点改为 `pending` 并入队。关机不保证发布，可配合「发布/排期时保持唤醒」设置阻止空闲睡眠；屏幕仍可熄灭。
 
 ## 界面与类型
 

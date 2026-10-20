@@ -125,6 +125,7 @@ export class AccountService {
       title: contents.getTitle(),
       canGoBack: history.canGoBack(),
       canGoForward: history.canGoForward(),
+      loading: contents.isLoadingMainFrame(),
     };
   }
   async navigateBrowser(id: string, url: string) {
