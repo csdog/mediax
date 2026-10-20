@@ -41,6 +41,8 @@ const api: DesktopApi = {
   hideTabPreview: () => call("hideTabPreview"),
   showToastOverlay: (overlay) => call("showToastOverlay", overlay),
   hideToastOverlay: () => call("hideToastOverlay"),
+  showTooltipOverlay: (overlay) => call("showTooltipOverlay", overlay),
+  hideTooltipOverlay: () => call("hideTooltipOverlay"),
   showNativePopup: (popup) => {
     ipcRenderer.send("mediax:native-popup-host-show", popup);
     return Promise.resolve();
@@ -146,6 +148,7 @@ const api: DesktopApi = {
   publishBatches: (kind, images, batches, scheduledAt) =>
     call("publishBatches", kind, images, batches, scheduledAt ?? null),
   history: () => call("history"),
+  deleteTask: (taskId) => call("deleteTask", taskId),
   calendar: (range) => call("calendar", range),
   rescheduleTask: (taskId, scheduledAt) => call("rescheduleTask", taskId, scheduledAt),
   analyticsSummary: (query) => call("analyticsSummary", query),

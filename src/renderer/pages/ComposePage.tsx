@@ -70,7 +70,6 @@ export function ComposePage() {
     accounts,
     selectedTargets,
     setSelectedTargets,
-    records,
     publishDialogOpen,
     setPublishDialogOpen,
     setFocusedTask,
@@ -209,9 +208,6 @@ export function ComposePage() {
       .join("\n"),
   ].join("\0");
   const synced = syncedSignature === signature && selectedTargets.length > 0 && ready;
-  const publishing = records.targets.some((target) =>
-    ["pending", "running", "awaiting_user"].includes(target.status),
-  );
   const eligible = accounts.filter(
     (account) => supportedKinds(account.platform).includes(contentKind) && account.targets.length,
   );
@@ -440,7 +436,7 @@ export function ComposePage() {
                 保存草稿
               </Button>
               <Button
-                disabled={busy || !ready || !selectedTargets.length || publishing}
+                disabled={busy || !ready || !selectedTargets.length}
                 onClick={openPublishConfirm}
               >
                 <Send />

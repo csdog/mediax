@@ -70,9 +70,8 @@ const sessions: Record<PlatformId, Session> = {
     "slave_user",
     "data_ticket",
   ]),
-  weibo: known("https://passport.weibo.com/sso/signin?entry=miniblog", "https://weibo.com", [
-    "SUB",
-  ]),
+  // Open the site itself. The passport sign-in page stays a login form even when SUB is present.
+  weibo: known("https://weibo.com/", "https://weibo.com", ["SUB"]),
   baijiahao: known(
     "https://baijiahao.baidu.com/builder/theme/bjh/login",
     "https://baijiahao.baidu.com",

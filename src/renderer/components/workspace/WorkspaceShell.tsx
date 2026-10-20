@@ -11,6 +11,7 @@ import { BrowserPage } from "@/pages/BrowserPage";
 import { ComposePage } from "@/pages/ComposePage";
 import { useWorkspace } from "@/app/WorkspaceContext";
 import { useNativeToastOverlay } from "@/hooks/useNativeToastOverlay";
+import { useNativeTooltipOverlay } from "@/hooks/useNativeTooltipOverlay";
 
 export function WorkspaceShell() {
   const {
@@ -19,13 +20,16 @@ export function WorkspaceShell() {
     setAvatarMenuOpen,
     settingsOpen,
     isNewTab,
+    isPageTab,
     isComposeTab,
     activeBrowser,
     activeBrowserViewId,
     concealBrowser,
   } = useWorkspace();
   const showBrowserChrome = Boolean(activeBrowserViewId) || isNewTab;
-  useNativeToastOverlay(Boolean(activeBrowserViewId) && !concealBrowser && !settingsOpen);
+  const mirrorNativeChrome = Boolean(activeBrowserViewId) && !concealBrowser && !settingsOpen;
+  useNativeToastOverlay(mirrorNativeChrome);
+  useNativeTooltipOverlay(mirrorNativeChrome);
   return (
     <TooltipProvider>
       <WorkspaceDialogs />
@@ -50,10 +54,10 @@ export function WorkspaceShell() {
                   <ComposePage />
                 ) : isNewTab ? (
                   <NewTabPage />
-                ) : activeBrowser ? (
-                  <BrowserPage />
-                ) : (
+                ) : isPageTab || !activeBrowser ? (
                   <Outlet />
+                ) : (
+                  <BrowserPage />
                 )}
               </div>
             </>

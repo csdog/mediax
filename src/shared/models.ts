@@ -217,6 +217,17 @@ export type BrowserNavigation = {
   title: string;
   canGoBack: boolean;
   canGoForward: boolean;
+  loading?: boolean;
+};
+export type TooltipOverlay = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text: string;
+  background: string;
+  color: string;
+  radius: string;
 };
 export type BrowserHistoryEntry = {
   url: string;
@@ -247,9 +258,10 @@ export type BrowserDownload = {
 export type WorkspaceSession = {
   tabs: {
     id: string;
-    kind?: "new" | "compose" | "web";
+    kind?: "new" | "compose" | "web" | "page";
     contentKind?: ContentKind;
     url?: string;
+    page?: DesktopPage;
   }[];
   activeId: string | null;
   page: DesktopPage;
@@ -288,6 +300,8 @@ export interface DesktopApi {
   hideTabPreview?(): Promise<void>;
   showToastOverlay?(overlay: ToastOverlay): Promise<void>;
   hideToastOverlay?(): Promise<void>;
+  showTooltipOverlay?(overlay: TooltipOverlay): Promise<void>;
+  hideTooltipOverlay?(): Promise<void>;
   showNativePopup(popup: NativePopupRequest): Promise<void>;
   hideNativePopup(): Promise<void>;
   onNativePopup(listener: (popup: NativePopupRequest) => void): () => void;
@@ -434,6 +448,7 @@ export interface DesktopApi {
     scheduledAt?: string | null,
   ): Promise<string>;
   history(): Promise<{ tasks: Task[]; targets: TaskTarget[] }>;
+  deleteTask(taskId: string): Promise<void>;
   calendar(range: { from: string; to: string }): Promise<CalendarEntry[]>;
   rescheduleTask(taskId: string, scheduledAt: string): Promise<Task>;
   analyticsSummary(query?: number | AnalyticsQuery): Promise<AnalyticsSummary>;

@@ -3,8 +3,9 @@ import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
 import { openKindEditor, submitKindEditor } from "../editor";
 import { NeedsUser, NotSubmitted, type Publisher } from "../Publisher";
-import { coverImage, discoverProfile, replaceText, requireVideo, waitUntil } from "../form";
+import { coverImage, replaceText, requireVideo, waitUntil } from "../form";
 import { postTitle } from "../postText";
+import { readWeiboProfile } from "./weiboProfile";
 
 function loggedOut(url: string) {
   return /passport\.weibo\.com|\/newlogin|openLoginLayer/i.test(url);
@@ -21,10 +22,25 @@ export class WeiboAdapter implements Publisher {
 
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
-    if (!page.url().includes("weibo.com")) {
+    let host = "";
+    try {
+      host = new URL(page.url()).hostname;
+    } catch {
+      host = "";
+    }
+    if (host !== "weibo.com" && host !== "www.weibo.com") {
       await page.goto("https://weibo.com/", { waitUntil: "domcontentloaded", timeout: 60000 });
     }
-    return discoverProfile(page, accountId, "微博账号", loggedOut);
+    if (loggedOut(page.url())) return [];
+    const profile = await page.evaluate(readWeiboProfile).catch(() => null);
+    return [
+      {
+        accountId,
+        identityId: "1",
+        name: profile?.name || "微博账号",
+        kind: "profile",
+      },
+    ];
   }
 
   async prepare(task: Task, _target: TaskTarget) {

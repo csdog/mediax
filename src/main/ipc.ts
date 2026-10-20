@@ -25,6 +25,7 @@ import {
   type ImageAsset,
   type TabPreviewOverlay,
   type ToastOverlay,
+  type TooltipOverlay,
   type Target,
 } from "../shared/models";
 import { parseProfile, readProfile } from "../shared/profile";
@@ -50,6 +51,7 @@ import type { BrowserHistoryStore } from "./browser/BrowserHistoryStore";
 import type { AppUpdater } from "./desktop/AppUpdater";
 import { TabPreviewWindow } from "./desktop/TabPreviewWindow";
 import { ToastOverlayWindow } from "./desktop/ToastOverlayWindow";
+import { TooltipOverlayView } from "./desktop/TooltipOverlayView";
 import {
   NativePopupView,
   parseNativePopup,
@@ -111,6 +113,7 @@ export function registerIpc(
   const images = new Map<string, ImageAsset>();
   const tabPreview = new TabPreviewWindow(window);
   const toastOverlay = new ToastOverlayWindow(window);
+  const tooltipOverlay = new TooltipOverlayView(window);
   const nativePopup = new NativePopupView(window, (event) => {
     if (!window.isDestroyed()) window.webContents.send("mediax:native-popup-event", event);
   });
@@ -156,20 +159,30 @@ export function registerIpc(
       !value ||
       !Array.isArray(value.tabs) ||
       value.tabs.length > 100 ||
-      !["accounts", "publish", "compose", "video", "history", "calendar", "analytics"].includes(
-        value.page,
-      )
+      !isWorkspacePage(value.page)
     )
       throw new Error("无效标签页状态");
     const accountIds = new Set(db.accounts().map((account) => account.id));
     const ids = new Set<string>();
     const tabs = value.tabs.map(
-      (tab: { id: string; kind?: string; contentKind?: unknown; url?: unknown }) => {
+      (tab: {
+        id: string;
+        kind?: string;
+        contentKind?: unknown;
+        url?: unknown;
+        page?: unknown;
+      }) => {
         if (!tab || typeof tab.id !== "string" || ids.has(tab.id)) throw new Error("无效标签页");
         if (tab.kind === "new") {
           if (!/^new-[a-zA-Z0-9-]{1,80}$/.test(tab.id)) throw new Error("无效标签页");
           ids.add(tab.id);
           return { id: tab.id, kind: "new" as const };
+        }
+        if (tab.kind === "page") {
+          if (!/^new-[a-zA-Z0-9-]{1,80}$/.test(tab.id) || !isWorkspacePage(tab.page))
+            throw new Error("无效标签页");
+          ids.add(tab.id);
+          return { id: tab.id, kind: "page" as const, page: tab.page };
         }
         if (tab.kind === "compose") {
           if (!/^compose-[a-zA-Z0-9-]{1,80}$/.test(tab.id) || !isContentKind(tab.contentKind))
@@ -390,6 +403,8 @@ export function registerIpc(
     toastOverlay.show(toastOverlayPayload(value, window.getContentSize()[0])),
   );
   on("hideToastOverlay", () => toastOverlay.hide());
+  on("showTooltipOverlay", (value) => tooltipOverlay.show(tooltipOverlayPayload(value)));
+  on("hideTooltipOverlay", () => tooltipOverlay.hide());
   const fromMainRenderer = (sender: Electron.WebContents) =>
     sender === window.webContents && !window.isDestroyed();
   ipcMain.on("mediax:native-popup-host-show", (event, value) => {
@@ -626,6 +641,7 @@ export function registerIpc(
     return db.analyticsSummary(30);
   });
   on("retry", (id) => publishing.retry(text(id)));
+  on("deleteTask", (id) => publishing.deleteTask(text(id)));
   on("republish", (id) => publishing.republish(text(id)));
   on("resume", (id) => publishing.resume(text(id)));
   on("openPost", async (value) => {
@@ -637,6 +653,50 @@ export function registerIpc(
     publishing.verify(text(id), url === undefined ? undefined : text(url)),
   );
   return publishing;
+}
+
+const workspacePages = [
+  "accounts",
+  "publish",
+  "compose",
+  "video",
+  "history",
+  "calendar",
+  "analytics",
+] as const;
+
+function isWorkspacePage(value: unknown): value is (typeof workspacePages)[number] {
+  return typeof value === "string" && (workspacePages as readonly string[]).includes(value);
+}
+
+function cssToken(value: unknown, name: string) {
+  if (typeof value !== "string" || value.length < 1 || value.length > 80) throw new Error(name);
+  if (!/^[#(),.%\s\w.+-]+$/.test(value)) throw new Error(name);
+  return value;
+}
+
+function tooltipOverlayPayload(value: unknown): TooltipOverlay {
+  if (!value || typeof value !== "object") throw new Error("无效提示");
+  const overlay = value as Record<string, unknown>;
+  const number = (item: unknown, name: string) => {
+    if (typeof item !== "number" || !Number.isFinite(item)) throw new Error(name);
+    return item;
+  };
+  const width = number(overlay.width, "无效提示尺寸");
+  const height = number(overlay.height, "无效提示尺寸");
+  if (width < 1 || height < 1 || width > 480 || height > 160) throw new Error("无效提示尺寸");
+  const text = typeof overlay.text === "string" ? overlay.text.trim().slice(0, 200) : "";
+  if (!text) throw new Error("无效提示文案");
+  return {
+    x: number(overlay.x, "无效提示位置"),
+    y: number(overlay.y, "无效提示位置"),
+    width,
+    height,
+    text,
+    background: cssToken(overlay.background, "无效提示颜色"),
+    color: cssToken(overlay.color, "无效提示颜色"),
+    radius: cssToken(overlay.radius, "无效提示圆角"),
+  };
 }
 
 function toastOverlayPayload(value: unknown, windowWidth: number): ToastOverlay {

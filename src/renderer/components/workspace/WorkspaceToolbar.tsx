@@ -3,7 +3,7 @@ import {
   CodexSidebarHiddenIcon,
   CodexArrowLeftIcon,
 } from "./CodexNavigationIcons";
-import { FolderOpen, X, Monitor, Plus, Globe } from "lucide-react";
+import { FolderOpen, Loader2, X, Monitor, Plus, Globe } from "lucide-react";
 import { useBrowserNavigation } from "@/hooks/useBrowserNavigation";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -11,6 +11,7 @@ import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/h
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProfileMark } from "@/components/ProfileMark";
 import { useWorkspace } from "@/app/WorkspaceContext";
+import { desktopPages } from "@/app/navigation";
 import { useNativeTabPreview } from "@/hooks/useNativeTabPreview";
 
 export function WorkspaceToolbar() {
@@ -23,8 +24,9 @@ export function WorkspaceToolbar() {
     browserTabs,
     setHoveredTab,
     hoveredTab,
-    pageTitle,
-    page,
+    workspaceTitle,
+    workspacePage,
+    browserNavAction,
     accounts,
     records,
     body,
@@ -39,6 +41,8 @@ export function WorkspaceToolbar() {
   const navigation = useBrowserNavigation(activeBrowserViewId);
   const canGoBack = settingsOpen || Boolean(navigation.data?.canGoBack);
   const canGoForward = !settingsOpen && Boolean(navigation.data?.canGoForward);
+  const backLoading = browserNavAction === "back";
+  const forwardLoading = browserNavAction === "forward";
   const nativePreview = typeof window.desktop.showTabPreview === "function";
   useNativeTabPreview(nativePreview ? hoveredTab : null);
   return (
@@ -53,6 +57,7 @@ export function WorkspaceToolbar() {
                 size="icon"
                 className="toolbar-nav-button"
                 aria-label="后退"
+                aria-busy={backLoading || undefined}
                 disabled={!canGoBack}
                 onClick={() => {
                   if (settingsOpen) {
@@ -62,7 +67,11 @@ export function WorkspaceToolbar() {
                   void run(() => goBackBrowser());
                 }}
               >
-                <CodexArrowLeftIcon className="size-5" />
+                {backLoading ? (
+                  <Loader2 className="size-5 animate-spin" aria-hidden />
+                ) : (
+                  <CodexArrowLeftIcon className="size-5" />
+                )}
               </Button>
             }
           />
@@ -77,10 +86,15 @@ export function WorkspaceToolbar() {
                 size="icon"
                 className="toolbar-nav-button"
                 aria-label="前进"
+                aria-busy={forwardLoading || undefined}
                 disabled={!canGoForward}
                 onClick={() => void run(() => goForwardBrowser())}
               >
-                <CodexArrowLeftIcon className="size-5 -scale-x-100" />
+                {forwardLoading ? (
+                  <Loader2 className="size-5 animate-spin" aria-hidden />
+                ) : (
+                  <CodexArrowLeftIcon className="size-5 -scale-x-100" />
+                )}
               </Button>
             }
           />
@@ -151,7 +165,7 @@ export function WorkspaceToolbar() {
                   }}
                 >
                   <FolderOpen className="size-3.5" />
-                  <span>{pageTitle}</span>
+                  <span>{workspaceTitle}</span>
                 </button>
               }
             />
@@ -164,13 +178,13 @@ export function WorkspaceToolbar() {
               data-preview-tab="workspace"
             >
               <div className="space-y-1 px-3 py-2.5">
-                <p className="text-sm font-medium">{pageTitle}</p>
+                <p className="text-sm font-medium">{workspaceTitle}</p>
                 <p className="text-xs text-muted-foreground">MediaX · 本地工作空间</p>
               </div>
               <div className="border-t bg-background p-3 text-xs text-muted-foreground">
-                {page === "accounts" ? (
+                {workspacePage === "accounts" ? (
                   `${accounts.length} 个账号 · ${accounts.filter((account) => account.login === "logged_in").length} 个已登录`
-                ) : page === "history" ? (
+                ) : workspacePage === "history" ? (
                   `${records.tasks.length} 条发布记录`
                 ) : (
                   <p className="line-clamp-5 whitespace-pre-wrap">
@@ -182,6 +196,10 @@ export function WorkspaceToolbar() {
           </HoverCard>
           {browserTabs.map((tab) => {
             const account = accounts.find((account) => account.id === tab.id);
+            const PageIcon =
+              tab.kind === "page"
+                ? desktopPages.find((item) => item.id === tab.page)?.icon
+                : undefined;
             return (
               <HoverCard
                 key={tab.id}
@@ -214,7 +232,9 @@ export function WorkspaceToolbar() {
                           setActiveBrowser(tab.id);
                         }}
                       >
-                        {tab.kind !== "new" && tab.kind !== "compose" ? (
+                        {PageIcon ? (
+                          <PageIcon className="size-4 shrink-0" aria-hidden />
+                        ) : tab.kind !== "new" && tab.kind !== "compose" && tab.kind !== "page" ? (
                           tab.icon ? (
                             <img
                               src={tab.icon}
@@ -272,10 +292,13 @@ export function WorkspaceToolbar() {
                       {tabPreview?.id === tab.id
                         ? tabPreview.data?.title ||
                           tabPreview.error ||
-                          (tab.kind === "web" || tab.kind === "new" || tab.kind === "compose"
+                          (tab.kind === "web" ||
+                          tab.kind === "new" ||
+                          tab.kind === "page" ||
+                          tab.kind === "compose"
                             ? tab.name
                             : "页面预览")
-                        : tab.kind === "new" || tab.kind === "compose"
+                        : tab.kind === "new" || tab.kind === "page" || tab.kind === "compose"
                           ? tab.name
                           : "正在获取预览…"}
                     </p>

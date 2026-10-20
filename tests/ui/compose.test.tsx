@@ -298,7 +298,52 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
   expect(
     screen.getByRole("tab", { name: "新标签页", exact: true }).getAttribute("aria-selected"),
   ).toBe("true");
+  fireEvent.click(
+    within(screen.getByRole("region", { name: "工具" })).getByRole("button", { name: /发布记录/ }),
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "发布记录", exact: true })).toBeTruthy(),
+  );
+  const workspaceTabs = screen.getByRole("tablist", { name: "工作区标签页" });
+  expect(
+    within(workspaceTabs)
+      .getByRole("tab", { name: "发布记录", exact: true })
+      .getAttribute("aria-selected"),
+  ).toBe("true");
+  expect(
+    within(workspaceTabs)
+      .getByRole("tab", { name: "账号管理", exact: true })
+      .getAttribute("aria-selected"),
+  ).toBe("false");
+  fireEvent.click(within(workspaceTabs).getByRole("tab", { name: "账号管理", exact: true }));
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "账号管理", exact: true })).toBeTruthy(),
+  );
+  expect(within(workspaceTabs).getByRole("tab", { name: "发布记录", exact: true })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "新建标签页" }));
+  fireEvent.click(
+    within(screen.getByRole("region", { name: "工具" })).getByRole("button", { name: /账号管理/ }),
+  );
+  await waitFor(() =>
+    expect(
+      within(workspaceTabs)
+        .getAllByRole("tab", { name: "账号管理", exact: true })
+        .some((tab) => tab.getAttribute("aria-selected") === "true"),
+    ).toBe(true),
+  );
+  expect(within(workspaceTabs).getAllByRole("tab", { name: "账号管理", exact: true })).toHaveLength(
+    2,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "关闭 账号管理 标签页" }));
+  await waitFor(() =>
+    expect(
+      within(workspaceTabs).getAllByRole("tab", { name: "账号管理", exact: true }),
+    ).toHaveLength(1),
+  );
   fireEvent.click(screen.getByRole("tab", { name: "账号管理", exact: true }));
+  await waitFor(() =>
+    expect(screen.getByRole("heading", { name: "账号管理", exact: true })).toBeTruthy(),
+  );
   fireEvent.click(screen.getByRole("button", { name: "添加账号", exact: true }));
   const addAccountDialog = screen.getByRole("dialog", { name: "添加账号" });
   expect(addAccountDialog).toBeTruthy();

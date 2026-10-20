@@ -209,6 +209,9 @@ body {
 .toolbar-navigation button:disabled {
   opacity: 0.4;
 }
+[data-slot="tooltip-content"][data-native-mirrored] {
+  visibility: hidden;
+}
 .workspace .browser-chrome [data-slot="button"] svg {
   width: 16px;
   height: 16px;

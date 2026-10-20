@@ -8,13 +8,15 @@ export type TabPreview = {
 };
 type Options = {
   hoveredTab: string | null;
-  browserTabs: { id: string; kind?: "new" | "compose" | "web" }[];
+  browserTabs: { id: string; kind?: "new" | "compose" | "web" | "page" }[];
 };
 export function useTabPreview({ hoveredTab, browserTabs }: Options): TabPreview | null {
   const isLocal =
     hoveredTab === "workspace" ||
     browserTabs.some(
-      (tab) => tab.id === hoveredTab && (tab.kind === "new" || tab.kind === "compose"),
+      (tab) =>
+        tab.id === hoveredTab &&
+        (tab.kind === "new" || tab.kind === "page" || tab.kind === "compose"),
     );
   const query = useQuery({
     queryKey: ["desktop", "tab-preview", hoveredTab],

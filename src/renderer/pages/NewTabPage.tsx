@@ -14,7 +14,7 @@ const tools: { id: DesktopPage; shortcut?: string }[] = [
 ];
 
 export function NewTabPage() {
-  const { setPage, setActiveBrowser, openSettings } = useWorkspace();
+  const { openAppPage, openSettings } = useWorkspace();
   const shortcuts = useQuery({
     queryKey: ["desktop", "shortcut"],
     queryFn: () => window.desktop.shortcutSettings(),
@@ -22,8 +22,7 @@ export function NewTabPage() {
   });
   const map = shortcuts.data?.shortcuts ?? defaultShortcutMap();
   const openPage = (id: DesktopPage) => {
-    setActiveBrowser(null);
-    setPage(id);
+    openAppPage(id);
   };
   return (
     <main className="new-tab-page">
@@ -53,14 +52,7 @@ export function NewTabPage() {
                 </button>
               );
             })}
-            <button
-              type="button"
-              className="new-tab-tool"
-              onClick={() => {
-                setActiveBrowser(null);
-                openSettings();
-              }}
-            >
+            <button type="button" className="new-tab-tool" onClick={() => openSettings()}>
               <Settings aria-hidden />
               <span>设置</span>
               {formatAccelerator(map.settings ?? "") ? (

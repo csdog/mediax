@@ -93,3 +93,38 @@ it("creates multiple tasks in one publishBatches call", async () => {
   publishing.stopScheduler();
   db.close();
 });
+
+it("creates a new task while an earlier target is still awaiting the user", async () => {
+  const db = new Database(":memory:");
+  const account = db.addAccount("抖音", "douyin");
+  const target = {
+    accountId: account.id,
+    identityId: "1",
+    name: "抖音主页",
+    kind: "profile" as const,
+  };
+  const accounts = {
+    list: () => [{ ...account, login: "logged_in" as const, targets: [target] }],
+    adapter: vi.fn(),
+    exclusive: (work: () => Promise<void>) => work(),
+  } as unknown as AccountService;
+  const publishing = new PublishService(db, accounts, "/tmp/mediax-batch-assets");
+  const blocked = db.createTask("旧正文", [], [target], { contentKind: "moment" });
+  db.transition(db.targets(blocked.id)[0]!.id, "awaiting_user", "未找到发布按钮");
+  const scheduledAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  await publishing.publishBatches(
+    "moment",
+    [],
+    [{ title: null, body: "新正文", targets: [target] }],
+    scheduledAt,
+  );
+  expect(db.tasks()).toHaveLength(2);
+  expect(
+    db
+      .targets()
+      .map((item) => item.status)
+      .sort(),
+  ).toEqual(["awaiting_user", "scheduled"]);
+  publishing.stopScheduler();
+  db.close();
+});

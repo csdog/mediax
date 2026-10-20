@@ -246,6 +246,26 @@ export class Database {
   tasks(): Task[] {
     return this.orm.select().from(schema.tasks).orderBy(desc(schema.tasks.createdAt)).all();
   }
+  deleteTask(id: string) {
+    this.task(id);
+    const targets = this.targets(id);
+    if (
+      targets.some((target) =>
+        ["pending", "running", "awaiting_user", "submitted"].includes(target.status),
+      )
+    )
+      throw new Error("该记录仍有未完成的发布，完成后再删除");
+    this.orm.transaction((tx) => {
+      for (const target of targets) {
+        tx.delete(schema.attempts).where(eq(schema.attempts.targetId, target.id)).run();
+        tx.delete(schema.settings)
+          .where(eq(schema.settings.key, `publish-evidence:${target.id}`))
+          .run();
+      }
+      tx.delete(schema.targets).where(eq(schema.targets.taskId, id)).run();
+      tx.delete(schema.tasks).where(eq(schema.tasks.id, id)).run();
+    });
+  }
   /** Promote due scheduled targets to pending. Returns promoted task ids. */
   promoteDueScheduled(now = new Date()): string[] {
     const iso = now.toISOString();

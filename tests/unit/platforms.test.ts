@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   hasPlatformSession,
+  platformHome,
   sessionOwner,
   urlLooksLoggedIn,
 } from "../../src/main/platforms/catalog";
@@ -32,6 +33,7 @@ it("treats YouTube and Reddit session cookies as logged in", () => {
   expect(urlLooksLoggedIn("sohu", "https://mp.sohu.com/home")).toBe(true);
   expect(urlLooksLoggedIn("sohu", "https://mp.sohu.com/login")).toBe(false);
   expect(urlLooksLoggedIn("facebook", "https://www.facebook.com/")).toBe(false);
+  expect(platformHome.weibo).toBe("https://weibo.com/");
 });
 
 it("gives implemented platforms their own publisher", () => {

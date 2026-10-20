@@ -1,5 +1,4 @@
-import { BrowserWindow, nativeTheme, type Rectangle } from "electron";
-import { pathToFileURL } from "node:url";
+import { BrowserWindow, nativeImage, nativeTheme, type Rectangle } from "electron";
 import { startupSplashHtml } from "./startupSplashPage";
 
 /** Full-size transparent splash while the main window is still starting. */
@@ -38,7 +37,8 @@ export class StartupSplash {
           }
         : {}),
     });
-    const iconUrl = pathToFileURL(iconPath).href;
+    // A data: document cannot load file: resources. Embed the image instead.
+    const iconUrl = nativeImage.createFromPath(iconPath).toDataURL();
     const html = startupSplashHtml(iconUrl);
     void this.window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
     this.window.once("ready-to-show", () => {
@@ -55,6 +55,7 @@ export class StartupSplash {
     const win = this.window;
     this.window = null;
     if (!win || win.isDestroyed()) return;
-    win.close();
+    // The splash is deliberately not user-closable; close() cannot dismiss it.
+    win.destroy();
   }
 }
