@@ -195,9 +195,13 @@ export class AccountBrowserManager {
         loading: contents.isLoadingMainFrame(),
       });
     };
+    let faviconRevision = 0;
     view.webContents.on("did-start-navigation", (_event, url, inPlace, isMainFrame) => {
       if (!isMainFrame) return;
-      if (!inPlace) this.favicons.delete(accountId);
+      if (!inPlace) {
+        faviconRevision++;
+        this.favicons.delete(accountId);
+      }
       notifyNavigation(url);
     });
     view.webContents.on("did-redirect-navigation", (_event, url, _inPlace, isMainFrame) => {
@@ -226,11 +230,13 @@ export class AccountBrowserManager {
     });
     view.webContents.on("page-title-updated", () => remember(false));
     view.webContents.on("page-favicon-updated", (_event, favicons) => {
+      const revision = ++faviconRevision;
       const page = view.webContents;
       const url = page.getURL();
       const title = page.getTitle();
       void loadFavicon(page.session, favicons).then((icon) => {
-        if (!icon || page.isDestroyed() || page.getURL() !== url) return;
+        if (!icon || revision !== faviconRevision || page.isDestroyed() || page.getURL() !== url)
+          return;
         this.favicons.set(accountId, icon);
         notifyNavigation(url);
         this.onVisit?.(accountId, url, title, false, icon);

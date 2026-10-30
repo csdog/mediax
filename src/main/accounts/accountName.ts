@@ -31,6 +31,6 @@ export function discoveredAccountName(platform: PlatformId, targets: Target[]) {
 function isGenericProfileName(platform: PlatformId, name: string) {
   const label = platformInfo[platform].label;
   if (name === label || name === `${label}账号` || name === `${label} 账号`) return true;
-  if (name.startsWith(label) && /账号|频道$/.test(name)) return true;
-  return /^[\u4e00-\u9fa5A-Za-z0-9]{1,8}账号$/.test(name);
+  if (name === `${label}频道` || name === `${label} 频道`) return true;
+  return platform === "weibo" && (name === "微博" || name === "微博账号");
 }

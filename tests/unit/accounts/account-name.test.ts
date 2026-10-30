@@ -3,9 +3,14 @@ import {
   discoveredAccountName,
   isGeneratedAccountName,
   usableAccountName,
-} from "../../src/main/accounts/accountName";
+} from "../../../src/main/accounts/accountName";
 
 describe("account display name", () => {
+  it("preserves real nicknames containing the word account", () => {
+    expect(usableAccountName("zhihu", "我的创作账号")).toBe("我的创作账号");
+    expect(usableAccountName("weibo", "真实账号")).toBe("真实账号");
+    expect(usableAccountName("weibo", "微博账号")).toBeNull();
+  });
   it("uses the platform profile name instead of the generated label", () => {
     expect(isGeneratedAccountName("Facebook 账号 2")).toBe(true);
     expect(

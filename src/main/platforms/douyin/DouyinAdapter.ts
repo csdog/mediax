@@ -1,6 +1,7 @@
 import type { Page } from "playwright-core";
 import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
+import { isPlatformLoginUrl, platformSites } from "../../../shared/platformSites";
 import { openKindEditor, submitKindEditor } from "../editor";
 import { NeedsUser, type Publisher } from "../Publisher";
 import {
@@ -17,7 +18,7 @@ const uploadUrl = "https://creator.douyin.com/creator-micro/content/upload";
 const articleUrl = "https://creator.douyin.com/creator-micro/content/post/article";
 
 function loggedOut(url: string) {
-  return /login|passport/i.test(url) || !url.includes("creator.douyin.com");
+  return isPlatformLoginUrl("douyin", url) || new URL(url).hostname !== "creator.douyin.com";
 }
 
 export class DouyinAdapter implements Publisher {
@@ -30,10 +31,10 @@ export class DouyinAdapter implements Publisher {
 
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
-    if (!page.url().includes("creator.douyin.com")) {
-      await page.goto(uploadUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    if (new URL(page.url()).hostname !== "creator.douyin.com") {
+      await page.goto(platformSites.douyin.home, { waitUntil: "domcontentloaded", timeout: 60000 });
     }
-    return discoverProfile(page, accountId, "抖音账号", loggedOut);
+    return discoverProfile(page, accountId, "抖音账号", loggedOut, "douyin");
   }
 
   async prepare(task: Task, _target: TaskTarget) {

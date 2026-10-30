@@ -16,7 +16,7 @@ import { DownloadStore } from "./desktop/DownloadStore";
 import { AppUpdater } from "./desktop/AppUpdater";
 import { findDeepLinkArg, registerDeepLinkProtocol } from "./desktop/deepLinks";
 import { findOpenFileArgs } from "./desktop/openFiles";
-import { shouldStartHidden } from "./desktop/loginItem";
+import { repairOpenAtLogin, shouldStartHidden } from "./desktop/loginItem";
 import { restoreWindowState } from "./desktop/windowState";
 import { installWindowBackdrop } from "./desktop/windowBackdrop";
 import { installThemePreference } from "./desktop/themePreference";
@@ -129,6 +129,7 @@ async function start(): Promise<void> {
     migrateLegacyUserData();
   }
   initializeLogging();
+  repairOpenAtLogin();
   if (!(await acquireInstanceLock())) return;
   quitWhenDevelopmentParentExits();
   const port = await unusedPort();
@@ -278,7 +279,11 @@ async function start(): Promise<void> {
   };
   win.once("ready-to-show", revealMainWindow);
   const loadPromise = process.env.ELECTRON_RENDERER_URL
-    ? win.loadURL(process.env.ELECTRON_RENDERER_URL)
+    ? win.loadURL(
+        !app.isPackaged && process.argv.includes("--demo")
+          ? new URL("demos/index.html", process.env.ELECTRON_RENDERER_URL).href
+          : process.env.ELECTRON_RENDERER_URL,
+      )
     : win.loadFile(join(__dirname, "../renderer/index.html"));
   const shell = new DesktopShell(win, db);
   deepLinkHandler = (url) => shell.handleDeepLink(url);
@@ -339,6 +344,7 @@ async function start(): Promise<void> {
   lifecycle.markRestored();
   // Eventually phase: account sync + updater + Agent control API after first paint settles.
   lifecycle.whenEventually(() => {
+    publishing.startScheduler();
     accounts.startAutoRefresh();
     updater.start();
     void import("./control/ControlServer")

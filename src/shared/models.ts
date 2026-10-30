@@ -1,3 +1,5 @@
+import type { PublishPreset, PublishPresetInput } from "./publishPresets";
+
 export const platforms = [
   "douyin",
   "kuaishou",
@@ -162,12 +164,17 @@ export type TabPreviewOverlay = {
   placeholder: boolean;
 };
 export type ToastOverlayItem = {
+  id: string | number;
+  duration: number | null;
+  dismissible?: boolean;
   icon?: string;
   type: string;
   title: string;
   description?: string;
 };
 export type ToastOverlay = {
+  maxHeight?: number;
+  closeIcon?: string;
   theme?: "light" | "dark";
   x: number;
   y: number;
@@ -175,6 +182,10 @@ export type ToastOverlay = {
   height: number;
   toasts: ToastOverlayItem[];
 };
+export type NativeToastEvent =
+  | { type: "resize"; height: number }
+  | { type: "empty" }
+  | { type: "dismiss"; id: string | number; reason: "timeout" | "close" };
 export type NativePopupKind = "downloads" | "extensions" | "history" | "browser-menu";
 export type NativePopupAction =
   | { type: "open-downloads-folder" }
@@ -300,6 +311,9 @@ export interface DesktopApi {
   hideTabPreview?(): Promise<void>;
   showToastOverlay?(overlay: ToastOverlay): Promise<void>;
   hideToastOverlay?(): Promise<void>;
+  onNativeToastDismissed?(
+    listener: (event: Extract<NativeToastEvent, { type: "dismiss" }>) => void,
+  ): () => void;
   showTooltipOverlay?(overlay: TooltipOverlay): Promise<void>;
   hideTooltipOverlay?(): Promise<void>;
   showNativePopup(popup: NativePopupRequest): Promise<void>;
@@ -325,6 +339,9 @@ export interface DesktopApi {
     keepAwakeWhilePublishing?: boolean;
     calendarTimezone?: string;
   }): Promise<{ keepAwakeWhilePublishing: boolean; calendarTimezone: string }>;
+  publishPresets(): Promise<PublishPreset[]>;
+  createPublishPreset(input: PublishPresetInput): Promise<PublishPreset>;
+  deletePublishPreset(id: string): Promise<PublishPreset[]>;
   publishSettings(): Promise<{
     silent: boolean;
     concurrency: number;

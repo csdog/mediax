@@ -1,4 +1,6 @@
 import type { PlatformId } from "../../shared/models";
+import { platformSites, isPlatformLoginUrl, isPlatformUrl } from "../../shared/platformSites";
+export { platformForUrl } from "../../shared/platformSites";
 import { isChannelsPlatformUrl } from "./channels/session";
 
 type Session = {
@@ -9,123 +11,99 @@ type Session = {
 };
 
 function known(
-  home: string,
+  platform: PlatformId,
   cookieUrl: string,
   cookies: readonly string[],
   challenge?: RegExp,
 ): Session {
-  return { home, cookieUrl, cookies, challenge };
+  return { home: platformSites[platform].home, cookieUrl, cookies, challenge };
 }
 
-function login(home: string): Session {
+function login(platform: PlatformId): Session {
+  const home = platformSites[platform].home;
   return { home, cookieUrl: home, cookies: [] };
 }
 
 const sessions: Record<PlatformId, Session> = {
   facebook: known(
-    "https://www.facebook.com/",
+    "facebook",
     "https://www.facebook.com",
     ["c_user"],
     /checkpoint|two_step_verification/,
   ),
   youtube: known(
-    "https://studio.youtube.com/",
+    "youtube",
     "https://www.youtube.com",
     ["SID", "LOGIN_INFO", "__Secure-1PSID", "__Secure-3PSID"],
     /accounts\.google\.com\/.*challenge/,
   ),
   tiktok: known(
-    "https://www.tiktok.com/login",
+    "tiktok",
     "https://www.tiktok.com",
     ["sessionid", "sid_tt", "sessionid_ss"],
     /tiktok\.com\/.*captcha/i,
   ),
-  instagram: known("https://www.instagram.com/accounts/login/", "https://www.instagram.com", [
-    "sessionid",
-  ]),
-  threads: known("https://www.threads.com/login", "https://www.threads.com", ["sessionid"]),
-  twitter: known("https://x.com/i/flow/login", "https://x.com", ["auth_token"]),
-  linkedin: known("https://www.linkedin.com/login", "https://www.linkedin.com", ["li_at"]),
-  pinterest: known("https://www.pinterest.com/login/", "https://www.pinterest.com", [
-    "_pinterest_sess",
-  ]),
-  reddit: known("https://www.reddit.com/login", "https://www.reddit.com", ["reddit_session"]),
-  douyin: known("https://creator.douyin.com/", "https://creator.douyin.com", ["sessionid"]),
-  kuaishou: known("https://cp.kuaishou.com/", "https://cp.kuaishou.com", [
+  instagram: known("instagram", "https://www.instagram.com", ["sessionid"]),
+  threads: known("threads", "https://www.threads.com", ["sessionid"]),
+  twitter: known("twitter", "https://x.com", ["auth_token"]),
+  linkedin: known("linkedin", "https://www.linkedin.com", ["li_at"]),
+  pinterest: known("pinterest", "https://www.pinterest.com", ["_pinterest_sess"]),
+  reddit: known("reddit", "https://www.reddit.com", ["reddit_session"]),
+  douyin: known("douyin", "https://creator.douyin.com", ["sessionid"]),
+  kuaishou: known("kuaishou", "https://cp.kuaishou.com", [
     "userId",
     "kuaishou.web.cp.api_st",
     "passToken",
   ]),
-  xiaohongshu: known("https://creator.xiaohongshu.com/login", "https://creator.xiaohongshu.com", [
+  xiaohongshu: known("xiaohongshu", "https://creator.xiaohongshu.com", [
     "customer-sso-sid",
     "access-token-creator.xiaohongshu.com",
   ]),
-  bilibili: known("https://passport.bilibili.com/login", "https://www.bilibili.com", ["SESSDATA"]),
+  bilibili: known("bilibili", "https://www.bilibili.com", ["SESSDATA"]),
   // wxuin identifies a WeChat user even on the logged-out QR login page.
-  channels: known("https://channels.weixin.qq.com/platform", "https://channels.weixin.qq.com", [
-    "sessionid",
-  ]),
-  wechat: known("https://mp.weixin.qq.com/", "https://mp.weixin.qq.com", [
-    "slave_sid",
-    "slave_user",
-    "data_ticket",
-  ]),
-  // Open the site itself. The passport sign-in page stays a login form even when SUB is present.
-  weibo: known("https://weibo.com/", "https://weibo.com", ["SUB"]),
-  baijiahao: known(
-    "https://baijiahao.baidu.com/builder/theme/bjh/login",
-    "https://baijiahao.baidu.com",
-    ["BDUSS"],
-  ),
-  toutiao: known("https://mp.toutiao.com/profile_v4/index", "https://mp.toutiao.com", [
-    "sessionid",
-    "sso_uid_tt",
-  ]),
-  zhihu: known("https://www.zhihu.com/signin", "https://www.zhihu.com", ["z_c0"]),
-  qq: known("https://om.qq.com/userAuth/index", "https://om.qq.com", ["userid", "omtoken"]),
-  alipay: known("https://c.alipay.com/page/portal/home", "https://c.alipay.com", [
-    "ALIPAYJSESSIONID",
-    "ctoken",
-  ]),
-  hupu: known(
-    "https://passport.hupu.com/v2/login?pcPhone=1&jumpurl=https://www.hupu.com",
-    "https://www.hupu.com",
-    ["u"],
-  ),
-  sohu: login("https://mp.sohu.com/"),
-  yidian: login("https://mp.yidianzixun.com/"),
-  dayu: login("https://mp.uc.cn/"),
-  netease: login("https://mp.163.com/"),
-  iqiyi: login("https://mp.iqiyi.com/"),
-  weishi: login("https://weishi.qq.com/"),
-  sohuvideo: login("https://tv.sohu.com/"),
-  pipixia: login("https://www.pipix.com/"),
-  tencentvideo: login("https://v.qq.com/"),
-  duoduo: login("https://live.pinduoduo.com/"),
-  meipai: login("https://www.meipai.com/"),
-  acfun: login("https://www.acfun.cn/"),
-  kuaichuan: login("https://kuaichuan.360kuai.com/"),
-  xueqiu: login("https://mp.xueqiu.com/"),
-  fengwang: login("https://www.fengwang.com/"),
-  dewu: login("https://www.dewu.com/"),
-  jd: login("https://ce.jd.com/"),
-  douban: login("https://www.douban.com/"),
-  csdn: login("https://mp.csdn.net/"),
-  jianshu: login("https://www.jianshu.com/"),
-  chejia: login("https://creator.autohome.com.cn/"),
-  xhsmerchant: login("https://ark.xiaohongshu.com/"),
-  yiche: login("https://mp.yiche.com/"),
-  dongche: login("https://mp.dongchedi.com/"),
-  ximalaya: login("https://studio.ximalaya.com/"),
-  xiaoyuzhou: login("https://podcaster.xiaoyuzhoufm.com/"),
-  guanghe: login("https://creator.guanghe.taobao.com/"),
-  xhsdm: login("https://pro.xiaohongshu.com/"),
-  zsxq: login("https://wx.zsxq.com/"),
-  music163: login("https://music.163.com/st/musician"),
-  qqmusic: login("https://y.qq.com/artists/"),
-  qingting: login("https://www.qingting.fm/"),
-  lizhi: login("https://www.lizhi.fm/"),
-  googlebusiness: login("https://business.google.com/"),
+  channels: known("channels", "https://channels.weixin.qq.com", ["sessionid"]),
+  wechat: known("wechat", "https://mp.weixin.qq.com", ["slave_sid", "slave_user", "data_ticket"]),
+  weibo: known("weibo", "https://weibo.com", ["SUB"]),
+  baijiahao: known("baijiahao", "https://baijiahao.baidu.com", ["BDUSS"]),
+  toutiao: known("toutiao", "https://mp.toutiao.com", ["sessionid", "sso_uid_tt"]),
+  zhihu: known("zhihu", "https://www.zhihu.com", ["z_c0"]),
+  qq: known("qq", "https://om.qq.com", ["userid", "omtoken"]),
+  alipay: known("alipay", "https://c.alipay.com", ["ALIPAYJSESSIONID", "ctoken"]),
+  hupu: known("hupu", "https://www.hupu.com", ["u"]),
+  sohu: login("sohu"),
+  yidian: login("yidian"),
+  dayu: login("dayu"),
+  netease: login("netease"),
+  iqiyi: login("iqiyi"),
+  weishi: login("weishi"),
+  sohuvideo: login("sohuvideo"),
+  pipixia: login("pipixia"),
+  tencentvideo: login("tencentvideo"),
+  duoduo: login("duoduo"),
+  meipai: login("meipai"),
+  acfun: login("acfun"),
+  kuaichuan: login("kuaichuan"),
+  xueqiu: login("xueqiu"),
+  fengwang: login("fengwang"),
+  dewu: login("dewu"),
+  jd: login("jd"),
+  douban: login("douban"),
+  csdn: login("csdn"),
+  jianshu: login("jianshu"),
+  chejia: login("chejia"),
+  xhsmerchant: login("xhsmerchant"),
+  yiche: login("yiche"),
+  dongche: login("dongche"),
+  ximalaya: login("ximalaya"),
+  xiaoyuzhou: login("xiaoyuzhou"),
+  guanghe: login("guanghe"),
+  xhsdm: login("xhsdm"),
+  zsxq: login("zsxq"),
+  music163: login("music163"),
+  qqmusic: login("qqmusic"),
+  qingting: login("qingting"),
+  lizhi: login("lizhi"),
+  googlebusiness: login("googlebusiness"),
 };
 
 export const platformHome = Object.fromEntries(
@@ -144,23 +122,21 @@ export function sessionCookieNames(platform: PlatformId) {
   return sessions[platform].cookies;
 }
 
-export function platformForUrl(url: string): PlatformId | null {
-  try {
-    const host = new URL(url).hostname;
-    for (const [platform, cookieUrl] of Object.entries(platformCookieUrl)) {
-      const cookieHost = new URL(cookieUrl).hostname;
-      if (host === cookieHost || host.endsWith(`.${cookieHost}`)) {
-        return platform as PlatformId;
-      }
-    }
-  } catch {
-    /* Ignore invalid URLs. */
-  }
-  return null;
-}
-
 export function hasPlatformSession(platform: PlatformId, cookies: { name: string }[], url = "") {
+  if (url && isPlatformUrl(platform, url) && isPlatformLoginUrl(platform, url)) return false;
   if (platform === "channels" && url && !isChannelsPlatformUrl(url)) return false;
+  if (platform === "xiaohongshu" && url) {
+    try {
+      const current = new URL(url);
+      if (
+        current.hostname === "creator.xiaohongshu.com" &&
+        /^\/(?:login|signin)(?:[/.]|$)/i.test(current.pathname)
+      )
+        return false;
+    } catch {
+      return false;
+    }
+  }
   const names = sessions[platform].cookies;
   return cookies.some((cookie) => names.includes(cookie.name));
 }
@@ -169,18 +145,9 @@ export function keepsClosedSession(platform: PlatformId) {
   return sessions[platform].cookies.length === 0;
 }
 
+// A candidate workspace URL, not proof of login: callers also require a scoped profile.
 export function urlLooksLoggedIn(platform: PlatformId, url: string) {
-  if (!keepsClosedSession(platform) || !url) return false;
-  try {
-    const current = new URL(url);
-    const home = new URL(sessions[platform].cookieUrl);
-    const host =
-      current.hostname === home.hostname || current.hostname.endsWith(`.${home.hostname}`);
-    if (!host) return false;
-    return !/login|signin|passport|userAuth/i.test(`${current.pathname}${current.search}`);
-  } catch {
-    return false;
-  }
+  return keepsClosedSession(platform) && Boolean(url) && !isPlatformLoginUrl(platform, url);
 }
 
 // Facebook keeps the stable c_user id. Other session cookies rotate,

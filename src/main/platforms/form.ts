@@ -1,6 +1,7 @@
-import { readCreatorProfile, type CreatorPlatform } from "../accounts/creatorProfile";
+import { readPlatformProfile } from "../accounts/platformProfile";
+import { usableAccountName } from "../accounts/accountName";
 import type { Locator, Page } from "playwright-core";
-import type { Target, Task } from "../../shared/models";
+import type { PlatformId, Target, Task } from "../../shared/models";
 import { NeedsUser, NotSubmitted } from "./Publisher";
 import { isAudio, isVideo } from "../../shared/content";
 
@@ -19,16 +20,15 @@ export function coverImage(task: Task) {
 export async function discoverProfile(
   page: Page,
   accountId: string,
-  name: string,
+  _name: string,
   loggedOut: (url: string) => boolean,
-  platform?: CreatorPlatform,
+  platform?: PlatformId,
 ): Promise<Target[]> {
   if (loggedOut(page.url())) return [];
-  if (platform) {
-    await page.waitForFunction(readCreatorProfile, platform, { timeout: 10_000 }).catch(() => {});
-    const profile = await page.evaluate(readCreatorProfile, platform);
-    if (profile) name = profile.name;
-  }
+  if (!platform) return [];
+  const profile = await readPlatformProfile(page, platform);
+  const name = usableAccountName(platform, profile?.name);
+  if (!name) return [];
   return [{ accountId, identityId: "1", name, kind: "profile" }];
 }
 

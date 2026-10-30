@@ -1,0 +1,143 @@
+html,
+body {
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+[data-native-toaster] {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+}
+.native-toast {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--normal-border);
+  border-radius: 16px;
+  background: var(--normal-bg);
+  color: var(--normal-text);
+  box-shadow: 0 4px 10px rgb(0 0 0 / 12%);
+  font-size: 13px;
+  line-height: 1.5;
+  transform-origin: bottom center;
+  transform: translateY(calc(-1 * var(--offset, 0px))) scale(var(--scale, 1));
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 240ms ease;
+}
+.native-toast[hidden],
+[data-native-toast-icon][hidden],
+.native-toast .close[hidden],
+.description[hidden] {
+  display: none;
+}
+.native-toast[data-phase="entering"] {
+  opacity: 0;
+  transform: translateY(calc(100% + 24px)) scale(0.95);
+}
+.native-toast[data-phase="leaving"] {
+  opacity: 0;
+  transform: translateY(8px) scale(0.95);
+  pointer-events: none;
+}
+.native-toast .copy {
+  flex: 1;
+  min-width: 0;
+  max-height: var(--copy-max-height, 180px);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+.native-toast p {
+  margin: 0;
+}
+.native-toast .title {
+  font-weight: 500;
+}
+.native-toast .description {
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.native-toast .copy,
+.native-toast > [data-native-toast-icon],
+.native-toast .close {
+  transition: opacity 160ms ease;
+}
+[data-native-toaster]:not([data-expanded="true"]) .native-toast[data-front="false"] > * {
+  opacity: 0;
+  pointer-events: none;
+}
+[data-native-toast-icon] {
+  display: block;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  background-color: currentColor;
+  mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+}
+.native-toast .close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  padding: 2px;
+  cursor: pointer;
+}
+.native-toast .close:hover {
+  background: rgb(128 128 128 / 16%);
+}
+.native-toast .close:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.native-toast[data-type="success"] {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+.native-toast[data-type="info"] {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-color: var(--info-border);
+}
+.native-toast[data-type="warning"] {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: var(--warning-border);
+}
+.native-toast[data-type="error"] {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border-color: var(--error-border);
+}
+.native-toast[data-type="loading"] > [data-native-toast-icon] {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .native-toast,
+  .native-toast > * {
+    transition: none;
+    animation: none !important;
+  }
+}

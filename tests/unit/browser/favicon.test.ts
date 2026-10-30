@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import type { Session } from "electron";
 vi.mock("electron", () => ({ nativeImage: { createFromBuffer: () => ({ isEmpty: () => true }) } }));
-import { loadFavicon } from "../../src/main/browser/favicon";
+import { loadFavicon } from "../../../src/main/browser/favicon";
 
 it("preserves ICO icons that nativeImage cannot decode", async () => {
   const fetch = vi.fn(
@@ -17,4 +17,19 @@ it("preserves URL-encoded SVG icons", async () => {
   const icon =
     "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E";
   expect(await loadFavicon({} as Session, [icon])).toBe(icon);
+});
+
+it("tries the next candidate when a site serves an error page instead of its first favicon", async () => {
+  const fetch = vi.fn(async (url: string) =>
+    url.endsWith("broken.ico")
+      ? new Response("<html>login</html>", { headers: { "content-type": "text/html" } })
+      : new Response(new Uint8Array([0, 0, 1, 0]), { headers: { "content-type": "image/x-icon" } }),
+  );
+  expect(
+    await loadFavicon({ fetch } as unknown as Session, [
+      "https://example.com/broken.ico",
+      "https://example.com/real.ico",
+    ]),
+  ).toBe("data:image/x-icon;base64,AAABAA==");
+  expect(fetch).toHaveBeenCalledTimes(2);
 });

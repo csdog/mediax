@@ -43,7 +43,7 @@ body {
   padding-top: var(--toolbar-height);
   background: var(--chrome);
 }
-/* One rounded surface joins the sidebar and the content, inset from the window shell. */
+/* Shared outline; the sidebar and content supply their own surface materials. */
 .workspace::before {
   content: "";
   position: absolute;
@@ -51,7 +51,7 @@ body {
   z-index: 0;
   pointer-events: none;
   border-radius: var(--radius-pane);
-  background: var(--page-surface);
+  background: transparent;
   box-shadow: 0 0 0 1px var(--surface-stroke);
 }
 .workspace.settings-active::before {
@@ -772,7 +772,9 @@ html.dark .browser-download-item[data-hover="true"] {
   pointer-events: none;
 }
 .workspace [data-slot="sidebar-inner"] {
-  background: var(--sidebar);
+  background: var(--workspace-sidebar-surface);
+  -webkit-backdrop-filter: blur(20px) saturate(115%);
+  backdrop-filter: blur(20px) saturate(115%);
   border: 0;
   border-radius: var(--radius-pane) 0 0 var(--radius-pane);
   overflow: hidden;

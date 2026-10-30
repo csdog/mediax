@@ -32,7 +32,7 @@ export class KuaishouAdapter implements Publisher {
     if (!page.url().includes("cp.kuaishou.com")) {
       await page.goto(uploadUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
     }
-    return discoverProfile(page, accountId, "快手账号", loggedOut);
+    return discoverProfile(page, accountId, "快手账号", loggedOut, "kuaishou");
   }
 
   async prepare(task: Task, _target: TaskTarget) {

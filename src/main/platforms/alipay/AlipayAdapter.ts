@@ -24,7 +24,7 @@ export class AlipayAdapter implements Publisher {
     if (!page.url().includes("c.alipay.com")) {
       await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
     }
-    return discoverProfile(page, accountId, "支付宝生活号", loggedOut);
+    return discoverProfile(page, accountId, "支付宝生活号", loggedOut, "alipay");
   }
 
   async prepare(task: Task, _target: TaskTarget) {

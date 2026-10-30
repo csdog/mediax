@@ -20,6 +20,8 @@ export function usePublishSettings() {
   const current = settings.data ?? defaultPublishSettings;
   return {
     publishSettings: current,
+    publishSettingsReady: settings.isSuccess,
+    applyPublishSettings: save.mutateAsync,
     silentPublish: current.silent,
     setSilentPublish: (silent: boolean) => saveSilent.mutate(silent),
     setPublishConcurrency: (concurrency: number) => save.mutate({ concurrency }),

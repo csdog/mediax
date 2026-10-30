@@ -1,13 +1,13 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { BrowserWindow } from "electron";
-import { AccountBrowserManager } from "../../src/main/browser/AccountBrowserManager";
-import { loadFavicon } from "../../src/main/browser/favicon";
-import { platforms } from "../../src/shared/models";
-vi.mock("../../src/main/browser/contextMenu", () => ({
+import { AccountBrowserManager } from "../../../src/main/browser/AccountBrowserManager";
+import { loadFavicon } from "../../../src/main/browser/favicon";
+import { platforms } from "../../../src/shared/models";
+vi.mock("../../../src/main/browser/contextMenu", () => ({
   installBrowserContextMenu: vi.fn(async () => {}),
 }));
 
-vi.mock("../../src/main/browser/favicon", () => ({
+vi.mock("../../../src/main/browser/favicon", () => ({
   loadFavicon: vi.fn(async () => "data:image/png;base64,aWNvbg=="),
 }));
 
@@ -47,7 +47,7 @@ vi.mock("electron", () => ({
 function manager() {
   const host = {
     on: vi.fn(),
-    webContents: { on: vi.fn() },
+    webContents: { on: vi.fn(), send: vi.fn() },
     isDestroyed: () => false,
     getContentSize: () => [1000, 700],
     contentView: { addChildView: vi.fn(), removeChildView: vi.fn() },
@@ -279,4 +279,31 @@ it("reports native page focus and clicks even without a history popup", async ()
   expect(interaction).toHaveBeenCalledTimes(2);
   emit("input-event", { type: "mouseMove" });
   expect(interaction).toHaveBeenCalledTimes(2);
+});
+
+it("ignores older favicon requests even when navigation returns to the same URL", async () => {
+  const browsers = manager();
+  view.webContents.loadURL.mockResolvedValueOnce(undefined);
+  await browsers.open("account-1", "https://mp.toutiao.com/", { focus: false });
+  const emit = (name: string, ...args: unknown[]) => {
+    for (const [event, listener] of view.webContents.on.mock.calls) {
+      if (event === name) listener({}, ...args);
+    }
+  };
+  let finishOld!: (icon: string) => void;
+  vi.mocked(loadFavicon).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishOld = resolve;
+      }),
+  );
+  emit("page-favicon-updated", ["https://example.com/old.ico"]);
+  emit("did-start-navigation", "https://mp.toutiao.com/", false, true);
+  emit("page-favicon-updated", ["https://example.com/new.ico"]);
+  await vi.waitFor(() =>
+    expect(browsers.favicon("account-1")).toBe("data:image/png;base64,aWNvbg=="),
+  );
+  finishOld("data:image/png;base64,b2xk");
+  await Promise.resolve();
+  expect(browsers.favicon("account-1")).toBe("data:image/png;base64,aWNvbg==");
 });
