@@ -13,6 +13,7 @@
     "dev": "node scripts/patch-electron-dock-name.mjs && electron-vite dev --watch",
     "dev:demo": "node scripts/patch-electron-dock-name.mjs && electron-vite dev --watch -- --demo",
     "build": "electron-vite build && node scripts/check-production-demos.mjs",
+    "release:notes": "node scripts/release-notes.mjs",
     "typecheck": "tsc --noEmit",
     "test:integration": "pnpm run build && node --test --test-concurrency=1 tests/integration/*.test.mjs",
     "package:mac": "pnpm run build && electron-builder --mac --dir --publish never",

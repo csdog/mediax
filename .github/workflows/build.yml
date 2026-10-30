@@ -61,7 +61,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: ${{ matrix.os == 'ubuntu-latest' }}
           files: |
             dist/*.dmg
             dist/*.zip
@@ -72,3 +71,26 @@ jobs:
             dist/*.yaml
             dist/*.blockmap
           fail_on_unmatched_files: false
+
+  release_notes:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26.9.0
+
+      - name: Generate release notes from commits
+        run: node scripts/release-notes.mjs "$RELEASE_TAG" > release-notes.md
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+
+      - name: Update release notes
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
