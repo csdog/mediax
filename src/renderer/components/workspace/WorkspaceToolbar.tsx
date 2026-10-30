@@ -13,6 +13,8 @@ import { ProfileMark } from "@/components/ProfileMark";
 import { useWorkspace } from "@/app/WorkspaceContext";
 import { desktopPages } from "@/app/navigation";
 import { useNativeTabPreview } from "@/hooks/useNativeTabPreview";
+import { platformIcons } from "@/assets/platformIcons";
+import { platformForUrl } from "../../../shared/platformSites";
 
 export function WorkspaceToolbar() {
   const {
@@ -196,6 +198,9 @@ export function WorkspaceToolbar() {
           </HoverCard>
           {browserTabs.map((tab) => {
             const account = accounts.find((account) => account.id === tab.id);
+            const sitePlatform =
+              tab.kind === undefined || tab.kind === "web" ? platformForUrl(tab.url ?? "") : null;
+            const siteIcon = tab.icon ?? (sitePlatform ? platformIcons[sitePlatform] : undefined);
             const PageIcon =
               tab.kind === "page"
                 ? desktopPages.find((item) => item.id === tab.page)?.icon
@@ -235,9 +240,9 @@ export function WorkspaceToolbar() {
                         {PageIcon ? (
                           <PageIcon className="size-4 shrink-0" aria-hidden />
                         ) : tab.kind !== "new" && tab.kind !== "compose" && tab.kind !== "page" ? (
-                          tab.icon ? (
+                          siteIcon ? (
                             <img
-                              src={tab.icon}
+                              src={siteIcon}
                               alt="网站图标"
                               className="size-4 shrink-0 object-contain"
                             />

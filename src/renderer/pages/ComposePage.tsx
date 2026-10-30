@@ -17,6 +17,7 @@ import {
 import { applyLocalFiles, pathsFromDataTransfer } from "@/lib/importLocalFiles";
 import { publishKindMeta } from "@/lib/publishKindMeta";
 import { DateTimePicker } from "@/components/DateTimePicker";
+import { PublishPresetPicker } from "@/components/PublishPresetPicker";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -115,7 +116,7 @@ export function ComposePage() {
       const result = await applyLocalFiles(paths, contentKind, images);
       if (result.markdown != null) setBody(result.markdown);
       setImages(result.images);
-      if (result.notice) toast(result.notice);
+      if (result.notice) toast.info(result.notice);
     });
   };
   const paths = images.map((image) => image.path);
@@ -422,6 +423,13 @@ export function ComposePage() {
               </div>
             </div>
             <div className="ml-auto flex items-center gap-3">
+              <PublishPresetPicker
+                contentKind={contentKind}
+                accounts={accounts}
+                targets={selectedTargets}
+                onApply={setSelectedTargets}
+                busy={busy}
+              />
               <Button
                 variant="outline"
                 disabled={busy}

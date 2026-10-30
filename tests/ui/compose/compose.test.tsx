@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import "./setup";
+import ".././setup";
 import React from "react";
 import { it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
-import { App } from "../../src/renderer/src";
+import { App } from "../../../src/renderer/src";
 // jsdom has no native preload; exercise real logging in Electron integration instead.
-vi.mock("../../src/renderer/lib/logging", () => ({ initializeRendererLogging: vi.fn() }));
+vi.mock("../../../src/renderer/lib/logging", () => ({ initializeRendererLogging: vi.fn() }));
 it("imports and saves content, manages desktop tabs/settings, and requires target selection plus publish confirmation", async () => {
   let commandListener: ((command: any) => void) | undefined;
   let profile = { name: "MediaX", avatar: null as string | null };
@@ -14,6 +14,8 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     Parameters<typeof window.desktop.onBrowserNavigationChanged>[0]
   >();
   window.desktop = {
+    showToastOverlay: vi.fn().mockResolvedValue(undefined),
+    hideToastOverlay: vi.fn().mockResolvedValue(undefined),
     accountGroups: vi.fn().mockResolvedValue([]),
     createAccountGroup: vi.fn(),
     onCommand: vi.fn((listener) => {
@@ -380,6 +382,7 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     "data:image/png;base64,aWNvbg==",
   );
   expect(within(pageTab).getByLabelText("账号：Facebook 账号 1")).toBeTruthy();
+  const accountFetchesBeforeNavigation = vi.mocked(window.desktop.accounts).mock.calls.length;
   act(() => {
     for (const listener of navigationListeners)
       listener("account-1", {
@@ -391,6 +394,11 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
       });
   });
   expect(screen.getByRole("tab", { name: "新的页面标题" })).toBeTruthy();
+  await waitFor(() =>
+    expect(vi.mocked(window.desktop.accounts).mock.calls.length).toBeGreaterThan(
+      accountFetchesBeforeNavigation,
+    ),
+  );
   expect(
     within(screen.getByRole("tab", { name: "新的页面标题" }))
       .getByAltText("网站图标")
@@ -582,7 +590,15 @@ it("imports and saves content, manages desktop tabs/settings, and requires targe
     (screen.getByRole("button", { name: "添加账号", exact: true }) as HTMLButtonElement).disabled,
   ).toBe(false);
   finishRefresh(account);
-  expect(await screen.findByText("Facebook 账号 1：已登录")).toBeTruthy();
+  await waitFor(() =>
+    expect(window.desktop.showToastOverlay).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toasts: expect.arrayContaining([
+          expect.objectContaining({ title: "Facebook 账号 1：已登录" }),
+        ]),
+      }),
+    ),
+  );
   await waitFor(() => expect(window.desktop.refreshAccount).toHaveBeenCalled());
   await waitFor(() =>
     expect(

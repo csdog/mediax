@@ -29,7 +29,7 @@ export function AccountsPage() {
       );
       await reload();
       await openBrowser(account);
-      toast("请在账号浏览器中完成登录，登录后会自动识别。");
+      toast.info("请在账号浏览器中完成登录，登录后会自动识别。");
     });
   };
 
@@ -79,7 +79,7 @@ export function AccountsPage() {
               );
             } else if (results.length > 1) {
               const loggedIn = results.filter((account) => account.login === "logged_in").length;
-              toast(
+              toast.info(
                 `已检查 ${results.length} 个账号，${loggedIn} 个已登录，${results.length - loggedIn} 个需处理`,
               );
             }

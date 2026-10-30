@@ -1,3 +1,4 @@
+import { discoverProfile } from "../form";
 import type { Page } from "playwright-core";
 import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
@@ -16,18 +17,13 @@ export class RedditAdapter implements Publisher {
   async discover(accountId: string): Promise<Target[]> {
     const page = await this.page();
     await page.goto("https://old.reddit.com/", { waitUntil: "domcontentloaded", timeout: 60000 });
-    if (page.url().includes("/login")) return [];
-    const user = (
-      await page
-        .locator("#header-bottom-right .user a")
-        .first()
-        .textContent()
-        .catch(() => "")
-    )
-      ?.replace(/^u\//, "")
-      .trim();
-    if (!user || /log\s*in|登录/i.test(user)) return [];
-    return [{ accountId, identityId: "1", name: `u/${user}`, kind: "profile" }];
+    return discoverProfile(
+      page,
+      accountId,
+      "Reddit",
+      (url) => /login|signin|accounts.google.com/i.test(url),
+      "reddit",
+    );
   }
 
   async prepare(task: Task, target: TaskTarget) {

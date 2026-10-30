@@ -10,7 +10,6 @@ import { NewTabPage } from "@/pages/NewTabPage";
 import { BrowserPage } from "@/pages/BrowserPage";
 import { ComposePage } from "@/pages/ComposePage";
 import { useWorkspace } from "@/app/WorkspaceContext";
-import { useNativeToastOverlay } from "@/hooks/useNativeToastOverlay";
 import { useNativeTooltipOverlay } from "@/hooks/useNativeTooltipOverlay";
 
 export function WorkspaceShell() {
@@ -28,7 +27,6 @@ export function WorkspaceShell() {
   } = useWorkspace();
   const showBrowserChrome = Boolean(activeBrowserViewId) || isNewTab;
   const mirrorNativeChrome = Boolean(activeBrowserViewId) && !concealBrowser && !settingsOpen;
-  useNativeToastOverlay(mirrorNativeChrome);
   useNativeTooltipOverlay(mirrorNativeChrome);
   return (
     <TooltipProvider>

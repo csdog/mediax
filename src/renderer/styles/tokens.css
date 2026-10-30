@@ -14,6 +14,7 @@
   --line-height-heading: 24px;
   --surface-under: #f9f9f9;
   --chrome: rgb(237 237 237 / 28%);
+  --workspace-sidebar-surface: rgb(255 255 255 / 65%);
   --page-surface: rgb(249 249 249 / 85%);
   --border-subtle: rgb(13 13 13 / 5%);
   --surface-stroke: var(--border-subtle);
@@ -73,6 +74,7 @@
 .dark {
   --surface-under: #000000;
   --chrome: rgb(255 255 255 / 6%);
+  --workspace-sidebar-surface: rgb(32 32 32 / 72%);
   --page-surface: rgb(28 28 28 / 90%);
   --hover: #2c2c2c;
   --selected: #3a3a3a;

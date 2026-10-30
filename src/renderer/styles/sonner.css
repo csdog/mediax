@@ -786,8 +786,3 @@ html[dir="rtl"],
   opacity: 0;
   transform: scale(0.8) translate(-50%, -50%);
 }
-
-/* The native toast view replaces this copy while an external page is visible. */
-[data-sonner-toaster][data-native-mirrored] {
-  visibility: hidden;
-}

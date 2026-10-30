@@ -112,7 +112,7 @@ export function CalendarPage() {
 
   openAddScheduleRef.current = (at, anchor = null) => {
     if (!at) {
-      toast("无法排期到过去的时间");
+      toast.info("无法排期到过去的时间");
       return;
     }
     setAddScheduleAt(at);
@@ -353,7 +353,7 @@ export function CalendarPage() {
     const at = addScheduleAt.getTime() < min.getTime() ? min : addScheduleAt;
     setAddScheduleOpen(false);
     if (!accounts.length) {
-      toast("请先在账号管理中添加并登录账号，再排期发布。");
+      toast.info("请先在账号管理中添加并登录账号，再排期发布。");
       setPage("accounts");
       return;
     }

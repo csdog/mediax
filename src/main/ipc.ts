@@ -6,6 +6,8 @@ import {
   clipboard,
   nativeImage,
   shell as electronShell,
+  net,
+  powerMonitor,
 } from "electron";
 import { readAccountGroups, createAccountGroup, setAccountGroups } from "./accounts/groups";
 import { log } from "./logging";
@@ -13,6 +15,7 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, basename, join } from "node:path";
 import { postUrl } from "./platforms/facebook/FacebookAdapter";
 import { PublishService } from "./publish/PublishService";
+import { readPublishPresets, createPublishPreset, deletePublishPreset } from "./publish/presets";
 import { Database } from "./storage/Database";
 import { AccountService } from "./accounts/AccountService";
 import { markdownToText } from "./content/markdown";
@@ -124,9 +127,22 @@ export function registerIpc(
     if (!window.isDestroyed())
       window.webContents.send("mediax:native-popup-event", { type: "closed" });
   });
-  const publishing = new PublishService(db, accounts, join(app.getPath("userData"), "task-assets"));
-  publishing.startScheduler();
-  app.once("will-quit", () => publishing.stopScheduler());
+  const publishing = new PublishService(
+    db,
+    accounts,
+    join(app.getPath("userData"), "task-assets"),
+    () => net.isOnline(),
+  );
+  const suspendPublishing = () => publishing.suspend();
+  const wakePublishing = () => publishing.wake();
+  powerMonitor.on("suspend", suspendPublishing);
+  powerMonitor.on("resume", wakePublishing);
+  app.once("will-quit", () => {
+    publishing.suspend();
+    publishing.stopScheduler();
+    powerMonitor.removeListener("suspend", suspendPublishing);
+    powerMonitor.removeListener("resume", wakePublishing);
+  });
   const text = (value: unknown) => {
     if (typeof value !== "string") throw new Error("无效文本");
     return value;
@@ -201,8 +217,13 @@ export function registerIpc(
           return { id: tab.id, kind: "web" as const, url: tab.url.trim() };
         }
         if (tab.kind !== undefined || !accountIds.has(tab.id)) throw new Error("无效标签页");
+        if (
+          tab.url !== undefined &&
+          (typeof tab.url !== "string" || !/^https?:\/\//i.test(tab.url.trim()))
+        )
+          throw new Error("无效标签页");
         ids.add(tab.id);
-        return { id: tab.id };
+        return { id: tab.id, ...(typeof tab.url === "string" ? { url: tab.url.trim() } : {}) };
       },
     );
     if (value.activeId !== null && !ids.has(value.activeId)) throw new Error("无效活动标签页");
@@ -215,6 +236,9 @@ export function registerIpc(
   on("updateStatus", () => updater.getStatus());
   on("checkForUpdates", () => updater.check(true));
   on("installUpdate", () => updater.install());
+  on("publishPresets", () => readPublishPresets(db));
+  on("createPublishPreset", (input) => createPublishPreset(db, input, accounts.list()));
+  on("deletePublishPreset", (id) => deletePublishPreset(db, id));
   on("publishSettings", () => readPublishSettings((key) => db.setting(key)));
   on("setSilentPublish", (silent) => {
     if (typeof silent !== "boolean") throw new Error("无效设置");
@@ -335,7 +359,7 @@ export function registerIpc(
   on("accountGroups", () => readAccountGroups(db));
   on("setAccountGroups", (id, groupIds) => setAccountGroups(db, id, groupIds));
   on("createAccountGroup", (input) => createAccountGroup(db, input));
-  on("accounts", () => accounts.list());
+  on("accounts", () => accounts.listCurrent());
   on("addAccount", (name, platform) => {
     if (!isPlatform(platform)) throw new Error("暂不支持该平台");
     return accounts.add(text(name), platform);
@@ -717,12 +741,35 @@ function toastOverlayPayload(value: unknown, windowWidth: number): ToastOverlay 
     width,
     height,
     theme: overlay.theme === "dark" ? "dark" : "light",
-    toasts: items.slice(0, 3).map((item) => {
+    closeIcon:
+      typeof overlay.closeIcon === "string" &&
+      overlay.closeIcon.startsWith("data:image/svg+xml,") &&
+      overlay.closeIcon.length <= 16_000
+        ? overlay.closeIcon
+        : undefined,
+    toasts: items.slice(0, 50).map((item) => {
       if (!item || typeof item !== "object") throw new Error("无效通知条目");
       const toast = item as Record<string, unknown>;
       const title = typeof toast.title === "string" ? toast.title.slice(0, 200) : "";
       if (!title) throw new Error("无效通知文案");
+      if (
+        (typeof toast.id !== "string" && typeof toast.id !== "number") ||
+        (typeof toast.id === "number" && !Number.isFinite(toast.id)) ||
+        (typeof toast.id === "string" && toast.id.length > 200)
+      )
+        throw new Error("无效通知标识");
+      const duration =
+        toast.duration === null
+          ? null
+          : typeof toast.duration === "number" &&
+              Number.isFinite(toast.duration) &&
+              toast.duration >= 0
+            ? toast.duration
+            : 5000;
       return {
+        id: toast.id,
+        duration,
+        dismissible: toast.dismissible !== false,
         icon:
           typeof toast.icon === "string" &&
           toast.icon.startsWith("data:image/svg+xml,") &&

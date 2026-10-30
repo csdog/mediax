@@ -1,3 +1,4 @@
+import { discoverProfile } from "../form";
 import type { Page } from "playwright-core";
 import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
@@ -48,14 +49,13 @@ export class YouTubeAdapter implements Publisher {
       waitUntil: "domcontentloaded",
       timeout: 60000,
     });
-    await page.waitForTimeout(2500);
-    const url = page.url();
-    if (url.includes("accounts.google.com") || /signin/i.test(url)) return [];
-    const identityId = "1";
-    const entity = page.locator("#entity-name, ytcp-entity-name").first();
-    const name =
-      ((await entity.count()) ? await entity.textContent() : "")?.trim() || "YouTube 频道";
-    return [{ accountId, identityId, name: name.slice(0, 80), kind: "profile" }];
+    return discoverProfile(
+      page,
+      accountId,
+      "YouTube",
+      (url) => /login|signin|accounts.google.com/i.test(url),
+      "youtube",
+    );
   }
 
   async prepare(task: Task, _target: TaskTarget) {

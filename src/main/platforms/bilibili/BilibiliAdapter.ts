@@ -3,15 +3,9 @@ import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
 import { openKindEditor, submitKindEditor } from "../editor";
 import { NeedsUser, type Publisher } from "../Publisher";
-import {
-  discoverProfile,
-  replaceText,
-  requireFile,
-  requireVideo,
-  selectAll,
-  waitUntil,
-} from "../form";
+import { replaceText, requireFile, requireVideo, selectAll, waitUntil } from "../form";
 import { postTitle } from "../postText";
+import { readBilibiliProfile } from "../../accounts/bilibiliProfile";
 
 const uploadUrl = "https://member.bilibili.com/platform/upload/video/frame";
 
@@ -35,7 +29,9 @@ export class BilibiliAdapter implements Publisher {
         timeout: 60000,
       });
     }
-    return discoverProfile(page, accountId, "哔哩哔哩", loggedOut);
+    if (loggedOut(page.url())) return [];
+    const profile = await page.evaluate(readBilibiliProfile, undefined);
+    return profile ? [{ accountId, identityId: "1", name: profile.name, kind: "profile" }] : [];
   }
 
   async prepare(task: Task, _target: TaskTarget) {

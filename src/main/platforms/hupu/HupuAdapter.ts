@@ -28,7 +28,7 @@ export class HupuAdapter implements Publisher {
     if (!page.url().includes("hupu.com")) {
       await page.goto("https://www.hupu.com/", { waitUntil: "domcontentloaded", timeout: 60000 });
     }
-    return discoverProfile(page, accountId, "虎扑账号", loggedOut);
+    return discoverProfile(page, accountId, "虎扑账号", loggedOut, "hupu");
   }
 
   async prepare(task: Task, _target: TaskTarget) {

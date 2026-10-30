@@ -41,6 +41,12 @@ const api: DesktopApi = {
   hideTabPreview: () => call("hideTabPreview"),
   showToastOverlay: (overlay) => call("showToastOverlay", overlay),
   hideToastOverlay: () => call("hideToastOverlay"),
+  onNativeToastDismissed: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, event: Parameters<typeof listener>[0]) =>
+      listener(event);
+    ipcRenderer.on("mediax:toast-dismissed", receive);
+    return () => ipcRenderer.removeListener("mediax:toast-dismissed", receive);
+  },
   showTooltipOverlay: (overlay) => call("showTooltipOverlay", overlay),
   hideTooltipOverlay: () => call("hideTooltipOverlay"),
   showNativePopup: (popup) => {
@@ -84,6 +90,9 @@ const api: DesktopApi = {
       ipcRenderer.removeListener("mediax:update-status", receive);
     };
   },
+  publishPresets: () => call("publishPresets"),
+  createPublishPreset: (input) => call("createPublishPreset", input),
+  deletePublishPreset: (id) => call("deletePublishPreset", id),
   publishSettings: () => call("publishSettings"),
   setSilentPublish: (silent) => call("setSilentPublish", silent),
   setPublishSettings: (settings) => call("setPublishSettings", settings),

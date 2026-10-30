@@ -171,15 +171,15 @@ export function AccountManagement({
     const refreshing = refreshingIds.includes(account.id);
     return (
       <div className="inline-flex flex-wrap items-center justify-center gap-1 [.account-grid-item_&]:mt-2 [.account-grid-item_&]:justify-start">
+        <ActionIconButton label="打开账号" disabled={busy} onClick={() => onOpen(account)}>
+          <Monitor />
+        </ActionIconButton>
         <ActionIconButton
           label={refreshing ? "正在检查…" : "检查状态与发布身份"}
           disabled={busy || refreshing}
           onClick={() => void refresh([account.id])}
         >
           <RefreshCw className={cn(refreshing && "animate-spin")} />
-        </ActionIconButton>
-        <ActionIconButton label="打开账号" disabled={busy} onClick={() => onOpen(account)}>
-          <Monitor />
         </ActionIconButton>
         <ActionIconButton
           label={`删除 ${account.name}`}

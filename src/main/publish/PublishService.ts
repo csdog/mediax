@@ -20,25 +20,63 @@ export class PublishService {
   private schedule: ScheduleService;
   private running: Promise<void> | null = null;
   private creating = false;
+  private suspended = false;
+  private availabilityTimer: ReturnType<typeof setInterval> | null = null;
+  private lastBlockedReason: string | null | undefined;
   constructor(
     private db: Database,
     private accounts: AccountService,
     private assetsDirectory: string,
+    private isOnline: () => boolean = () => true,
   ) {
     this.queue = new PublishQueue(
       db,
       (target) => accounts.adapter(target.accountId),
       () => readPublishSettings((key) => db.setting(key)).concurrency,
+      () => this.blockedReason(),
     );
     this.schedule = new ScheduleService(db, () => {
-      void this.queue.run().catch(() => {});
+      this.runPending();
     });
   }
   startScheduler() {
+    if (this.availabilityTimer) return;
     this.schedule.start();
+    this.checkAvailability();
+    this.availabilityTimer = setInterval(() => this.checkAvailability(), 5_000);
   }
   stopScheduler() {
     this.schedule.stop();
+    if (this.availabilityTimer) clearInterval(this.availabilityTimer);
+    this.availabilityTimer = null;
+  }
+  suspend() {
+    this.suspended = true;
+    this.checkAvailability();
+  }
+  wake() {
+    this.suspended = false;
+    this.checkAvailability();
+    this.schedule.kick();
+  }
+  private blockedReason() {
+    if (this.suspended) return "系统进入休眠";
+    return this.isOnline() ? null : "网络连接已断开";
+  }
+  private checkAvailability() {
+    const reason = this.blockedReason();
+    if (reason !== this.lastBlockedReason) {
+      this.lastBlockedReason = reason;
+      if (reason) this.queue.interrupt(reason);
+      else this.schedule.kick();
+    }
+    if (!reason) this.runPending();
+  }
+  private runPending() {
+    if (this.running || this.blockedReason()) return;
+    if (!this.db.targets().some((target) => target.status === "pending")) return;
+    // Account inspection can temporarily own the browser; leave pending work for the next tick.
+    void this.execute(() => this.queue.run()).catch(() => {});
   }
   private async execute(work: () => Promise<void>) {
     if (this.running) throw new Error("已有发布任务正在执行");

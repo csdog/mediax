@@ -19,7 +19,13 @@ import { platformInfo } from "../../shared/platforms";
 import { bandwidthLimitBytesPerSecond, readPublishSettings } from "../../shared/publishSettings";
 import { NeedsUser, type Publisher } from "../platforms/Publisher";
 import { discoveredAccountName, shouldAdoptAccountName, usableAccountName } from "./accountName";
-import { isCreatorPlatform, readCreatorProfile } from "./creatorProfile";
+import { accountProfileScript } from "./platformProfile";
+import type { AccountProfile } from "./pageProfile";
+import { isPlatformLoginUrl } from "../../shared/platformSites";
+import { readZhihuProfile } from "./zhihuProfile";
+import { readWeiboProfile } from "../platforms/weibo/weiboProfile";
+import { readBilibiliProfile } from "./bilibiliProfile";
+import { readDouyinProfile } from "./douyinProfile";
 import { Database } from "../storage/Database";
 import { AccountBrowserManager } from "../browser/AccountBrowserManager";
 import type { BrowserHistoryStore } from "../browser/BrowserHistoryStore";
@@ -72,6 +78,10 @@ export class AccountService {
       const info = this.states.get(account.id) ?? this.stored(account.id);
       return this.adoptName(account.id, info);
     });
+  }
+  async listCurrent() {
+    await this.syncAll();
+    return this.list();
   }
   startAutoRefresh() {
     if (this.timer) return;
@@ -224,12 +234,11 @@ export class AccountService {
     if (!platform) return null;
     const cookieUrl = platformCookieUrl[platform];
     const cookies = await partition.cookies.get({ url: cookieUrl });
-    if (!hasPlatformSession(platform, cookies, pageUrl) && !urlLooksLoggedIn(platform, pageUrl)) {
+    const profileSession = await this.hasProfileSession(viewAccountId, platform, pageUrl);
+    if (!hasPlatformSession(platform, cookies, pageUrl) && !profileSession) {
       return null;
     }
-    const owner =
-      sessionOwner(platform, cookies, pageUrl) ??
-      (urlLooksLoggedIn(platform, pageUrl) ? platform : null);
+    const owner = sessionOwner(platform, cookies, pageUrl) ?? (profileSession ? platform : null);
     if (!owner) return null;
     const matchedId = await this.matchAccountByCookies(platform, owner, cookies, cookieUrl);
     if (!matchedId) return null;
@@ -269,8 +278,11 @@ export class AccountService {
       owner?: string;
       actor?: string;
       image?: string;
+      source?: string;
+      name?: string;
     } | null;
     return value &&
+      value.source === "account-profile" &&
       typeof value.image === "string" &&
       value.image.startsWith("data:image/png;base64,")
       ? value
@@ -285,9 +297,13 @@ export class AccountService {
         url: platformCookieUrl[account.platform],
       });
       const pageUrl = view.webContents.getURL();
+      const found = await this.readProfile(id);
       const owner =
         sessionOwner(account.platform, cookies, pageUrl) ??
-        (urlLooksLoggedIn(account.platform, pageUrl) ? account.platform : null);
+        (urlLooksLoggedIn(account.platform, pageUrl) &&
+        usableAccountName(account.platform, found?.name)
+          ? account.platform
+          : null);
       const actor =
         account.platform === "facebook"
           ? cookies.find((cookie) => cookie.name === "i_user")?.value || owner
@@ -301,19 +317,10 @@ export class AccountService {
         if (state) this.states.set(id, { ...state, avatar: undefined });
       }
       if (!owner) return;
-      const found = (await view.webContents.executeJavaScript(
-        isCreatorPlatform(account.platform)
-          ? `(${readCreatorProfile.toString()})(${JSON.stringify(account.platform)})`
-          : avatarProbe,
-      )) as {
-        href?: string | null;
-        rect?: { x: number; y: number; width: number; height: number } | null;
-        name?: string | null;
-      } | null;
-      let image = previous;
+      let image = found?.name && cached?.name !== found.name ? undefined : previous;
       if (found?.href)
         image = (await this.downloadAvatar(view.webContents.session, found.href)) ?? image;
-      if (image === previous && found?.rect) {
+      if (!image && found?.rect) {
         const pixels = await view.webContents.capturePage(found.rect, {
           stayHidden: true,
           stayAwake: true,
@@ -321,21 +328,41 @@ export class AccountService {
         if (!pixels.isEmpty())
           image = pixels.resize({ width: 80, height: 80, quality: "good" }).toDataURL();
       }
-      if (image && image !== previous) this.db.setSetting(`avatar:${id}`, { owner, actor, image });
+      if (image && (image !== previous || cached?.name !== found?.name))
+        this.db.setSetting(`avatar:${id}`, {
+          owner,
+          actor,
+          image,
+          source: "account-profile",
+          name: found?.name,
+        });
+      else if (!image && previous) this.db.setSetting(`avatar:${id}`, null);
       const named = usableAccountName(account.platform, found?.name);
-      if (
-        named &&
-        (isCreatorPlatform(account.platform) || shouldAdoptAccountName(account.name, named))
-      )
+      if (named && (account.platform !== "facebook" || shouldAdoptAccountName(account.name, named)))
         this.db.renameAccount(id, named);
-      const state = this.states.get(id);
+      const state = this.states.get(id) ?? this.stored(id);
+      if (named && account.platform !== "facebook") {
+        const saved = this.readIdentities(id);
+        if (saved?.owner === owner)
+          this.db.setSetting(`identities:${id}`, {
+            ...saved,
+            targets: saved.targets.map((target) =>
+              target.kind === "profile" ? { ...target, name: named } : target,
+            ),
+          });
+      }
       if (state)
-        this.states.set(id, {
+        this.remember({
           ...state,
+          targets:
+            named && account.platform !== "facebook"
+              ? state.targets.map((target) =>
+                  target.kind === "profile" ? { ...target, name: named } : target,
+                )
+              : state.targets,
           avatar: image,
           name:
-            named &&
-            (isCreatorPlatform(account.platform) || shouldAdoptAccountName(state.name, named))
+            named && (account.platform !== "facebook" || shouldAdoptAccountName(state.name, named))
               ? named
               : state.name,
         });
@@ -343,6 +370,49 @@ export class AccountService {
     } catch {
       return this.cachedAvatar(id)?.image;
     }
+  }
+  private async readProfile(
+    id: string,
+    platform = this.db.account(id).platform,
+  ): Promise<AccountProfile | null> {
+    const view = this.browsers.get(id);
+    if (
+      !view ||
+      view.webContents.isDestroyed() ||
+      isPlatformLoginUrl(platform, view.webContents.getURL())
+    )
+      return null;
+    const request = (url: string) =>
+      view.webContents.session.fetch(url, {
+        credentials: "include",
+        signal: AbortSignal.timeout(10_000),
+      });
+    if (platform === "bilibili") return readBilibiliProfile(request);
+    if (platform === "douyin") {
+      const profile = await readDouyinProfile(request);
+      if (profile?.href) return profile;
+      return (await view.webContents.executeJavaScript(accountProfileScript(platform))) ?? profile;
+    }
+    if (platform === "weibo") {
+      const profile = await readWeiboProfile(request);
+      if (profile?.href) return profile;
+      // Some Weibo endpoints require browser-origin headers; use the same account
+      // page's fetch/store when a partition request cannot read the complete profile.
+      return (
+        (await view.webContents.executeJavaScript(`(${readWeiboProfile.toString()})()`)) ?? profile
+      );
+    }
+    if (platform === "zhihu") {
+      const profile = await readZhihuProfile(request);
+      if (profile) return profile;
+    }
+    return view.webContents.executeJavaScript(
+      accountProfileScript(platform),
+    ) as Promise<AccountProfile | null>;
+  }
+  private async hasProfileSession(id: string, platform: PlatformId, url: string) {
+    if (!urlLooksLoggedIn(platform, url)) return false;
+    return Boolean(usableAccountName(platform, (await this.readProfile(id, platform))?.name));
   }
   private async downloadAvatar(partition: Electron.Session, href: string) {
     try {
@@ -528,14 +598,17 @@ export class AccountService {
         message: current.login === "unchecked" ? "请先打开账号浏览器并登录" : current.message,
       };
     }
-    if (a.platform === "channels" && view.webContents.isLoadingMainFrame())
+    if (
+      (a.platform === "channels" || a.platform === "xiaohongshu") &&
+      view.webContents.isLoadingMainFrame()
+    )
       return this.states.get(id) ?? this.stored(id);
     const url = view.webContents.getURL();
     const cookies = await view.webContents.session.cookies.get({
       url: platformCookieUrl[a.platform],
     });
-    const hasSession =
-      hasPlatformSession(a.platform, cookies, url) || urlLooksLoggedIn(a.platform, url);
+    const profileSession = await this.hasProfileSession(id, a.platform, url);
+    const hasSession = hasPlatformSession(a.platform, cookies, url) || profileSession;
     const result: AccountInfo = {
       ...a,
       avatar: await this.updateAvatar(id),
@@ -551,14 +624,12 @@ export class AccountService {
     if (result.login === "logged_in") {
       try {
         const found = await this.adapter(id).discover(id);
-        const saved = this.db.setting(`identities:${id}`) as {
-          owner?: string;
-          targets?: AccountInfo["targets"];
-        } | null;
+        const saved = this.readIdentities(id);
         const owner =
-          sessionOwner(a.platform, cookies, url) ??
-          (urlLooksLoggedIn(a.platform, url) ? a.platform : null);
-        const retained = saved && saved.owner === owner ? (saved.targets ?? []) : [];
+          sessionOwner(a.platform, cookies, url) ?? (profileSession ? a.platform : null);
+        // Only Facebook has multiple retained publishing identities. Other platforms
+        // must use the profile found in the current session, not a previous login's.
+        const retained = a.platform === "facebook" && saved?.owner === owner ? saved.targets : [];
         const targets = new Map(retained.map((t) => [t.identityId, t]));
         for (const t of found) targets.set(t.identityId, t);
         result.targets = [...targets.values()];
@@ -626,14 +697,16 @@ export class AccountService {
     return { owner: saved.owner, targets: this.targetsOf(id, saved.targets) };
   }
   private targetsOf(id: string, value: Target[] | undefined): Target[] {
-    if (!Array.isArray(value)) return [];
+    if (!Array.isArray(value) || !value.length) return [];
+    const platform = this.db.account(id).platform;
     return value.filter(
       (target) =>
         target &&
         target.accountId === id &&
         typeof target.identityId === "string" &&
         typeof target.name === "string" &&
-        (target.kind === "profile" || target.kind === "page"),
+        (target.kind === "profile" || target.kind === "page") &&
+        Boolean(usableAccountName(platform, target.name)),
     );
   }
   private remember(account: AccountInfo) {
@@ -658,7 +731,7 @@ export class AccountService {
     const account = this.db.account(id);
     const view = this.browsers.get(id);
     if (
-      account.platform === "channels" &&
+      (account.platform === "channels" || account.platform === "xiaohongshu") &&
       view &&
       !view.webContents.isDestroyed() &&
       view.webContents.isLoadingMainFrame()
@@ -670,16 +743,19 @@ export class AccountService {
         : session.fromPartition(partitionName(account.platform, id));
     const cookies = await partition.cookies.get({ url: platformCookieUrl[account.platform] });
     const url = view && !view.webContents.isDestroyed() ? view.webContents.getURL() : "";
+    const profileSession = await this.hasProfileSession(id, account.platform, url);
     const closedLoggedIn =
       !url &&
       keepsClosedSession(account.platform) &&
       (this.states.get(id) ?? this.stored(id)).login === "logged_in";
     const previous = this.states.get(id) ?? this.stored(id);
     const owner =
-      account.platform === "channels" && !url && previous.login !== "logged_in"
+      (account.platform === "channels" || account.platform === "xiaohongshu") &&
+      !url &&
+      previous.login !== "logged_in"
         ? null
         : (sessionOwner(account.platform, cookies, url) ??
-          (urlLooksLoggedIn(account.platform, url) || closedLoggedIn ? account.platform : null));
+          (profileSession || closedLoggedIn ? account.platform : null));
     let login: AccountInfo["login"];
     let message = previous.message;
     if (needsVerification(account.platform, url)) {
@@ -688,7 +764,7 @@ export class AccountService {
         account.platform === "facebook"
           ? "请在 Facebook 完成安全验证后重新检查"
           : "请在账号浏览器中完成安全验证后重新检查";
-    } else if (owner || urlLooksLoggedIn(account.platform, url)) login = "logged_in";
+    } else if (owner || profileSession) login = "logged_in";
     else if (closedLoggedIn) login = "logged_in";
     else login = "logged_out";
     if (login === "logged_out") message = loginPrompt(account.platform);
@@ -723,67 +799,6 @@ function loginPrompt(platform: PlatformId) {
   if (platform === "youtube") return "请在账号标签页中登录 Google / YouTube";
   return `请在账号标签页中登录 ${platformInfo[platform].label}`;
 }
-
-const avatarProbe = `(() => {
-  const hrefOf = (image) => {
-    const raw = image.currentSrc || image.src || image.getAttribute("href") || "";
-    if (!raw || raw.startsWith("data:") || raw.startsWith("blob:")) return null;
-    try {
-      const url = new URL(raw, location.href);
-      if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-      return url.href;
-    } catch {
-      return null;
-    }
-  };
-  const rectOf = (image) => {
-    const tag = image.tagName.toLowerCase();
-    if (tag === "img" && (!image.complete || !image.naturalWidth)) return null;
-    const r = image.getBoundingClientRect();
-    if (
-      r.width < 16 || r.height < 16 || r.width > 160 || r.height > 160 ||
-      r.x < 0 || r.y < 0 || r.right > innerWidth || r.bottom > innerHeight
-    ) return null;
-    return { x: Math.floor(r.x), y: Math.floor(r.y), width: Math.ceil(r.width), height: Math.ceil(r.height) };
-  };
-  const nameOf = (image) => {
-    let alt = (image.getAttribute("alt") || "").trim();
-    const wrapped = alt.match(/^(?:点击)?(?:打开|进入)(.+?)的(?:个人)?主页$/);
-    if (wrapped) alt = wrapped[1].trim();
-    if (!alt || alt.length > 40) return null;
-    if (/avatar|头像|logo|icon|profile|账号|账户|帐户|个人主页/i.test(alt)) return null;
-    return alt;
-  };
-  const pack = (image) => {
-    const href = hrefOf(image);
-    const rect = rectOf(image);
-    const name = nameOf(image);
-    return href || rect || name ? { href, rect, name } : null;
-  };
-  const menu = [...document.querySelectorAll('[role="button"],button')].find((el) =>
-    /^(Account|Your profile|你的个人主页|账户|帐户|账号)$/i.test(el.getAttribute("aria-label") || "") &&
-    el.getBoundingClientRect().width > 0);
-  if (menu) {
-    for (const image of menu.querySelectorAll("img,svg image")) {
-      const found = pack(image);
-      if (found) return found;
-    }
-    return null;
-  }
-  for (const image of document.querySelectorAll("img")) {
-    const text = [image.alt, image.getAttribute("aria-label") || "", image.className, image.getAttribute("src") || ""].join(" ");
-    if (!/avatar|头像|portrait/i.test(text)) continue;
-    const found = pack(image);
-    if (found) return found;
-  }
-  for (const el of document.querySelectorAll("[class*='avatar'],[class*='Avatar']")) {
-    const match = /url\\((['"]?)(https?:\\/\\/[^'")]+)\\1\\)/.exec(getComputedStyle(el).backgroundImage || "");
-    if (!match) continue;
-    const rect = rectOf(el);
-    return { href: match[2], rect };
-  }
-  return null;
-})()`;
 
 function discoveredMessage(platform: PlatformId, targets: Target[]) {
   if (platform === "youtube")

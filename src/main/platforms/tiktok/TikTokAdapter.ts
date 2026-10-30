@@ -1,3 +1,4 @@
+import { discoverProfile } from "../form";
 import type { FrameLocator, Locator, Page } from "playwright-core";
 import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { Target, Task, TaskTarget } from "../../../shared/models";
@@ -57,22 +58,13 @@ export class TikTokAdapter implements Publisher {
       waitUntil: "domcontentloaded",
       timeout: 60000,
     });
-    await page.waitForTimeout(2000);
-    if (page.url().includes("/login")) return [];
-    const href = await page
-      .locator('a[href*="/@"]')
-      .first()
-      .getAttribute("href")
-      .catch(() => null);
-    const handle = href?.match(/@([^/?#]+)/)?.[1];
-    return [
-      {
-        accountId,
-        identityId: "1",
-        name: handle ? `@${handle}` : "TikTok 账号",
-        kind: "profile",
-      },
-    ];
+    return discoverProfile(
+      page,
+      accountId,
+      "TikTok",
+      (url) => /login|signin|accounts.google.com/i.test(url),
+      "tiktok",
+    );
   }
 
   async prepare(task: Task, _target: TaskTarget) {

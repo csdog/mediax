@@ -40,7 +40,7 @@ export class BaijiahaoAdapter implements Publisher {
         timeout: 60000,
       });
     }
-    return discoverProfile(page, accountId, "百家号", loggedOut);
+    return discoverProfile(page, accountId, "百家号", loggedOut, "baijiahao");
   }
 
   async prepare(task: Task, _target: TaskTarget) {

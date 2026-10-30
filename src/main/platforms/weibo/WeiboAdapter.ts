@@ -32,15 +32,8 @@ export class WeiboAdapter implements Publisher {
       await page.goto("https://weibo.com/", { waitUntil: "domcontentloaded", timeout: 60000 });
     }
     if (loggedOut(page.url())) return [];
-    const profile = await page.evaluate(readWeiboProfile).catch(() => null);
-    return [
-      {
-        accountId,
-        identityId: "1",
-        name: profile?.name || "微博账号",
-        kind: "profile",
-      },
-    ];
+    const profile = await page.evaluate(readWeiboProfile, undefined).catch(() => null);
+    return profile ? [{ accountId, identityId: "1", name: profile.name, kind: "profile" }] : [];
   }
 
   async prepare(task: Task, _target: TaskTarget) {

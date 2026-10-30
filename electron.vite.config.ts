@@ -35,6 +35,7 @@ export default defineConfig(({ mode }) => {
           input: {
             index: resolve("src/preload/index.ts"),
             nativePopup: resolve("src/preload/native-popup.ts"),
+            nativeToast: resolve("src/preload/native-toast.ts"),
           },
         },
       },

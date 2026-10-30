@@ -4,11 +4,19 @@ import type { TaskTarget, Status } from "../../shared/models";
 
 export class PublishQueue {
   private active: Promise<void> | null = null;
+  private interruption = 0;
+  private interruptionReason = "发布过程被中断";
   constructor(
     private db: Database,
     private publisher: (target: TaskTarget) => Publisher,
     private concurrency: () => number = () => 1,
+    private blockedReason: () => string | null = () => null,
   ) {}
+  /** Invalidate in-flight preparation even if connectivity returns before it finishes. */
+  interrupt(reason: string) {
+    this.interruption += 1;
+    this.interruptionReason = reason;
+  }
   run(): Promise<void> {
     if (this.active) return this.active;
     this.active = this.drain().finally(() => {
@@ -29,6 +37,7 @@ export class PublishQueue {
     return Number.isFinite(value) ? Math.max(1, value) : 1;
   }
   private claim(accountBusy: Set<string>): TaskTarget | null {
+    if (this.blockedReason()) return null;
     for (const task of [...this.db.tasks()].reverse()) {
       for (const target of this.db.targets(task.id)) {
         if (target.status !== "pending") continue;
@@ -46,6 +55,13 @@ export class PublishQueue {
       return;
     }
     const attempt = this.db.startAttempt(target.id);
+    const generation = this.interruption;
+    const interrupted = () =>
+      this.blockedReason() ?? (generation !== this.interruption ? this.interruptionReason : null);
+    const assertReady = () => {
+      const reason = interrupted();
+      if (reason) throw new NeedsUser(`${reason}，请检查账号浏览器后继续发布`);
+    };
     let intent = false;
     let adapter: Publisher | undefined;
     const finish = (status: Status, error: string | null = null, url: string | null = null) => {
@@ -54,15 +70,35 @@ export class PublishQueue {
     };
     try {
       adapter = this.publisher(target);
+      assertReady();
       await adapter.prepare(task, target);
+      assertReady();
       await adapter.submit(task, target, () => {
+        assertReady();
         intent = true;
         this.db.transition(target.id, "submitted");
       });
       const url = await adapter.verify(task, target);
+      if (interrupted()) {
+        if (!intent) assertReady();
+        if (!url) {
+          finish("unknown", `${interrupted()}，发布结果不确定，请核验；不会自动重发`);
+          return;
+        }
+      }
       finish("verified", null, url);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      const reason = interrupted();
+      if (reason) {
+        finish(
+          intent ? "unknown" : "awaiting_user",
+          intent
+            ? `${reason}，发布结果不确定，请核验；不会自动重发`
+            : `${reason}，尚未点击发布，请检查账号浏览器后继续发布`,
+        );
+        return;
+      }
       if (error instanceof NeedsUser && !intent) {
         finish("awaiting_user", message);
         return;

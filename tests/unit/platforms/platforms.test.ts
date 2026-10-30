@@ -4,13 +4,13 @@ import {
   platformHome,
   sessionOwner,
   urlLooksLoggedIn,
-} from "../../src/main/platforms/catalog";
-import { isVideo, postTitle } from "../../src/main/platforms/postText";
-import { createPublisher } from "../../src/main/platforms/registry";
-import { supportedKinds } from "../../src/shared/content";
-import { Database } from "../../src/main/storage/Database";
-import { platforms } from "../../src/shared/models";
-import { platformGroups, platformsInGroup } from "../../src/shared/platforms";
+} from "../../../src/main/platforms/catalog";
+import { isVideo, postTitle } from "../../../src/main/platforms/postText";
+import { createPublisher } from "../../../src/main/platforms/registry";
+import { supportedKinds } from "../../../src/shared/content";
+import { Database } from "../../../src/main/storage/Database";
+import { platforms } from "../../../src/shared/models";
+import { platformGroups, platformsInGroup } from "../../../src/shared/platforms";
 
 it("names a post from the first line and detects video files", () => {
   expect(postTitle("第一行标题\n后面是正文", 100, "未命名")).toBe("第一行标题");
@@ -33,7 +33,7 @@ it("treats YouTube and Reddit session cookies as logged in", () => {
   expect(urlLooksLoggedIn("sohu", "https://mp.sohu.com/home")).toBe(true);
   expect(urlLooksLoggedIn("sohu", "https://mp.sohu.com/login")).toBe(false);
   expect(urlLooksLoggedIn("facebook", "https://www.facebook.com/")).toBe(false);
-  expect(platformHome.weibo).toBe("https://weibo.com/");
+  expect(platformHome.weibo).toBe("https://me.weibo.com/");
 });
 
 it("gives implemented platforms their own publisher", () => {

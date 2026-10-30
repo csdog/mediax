@@ -109,6 +109,6 @@ export function createPublisher(
     case "googlebusiness":
       return new GoogleBusinessAdapter(openPage);
     default:
-      return new LoginAdapter(openPage, platformInfo[platform].label);
+      return new LoginAdapter(openPage, platformInfo[platform].label, platform);
   }
 }
