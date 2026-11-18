@@ -1,6 +1,8 @@
 import type { Page } from "playwright-core";
 import type { ContentKind } from "../../../shared/models";
+import { markdownToHtml, markdownToText } from "../../content/markdown";
 import { platformSites } from "../../../shared/platformSites";
+import { replaceRichText } from "../form";
 import { WebPublisher, type WebFlow } from "./WebPublisher";
 
 const login = /login|signin|passport|userAuth|bizlogin/i;
@@ -30,11 +32,15 @@ const toutiao = flow("toutiao", "头条号", {
   moment: "https://mp.toutiao.com/profile_v4/weitoutiao/publish",
   video: "https://mp.toutiao.com/profile_v4/xigua/upload-video",
 });
-const zhihu = flow("zhihu", "知乎", {
-  article: "https://zhuanlan.zhihu.com/write",
-  moment: "https://www.zhihu.com/",
-  video: "https://www.zhihu.com/zvideo/upload-video",
-});
+const zhihu: WebFlow = {
+  ...flow("zhihu", "知乎", {
+    article: "https://zhuanlan.zhihu.com/write",
+    moment: "https://www.zhihu.com/",
+    video: "https://www.zhihu.com/zvideo/upload-video",
+  }),
+  fillArticleBody: (page, box, body) =>
+    replaceRichText(page, box, markdownToHtml(body), markdownToText(body)),
+};
 const qq = flow("qq", "企鹅号", {
   article: "https://om.qq.com/article/articlePublish",
   video: "https://om.qq.com/video/videoPublish",

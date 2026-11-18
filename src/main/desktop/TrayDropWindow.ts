@@ -1,6 +1,6 @@
 import { BrowserWindow, ipcMain, screen, type Tray } from "electron";
 import { join } from "node:path";
-
+import { productIpcChannel } from "../../shared/product";
 import { trayDropBounds } from "./trayDropBounds";
 
 const page = `<!doctype html>
@@ -145,8 +145,8 @@ export class TrayDropWindow {
       skipTransformProcessType: true,
     });
     this.window.setAlwaysOnTop(true, "pop-up-menu");
-    ipcMain.on("mediax:tray-drop-hot", this.onHot);
-    ipcMain.on("mediax:tray-drop-files", this.onFiles);
+    ipcMain.on(productIpcChannel("tray-drop-hot"), this.onHot);
+    ipcMain.on(productIpcChannel("tray-drop-files"), this.onFiles);
     void this.window
       .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`)
       .then(() => {
@@ -174,8 +174,8 @@ export class TrayDropWindow {
   }
 
   dispose() {
-    ipcMain.removeListener("mediax:tray-drop-hot", this.onHot);
-    ipcMain.removeListener("mediax:tray-drop-files", this.onFiles);
+    ipcMain.removeListener(productIpcChannel("tray-drop-hot"), this.onHot);
+    ipcMain.removeListener(productIpcChannel("tray-drop-files"), this.onFiles);
     screen.removeListener("display-metrics-changed", this.place);
     if (process.platform === "darwin") this.tray.setTitle("");
     if (this.window && !this.window.isDestroyed()) this.window.destroy();

@@ -3,7 +3,7 @@ import { initializeLogging, observeWindowLogging, log } from "./logging";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
-import { productId, productName } from "../shared/product";
+import { productDbFile, productId, productIpcChannel, productName } from "../shared/product";
 import { AccountBrowserManager } from "./browser/AccountBrowserManager";
 import { BrowserHistoryStore } from "./browser/BrowserHistoryStore";
 import { Database } from "./storage/Database";
@@ -219,7 +219,7 @@ async function start(): Promise<void> {
     return;
   }
   const db = new Database(
-    join(app.getPath("userData"), "mediax.sqlite"),
+    join(app.getPath("userData"), productDbFile),
     join(__dirname, "../../drizzle"),
   );
   db.recover();
@@ -292,7 +292,8 @@ async function start(): Promise<void> {
   if (earlyOpenFiles.length) shell.handleOpenFiles(earlyOpenFiles.splice(0));
   const updater = new AppUpdater(win, db);
   const downloads = new DownloadStore(() => {
-    if (!win.isDestroyed()) win.webContents.send("mediax:downloads-changed", downloads.list());
+    if (!win.isDestroyed())
+      win.webContents.send(productIpcChannel("downloads-changed"), downloads.list());
   });
   const browserHistory = new BrowserHistoryStore(
     join(app.getPath("userData"), "browser-history.json"),

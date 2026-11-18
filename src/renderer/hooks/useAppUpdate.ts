@@ -1,4 +1,5 @@
 import { userErrorMessage } from "../../shared/userError";
+import { productIpcChannel } from "../../shared/product";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UpdateStatus } from "../../shared/models";
@@ -47,8 +48,8 @@ export function useAppUpdate() {
       const detail = (event as CustomEvent<UpdateStatus>).detail;
       if (detail) apply(detail);
     };
-    window.addEventListener("mediax:update-status", receive);
-    return () => window.removeEventListener("mediax:update-status", receive);
+    window.addEventListener(productIpcChannel("update-status"), receive);
+    return () => window.removeEventListener(productIpcChannel("update-status"), receive);
   }, []);
   return {
     status:

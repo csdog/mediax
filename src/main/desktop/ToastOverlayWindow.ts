@@ -1,6 +1,7 @@
 import { ipcMain, WebContentsView, type BrowserWindow, type IpcMainEvent } from "electron";
 import { join } from "node:path";
 import type { NativeToastEvent, ToastOverlay } from "../../shared/models";
+import { productIpcChannel } from "../../shared/product";
 import sonnerStyles from "../../renderer/styles/sonner.css?raw";
 import nativeStyles from "./nativeToast.css?raw";
 import { installNativeToasts } from "./nativeToast";
@@ -21,12 +22,12 @@ export class ToastOverlayWindow {
   private measuredHeight = 1;
 
   constructor(private parent: BrowserWindow) {
-    ipcMain.on("mediax:toast-overlay-event", this.receive);
+    ipcMain.on(productIpcChannel("toast-overlay-event"), this.receive);
     parent.webContents.on("did-start-navigation", (_event, _url, _inPlace, isMainFrame) => {
       if (isMainFrame) this.hide();
     });
     parent.once("closed", () => {
-      ipcMain.removeListener("mediax:toast-overlay-event", this.receive);
+      ipcMain.removeListener(productIpcChannel("toast-overlay-event"), this.receive);
       this.hide();
     });
   }
@@ -50,7 +51,8 @@ export class ToastOverlayWindow {
       (data.reason === "timeout" || data.reason === "close") &&
       this.payload?.toasts.some((item) => item.id === data.id)
     ) {
-      if (!this.parent.isDestroyed()) this.parent.webContents.send("mediax:toast-dismissed", data);
+      if (!this.parent.isDestroyed())
+        this.parent.webContents.send(productIpcChannel("toast-dismissed"), data);
     }
   };
 

@@ -8,6 +8,7 @@ import {
 } from "../../shared/storageUsage";
 import { logFilePath } from "../log-path";
 import { readLogConfig } from "../../shared/logging";
+import { productDbFiles } from "../../shared/product";
 import { log } from "../logging";
 
 export const appCacheDirectoryNames = [
@@ -218,7 +219,7 @@ export async function collectStorageUsage(force = false): Promise<StorageUsage> 
   const logsDir = dirname(logFile);
   const partitionsDir = join(userData, "Partitions");
   const [database, partitions, assets, logsInUserData, rootCache, rootEntries] = await Promise.all([
-    namedSizes(userData, ["mediax.sqlite", "mediax.sqlite-shm", "mediax.sqlite-wal"]),
+    namedSizes(userData, [...productDbFiles]),
     partitionUsage(partitionsDir),
     entrySize(join(userData, "task-assets")),
     entrySize(join(userData, "logs")),
@@ -226,15 +227,7 @@ export async function collectStorageUsage(force = false): Promise<StorageUsage> 
     readdir(userData, { withFileTypes: true }).catch(() => []),
   ]);
 
-  const counted = new Set([
-    "mediax.sqlite",
-    "mediax.sqlite-shm",
-    "mediax.sqlite-wal",
-    "Partitions",
-    "task-assets",
-    "logs",
-    ...cacheNames,
-  ]);
+  const counted = new Set([...productDbFiles, "Partitions", "task-assets", "logs", ...cacheNames]);
   let other = 0;
   for (const entry of rootEntries) {
     if (counted.has(entry.name)) continue;

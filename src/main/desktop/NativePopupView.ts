@@ -6,6 +6,7 @@ import type {
   NativePopupHostEvent,
   NativePopupRequest,
 } from "../../shared/models";
+import { productIpcChannel } from "../../shared/product";
 
 const kinds = new Set(["downloads", "extensions", "history", "browser-menu"]);
 
@@ -96,7 +97,7 @@ export class NativePopupView {
     // Re-adding an existing child raises it above the active external page.
     this.parent.contentView.addChildView(view);
     if (this.ready) {
-      view.webContents.send("mediax:native-popup", request);
+      view.webContents.send(productIpcChannel("native-popup"), request);
       view.setVisible(true);
     }
   }
@@ -106,7 +107,7 @@ export class NativePopupView {
     if (!view || view.webContents.isDestroyed() || this.parent.isDestroyed()) return;
     this.ready = true;
     if (this.pending) {
-      view.webContents.send("mediax:native-popup", this.pending);
+      view.webContents.send(productIpcChannel("native-popup"), this.pending);
       view.setVisible(true);
     }
     log.debug("Native popup renderer ready", { pending: this.pending?.kind });

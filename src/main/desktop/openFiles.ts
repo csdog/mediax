@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import type { DesktopCommand } from "../../shared/models";
+import { productProtocol } from "../../shared/product";
 import { isMarkdownPath } from "../content/mediaAssets";
 import { isAudio, isImage, isVideo } from "../../shared/content";
 
@@ -11,7 +12,7 @@ export function findOpenFileArgs(argv: readonly string[]) {
   return argv.filter((arg, index) => {
     if (index === 0) return false;
     if (!arg || arg.startsWith("-")) return false;
-    if (/^mediax:/i.test(arg)) return false;
+    if (new RegExp(`^${productProtocol}:`, "i").test(arg)) return false;
     if (!openable(arg)) return false;
     try {
       return existsSync(arg);

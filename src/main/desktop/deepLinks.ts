@@ -1,6 +1,7 @@
 import { app } from "electron";
 import { resolve } from "node:path";
 import type { DesktopCommand, DesktopPage } from "../../shared/models";
+import { productProtocol } from "../../shared/product";
 
 const pages = new Set<DesktopPage>(["accounts", "publish", "history", "calendar", "analytics"]);
 
@@ -8,14 +9,14 @@ const pages = new Set<DesktopPage>(["accounts", "publish", "history", "calendar"
 export function registerDeepLinkProtocol() {
   if (process.defaultApp) {
     if (process.argv.length >= 2)
-      app.setAsDefaultProtocolClient("mediax", process.execPath, [resolve(process.argv[1])]);
+      app.setAsDefaultProtocolClient(productProtocol, process.execPath, [resolve(process.argv[1])]);
     return;
   }
-  app.setAsDefaultProtocolClient("mediax");
+  app.setAsDefaultProtocolClient(productProtocol);
 }
 
 export function findDeepLinkArg(argv: readonly string[]) {
-  return argv.find((arg) => /^mediax:\/\//i.test(arg));
+  return argv.find((arg) => new RegExp(`^${productProtocol}://`, "i").test(arg));
 }
 
 /**
@@ -32,7 +33,7 @@ export function parseDeepLink(raw: string): DesktopCommand | null {
   } catch {
     return null;
   }
-  if (url.protocol !== "mediax:") return null;
+  if (url.protocol !== `${productProtocol}:`) return null;
   const parts = [url.hostname, ...url.pathname.split("/")]
     .map((part) => part.trim())
     .filter(Boolean);

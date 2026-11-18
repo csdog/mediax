@@ -1,15 +1,20 @@
 import { expect, it } from "vitest";
+import { productIpcChannel } from "../../src/shared/product";
 import { userErrorMessage } from "../../src/shared/userError";
 
 it("unwraps nested IPC errors while preserving actionable instructions", () => {
   const hint = "账号页面加载超时，请打开账号浏览器确认网络后重试";
   expect(
     userErrorMessage(
-      new Error(`Error invoking remote method 'mediax:refreshAccount': Error: ${hint}`),
+      new Error(
+        `Error invoking remote method '${productIpcChannel("refreshAccount")}': Error: ${hint}`,
+      ),
     ),
   ).toBe(hint);
   expect(
-    userErrorMessage(`Error: Error invoking remote method 'mediax:openAccount': Error: ${hint}`),
+    userErrorMessage(
+      `Error: Error invoking remote method '${productIpcChannel("openAccount")}': Error: ${hint}`,
+    ),
   ).toBe(hint);
   expect(userErrorMessage("请在账号标签页中登录 Google / YouTube")).toBe(
     "请在账号标签页中登录 Google / YouTube",

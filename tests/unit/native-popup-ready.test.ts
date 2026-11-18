@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import type { BrowserWindow } from "electron";
 import type { NativePopupRequest } from "../../src/shared/models";
+import { productIpcChannel } from "../../src/shared/product";
 const fake = vi.hoisted(() => ({
   events: new Map<string, (...args: unknown[]) => void>(),
   send: vi.fn(),
@@ -48,7 +49,7 @@ it("delivers pending popup data only after the renderer subscribes, including af
   expect(fake.send).not.toHaveBeenCalled();
   expect(fake.visible).toBe(false);
   popup.rendererReady();
-  expect(fake.send).toHaveBeenLastCalledWith("mediax:native-popup", request);
+  expect(fake.send).toHaveBeenLastCalledWith(productIpcChannel("native-popup"), request);
   expect(fake.visible).toBe(true);
   fake.send.mockClear();
   fake.events.get("did-start-loading")!();
@@ -56,7 +57,7 @@ it("delivers pending popup data only after the renderer subscribes, including af
   popup.show(next);
   expect(fake.send).not.toHaveBeenCalled();
   popup.rendererReady();
-  expect(fake.send).toHaveBeenCalledExactlyOnceWith("mediax:native-popup", next);
+  expect(fake.send).toHaveBeenCalledExactlyOnceWith(productIpcChannel("native-popup"), next);
   fake.events.get("focus")!();
   expect(focus).toHaveBeenCalledOnce();
   expect(emit).toHaveBeenLastCalledWith({ type: "focus-omnibox" });

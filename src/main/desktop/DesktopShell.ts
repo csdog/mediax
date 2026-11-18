@@ -19,6 +19,7 @@ import { presentNotification } from "./presentNotification";
 import { TrayDropWindow } from "./TrayDropWindow";
 import { readNotificationSettings } from "../../shared/notificationSettings";
 import { readDesktopBehavior } from "../../shared/desktopBehavior";
+import { productIpcChannel } from "../../shared/product";
 
 export class DesktopShell {
   private tray: Tray;
@@ -262,11 +263,11 @@ export class DesktopShell {
   rendererReady() {
     this.rendererIsReady = true;
     for (const command of this.pending.splice(0))
-      this.window.webContents.send("mediax:command", command);
+      this.window.webContents.send(productIpcChannel("command"), command);
   }
   private dispatch(command: DesktopCommand) {
     this.show();
-    if (this.rendererIsReady) this.window.webContents.send("mediax:command", command);
+    if (this.rendererIsReady) this.window.webContents.send(productIpcChannel("command"), command);
     else this.pending.push(command);
   }
   private navigate(page: DesktopPage) {

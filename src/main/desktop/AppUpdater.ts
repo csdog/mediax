@@ -3,6 +3,7 @@ import type { AppUpdater as ElectronAutoUpdater } from "electron-updater";
 import type { UpdateStatus } from "../../shared/models";
 import { readAutoUpdateEnabled } from "../../shared/autoUpdateSettings";
 import { readNotificationSettings } from "../../shared/notificationSettings";
+import { productIpcChannel } from "../../shared/product";
 import { log } from "../logging";
 import type { Database } from "../storage/Database";
 import { presentNotification } from "./presentNotification";
@@ -197,7 +198,7 @@ export class AppUpdater {
     next.canInstall = next.state === "downloaded";
     this.status = next;
     if (!this.window.isDestroyed())
-      this.window.webContents.send("mediax:update-status", this.status);
+      this.window.webContents.send(productIpcChannel("update-status"), this.status);
   }
 
   private notify(title: string, body: string) {
@@ -213,7 +214,7 @@ export class AppUpdater {
         if (this.window.isMinimized()) this.window.restore();
         this.window.show();
         this.window.focus();
-        this.window.webContents.send("mediax:command", { action: "settings" });
+        this.window.webContents.send(productIpcChannel("command"), { action: "settings" });
       },
     });
   }

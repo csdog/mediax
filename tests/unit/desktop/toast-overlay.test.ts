@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { BrowserWindow } from "electron";
 import { ToastOverlayWindow } from "../../../src/main/desktop/ToastOverlayWindow";
+import { productIpcChannel } from "../../../src/shared/product";
 
 const native = vi.hoisted(() => ({
   setBounds: vi.fn(),
@@ -68,7 +69,7 @@ it("accepts events only from the native toast view and validates dismissals", as
   emit({ type: "dismiss", id: "unknown", reason: "close" });
   expect(host.webContents.send).not.toHaveBeenCalled();
   emit({ type: "dismiss", id: 1, reason: "close" });
-  expect(host.webContents.send).toHaveBeenCalledWith("mediax:toast-dismissed", {
+  expect(host.webContents.send).toHaveBeenCalledWith(productIpcChannel("toast-dismissed"), {
     type: "dismiss",
     id: 1,
     reason: "close",
