@@ -1,4 +1,4 @@
-import type { Page } from "playwright-core";
+import type { Locator, Page } from "playwright-core";
 import type { ContentKind, Task } from "../../shared/models";
 import { isAudio, isVideo } from "../../shared/content";
 import { NeedsUser } from "./Publisher";
@@ -12,6 +12,7 @@ export type KindEditor = {
   loggedOut: (url: string) => boolean;
   hint: string;
   files: EditorFiles;
+  fillArticleBody?: (page: Page, box: Locator, body: string) => Promise<void>;
 };
 
 const publishNames = ["发布", "发表", "立即投稿", "Post", "Share", "分享", "发帖", "发想法"];
@@ -64,7 +65,9 @@ export async function openKindEditor(page: Page, task: Task, spec: KindEditor) {
     } catch {
       throw new NeedsUser("未找到正文编辑器，请在账号浏览器中打开发布编辑器后继续");
     }
-    await replaceText(page, body, task.body);
+    if (task.contentKind === "article" && spec.fillArticleBody)
+      await spec.fillArticleBody(page, body, task.body);
+    else await replaceText(page, body, task.body);
   }
 }
 

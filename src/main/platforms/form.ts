@@ -44,6 +44,30 @@ export async function replaceText(page: Page, box: Locator, text: string) {
   }
 }
 
+/** Paste HTML into a contenteditable so rich editors (Zhihu, etc.) keep formatting. */
+export async function replaceRichText(page: Page, box: Locator, html: string, plain: string) {
+  await box.waitFor({ state: "visible", timeout: 30000 });
+  await box.click();
+  await page.keyboard.press(selectAll());
+  await page.keyboard.press("Delete");
+  const filled = await box.evaluate(
+    (el, payload) => {
+      const editor = el as HTMLElement;
+      editor.focus();
+      const data = new DataTransfer();
+      data.setData("text/html", payload.html);
+      data.setData("text/plain", payload.plain);
+      const event = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "clipboardData", { value: data });
+      editor.dispatchEvent(event);
+      if (editor.innerText.trim()) return true;
+      return document.execCommand("insertHTML", false, payload.html);
+    },
+    { html, plain },
+  );
+  if (!filled) await page.keyboard.insertText(plain);
+}
+
 export async function waitUntil(
   page: Page,
   ready: () => Promise<boolean>,

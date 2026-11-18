@@ -1,5 +1,5 @@
 import { isPlatformUrl } from "../../../shared/platformSites";
-import type { Page } from "playwright-core";
+import type { Locator, Page } from "playwright-core";
 import { supportedKinds as platformKinds } from "../../../shared/content";
 import type { ContentKind, PlatformId, Target, Task, TaskTarget } from "../../../shared/models";
 import { discoverProfile } from "../form";
@@ -12,6 +12,7 @@ export type WebFlow = {
   home: string;
   loggedOut: (url: string) => boolean;
   urls: Partial<Record<ContentKind, string>>;
+  fillArticleBody?: (page: Page, box: Locator, body: string) => Promise<void>;
 };
 
 export class WebPublisher implements Publisher {
@@ -47,6 +48,7 @@ export class WebPublisher implements Publisher {
       loggedOut: this.flow.loggedOut,
       hint: `请先在账号浏览器中登录 ${this.flow.label}`,
       files: editorFiles(task.contentKind),
+      fillArticleBody: this.flow.fillArticleBody,
     });
   }
 
