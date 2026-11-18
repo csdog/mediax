@@ -1,7 +1,8 @@
 import { dirname, join, resolve } from "node:path";
+import { productAppId } from "../../shared/product";
 
 /** LaunchAgent / autostart id. Distinct from the dev Electron bundle. */
-export const DEV_LOGIN_LABEL = "local.mediax.desktop.dev";
+export const DEV_LOGIN_LABEL = `${productAppId}.dev`;
 
 /** Set on the login launcher so the app can hide without wasOpenedAtLogin. */
 export const OPENED_AT_LOGIN_ENV = "MEDIAX_OPENED_AT_LOGIN";

@@ -3,6 +3,7 @@ import type { BrowserWindow } from "electron";
 import { AccountBrowserManager } from "../../../src/main/browser/AccountBrowserManager";
 import { loadFavicon } from "../../../src/main/browser/favicon";
 import { platforms } from "../../../src/shared/models";
+import { productIpcChannel } from "../../../src/shared/product";
 vi.mock("../../../src/main/browser/contextMenu", () => ({
   installBrowserContextMenu: vi.fn(async () => {}),
 }));
@@ -216,26 +217,26 @@ it("publishes main-frame navigation and redirects before loading completes", asy
   expect(send).not.toHaveBeenCalled();
   emit("did-start-navigation", "https://example.com/start", false, true);
   expect(send).toHaveBeenLastCalledWith(
-    "mediax:browser-navigation-changed",
+    productIpcChannel("browser-navigation-changed"),
     "web-test",
     expect.objectContaining({ url: "https://example.com/start" }),
   );
   emit("did-redirect-navigation", "https://example.com/final", false, true);
   expect(send).toHaveBeenLastCalledWith(
-    "mediax:browser-navigation-changed",
+    productIpcChannel("browser-navigation-changed"),
     "web-test",
     expect.objectContaining({ url: "https://example.com/final" }),
   );
   emit("did-navigate-in-page", "https://example.com/final#section", true);
   expect(send).toHaveBeenLastCalledWith(
-    "mediax:browser-navigation-changed",
+    productIpcChannel("browser-navigation-changed"),
     "web-test",
     expect.objectContaining({ url: "https://example.com/final#section" }),
   );
   emit("page-favicon-updated", ["https://mp.toutiao.com/favicon.ico"]);
   await vi.waitFor(() =>
     expect(send).toHaveBeenLastCalledWith(
-      "mediax:browser-navigation-changed",
+      productIpcChannel("browser-navigation-changed"),
       "web-test",
       expect.objectContaining({ icon: "data:image/png;base64,aWNvbg==" }),
     ),
@@ -247,14 +248,14 @@ it("publishes main-frame navigation and redirects before loading completes", asy
   state.loading = true;
   emit("did-start-loading");
   expect(send).toHaveBeenLastCalledWith(
-    "mediax:browser-navigation-changed",
+    productIpcChannel("browser-navigation-changed"),
     "web-test",
     expect.objectContaining({ loading: true }),
   );
   state.loading = false;
   emit("did-stop-loading");
   expect(send).toHaveBeenLastCalledWith(
-    "mediax:browser-navigation-changed",
+    productIpcChannel("browser-navigation-changed"),
     "web-test",
     expect.objectContaining({ loading: false }),
   );

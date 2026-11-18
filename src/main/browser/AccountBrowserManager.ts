@@ -4,6 +4,7 @@ import { installBrowserContextMenu } from "./contextMenu";
 import { loadFavicon } from "./favicon";
 import { log } from "../logging";
 import type { BrowserBounds, PlatformId } from "../../shared/models";
+import { productIpcChannel } from "../../shared/product";
 export class AccountBrowserManager {
   private windows = new Map<string, BrowserWindow>();
   private views = new Map<string, WebContentsView>();
@@ -186,7 +187,7 @@ export class AccountBrowserManager {
     const notifyNavigation = (url = view.webContents.getURL()) => {
       if (!this.host || this.host.isDestroyed() || view.webContents.isDestroyed()) return;
       const contents = view.webContents;
-      this.host.webContents.send("mediax:browser-navigation-changed", accountId, {
+      this.host.webContents.send(productIpcChannel("browser-navigation-changed"), accountId, {
         url,
         title: contents.getTitle(),
         icon: this.favicons.get(accountId),
@@ -244,7 +245,7 @@ export class AccountBrowserManager {
     });
     void installBrowserContextMenu(view.webContents, (url) => {
       if (this.host && !this.host.isDestroyed())
-        this.host.webContents.send("mediax:command", { action: "open-web", url });
+        this.host.webContents.send(productIpcChannel("command"), { action: "open-web", url });
       else if (!view.webContents?.isDestroyed()) void view.webContents.loadURL(url);
     }).catch((error) => log.warn("Browser context menu failed", { error: String(error) }));
     // Keep the bundled Chromium version, but omit desktop-shell product tokens.

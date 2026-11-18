@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { findOpenFileArgs, openFilesCommand } from "../../src/main/desktop/openFiles";
 import { preferredPageForFiles } from "../../src/shared/content";
+import { productProtocol } from "../../src/shared/product";
 
 describe("open files", () => {
   it("picks openable paths from argv and ignores flags / deep links", () => {
@@ -16,7 +17,7 @@ describe("open files", () => {
       findOpenFileArgs([
         "/app/Electron",
         "--some-flag",
-        "mediax://publish",
+        `${productProtocol}://publish`,
         md,
         png,
         join(dir, "missing.md"),

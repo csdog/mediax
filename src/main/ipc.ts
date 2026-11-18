@@ -74,6 +74,7 @@ import { readThemePreference, saveThemePreference } from "./desktop/themePrefere
 import { systemSearchProvider, systemSearchUrl } from "./desktop/webSearch";
 import { resolveOmniboxUrl } from "../shared/omnibox";
 import { parseThemePreference } from "../shared/themePreference";
+import { productIpcChannel } from "../shared/product";
 import { getOpenAtLogin, setOpenAtLogin } from "./desktop/loginItem";
 
 function savePublishSettings(
@@ -118,14 +119,15 @@ export function registerIpc(
   const toastOverlay = new ToastOverlayWindow(window);
   const tooltipOverlay = new TooltipOverlayView(window);
   const nativePopup = new NativePopupView(window, (event) => {
-    if (!window.isDestroyed()) window.webContents.send("mediax:native-popup-event", event);
+    if (!window.isDestroyed())
+      window.webContents.send(productIpcChannel("native-popup-event"), event);
   });
   accounts.setBrowserPageInteraction(() => {
     nativePopup.hide();
     // Native page focus does not reliably blur the main renderer's active input.
     // Notify even when the history popup was empty or already closed.
     if (!window.isDestroyed())
-      window.webContents.send("mediax:native-popup-event", { type: "closed" });
+      window.webContents.send(productIpcChannel("native-popup-event"), { type: "closed" });
   });
   const publishing = new PublishService(
     db,
@@ -148,7 +150,7 @@ export function registerIpc(
     return value;
   };
   const on = (name: string, fn: (...args: any[]) => unknown) =>
-    ipcMain.handle(`mediax:${name}`, async (event, ...args) => {
+    ipcMain.handle(productIpcChannel(name), async (event, ...args) => {
       if (
         event.sender !== window.webContents ||
         event.senderFrame !== window.webContents.mainFrame
@@ -431,7 +433,7 @@ export function registerIpc(
   on("hideTooltipOverlay", () => tooltipOverlay.hide());
   const fromMainRenderer = (sender: Electron.WebContents) =>
     sender === window.webContents && !window.isDestroyed();
-  ipcMain.on("mediax:native-popup-host-show", (event, value) => {
+  ipcMain.on(productIpcChannel("native-popup-host-show"), (event, value) => {
     if (!fromMainRenderer(event.sender)) return;
     try {
       nativePopup.show(parseNativePopup(value));
@@ -441,11 +443,11 @@ export function registerIpc(
       });
     }
   });
-  ipcMain.on("mediax:native-popup-host-hide", (event) => {
+  ipcMain.on(productIpcChannel("native-popup-host-hide"), (event) => {
     if (!fromMainRenderer(event.sender)) return;
     nativePopup.hide();
   });
-  ipcMain.on("mediax:native-popup-notify", (event, value) => {
+  ipcMain.on(productIpcChannel("native-popup-notify"), (event, value) => {
     if (!nativePopup.owns(event.sender)) return;
     if (!value || typeof value !== "object") return;
     if (value.type === "ready") {
@@ -459,7 +461,7 @@ export function registerIpc(
     if (value.type === "action") {
       const action = parseNativePopupAction(value.action);
       if (!action || window.isDestroyed()) return;
-      window.webContents.send("mediax:native-popup-event", { type: "action", action });
+      window.webContents.send(productIpcChannel("native-popup-event"), { type: "action", action });
     }
   });
   on("refreshAccount", (id) => accounts.refresh(text(id)));

@@ -1,9 +1,10 @@
 import "electron-log/preload";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { DesktopApi, DesktopCommand } from "../shared/models";
+import { productIpcChannel } from "../shared/product";
 import { userErrorMessage } from "../shared/userError";
 const call = (method: string, ...args: unknown[]) =>
-  ipcRenderer.invoke(`mediax:${method}`, ...args).catch((error: unknown) => {
+  ipcRenderer.invoke(productIpcChannel(method), ...args).catch((error: unknown) => {
     throw new Error(userErrorMessage(error));
   });
 const api: DesktopApi = {
@@ -20,8 +21,9 @@ const api: DesktopApi = {
       id: string,
       navigation: Parameters<typeof listener>[1],
     ) => listener(id, navigation);
-    ipcRenderer.on("mediax:browser-navigation-changed", receive);
-    return () => ipcRenderer.removeListener("mediax:browser-navigation-changed", receive);
+    ipcRenderer.on(productIpcChannel("browser-navigation-changed"), receive);
+    return () =>
+      ipcRenderer.removeListener(productIpcChannel("browser-navigation-changed"), receive);
   },
   browserHistory: (query) => call("browserHistory", query),
   removeBrowserHistory: (url) => call("removeBrowserHistory", url),
@@ -44,32 +46,32 @@ const api: DesktopApi = {
   onNativeToastDismissed: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, event: Parameters<typeof listener>[0]) =>
       listener(event);
-    ipcRenderer.on("mediax:toast-dismissed", receive);
-    return () => ipcRenderer.removeListener("mediax:toast-dismissed", receive);
+    ipcRenderer.on(productIpcChannel("toast-dismissed"), receive);
+    return () => ipcRenderer.removeListener(productIpcChannel("toast-dismissed"), receive);
   },
   showTooltipOverlay: (overlay) => call("showTooltipOverlay", overlay),
   hideTooltipOverlay: () => call("hideTooltipOverlay"),
   showNativePopup: (popup) => {
-    ipcRenderer.send("mediax:native-popup-host-show", popup);
+    ipcRenderer.send(productIpcChannel("native-popup-host-show"), popup);
     return Promise.resolve();
   },
   hideNativePopup: () => {
-    ipcRenderer.send("mediax:native-popup-host-hide");
+    ipcRenderer.send(productIpcChannel("native-popup-host-hide"));
     return Promise.resolve();
   },
   onNativePopup: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, popup: Parameters<typeof listener>[0]) =>
       listener(popup);
-    ipcRenderer.on("mediax:native-popup", receive);
-    return () => ipcRenderer.removeListener("mediax:native-popup", receive);
+    ipcRenderer.on(productIpcChannel("native-popup"), receive);
+    return () => ipcRenderer.removeListener(productIpcChannel("native-popup"), receive);
   },
   onNativePopupHostEvent: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, event: Parameters<typeof listener>[0]) =>
       listener(event);
-    ipcRenderer.on("mediax:native-popup-event", receive);
-    return () => ipcRenderer.removeListener("mediax:native-popup-event", receive);
+    ipcRenderer.on(productIpcChannel("native-popup-event"), receive);
+    return () => ipcRenderer.removeListener(productIpcChannel("native-popup-event"), receive);
   },
-  notifyNativePopup: (event) => ipcRenderer.send("mediax:native-popup-notify", event),
+  notifyNativePopup: (event) => ipcRenderer.send(productIpcChannel("native-popup-notify"), event),
   closeAccountBrowser: (id) => call("closeAccountBrowser", id),
   shortcutSettings: () => call("shortcutSettings"),
   setGlobalShortcut: (accelerator) => call("setGlobalShortcut", accelerator),
@@ -85,9 +87,9 @@ const api: DesktopApi = {
   onUpdateStatus: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, status: Parameters<typeof listener>[0]) =>
       listener(status);
-    ipcRenderer.on("mediax:update-status", receive);
+    ipcRenderer.on(productIpcChannel("update-status"), receive);
     return () => {
-      ipcRenderer.removeListener("mediax:update-status", receive);
+      ipcRenderer.removeListener(productIpcChannel("update-status"), receive);
     };
   },
   publishPresets: () => call("publishPresets"),
@@ -116,10 +118,10 @@ const api: DesktopApi = {
   onCommand: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, command: DesktopCommand) =>
       listener(command);
-    ipcRenderer.on("mediax:command", receive);
+    ipcRenderer.on(productIpcChannel("command"), receive);
     void call("rendererReady");
     return () => {
-      ipcRenderer.removeListener("mediax:command", receive);
+      ipcRenderer.removeListener(productIpcChannel("command"), receive);
     };
   },
   accountGroups: () => call("accountGroups"),
@@ -143,9 +145,9 @@ const api: DesktopApi = {
   onDownloadsChanged: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, items: Parameters<typeof listener>[0]) =>
       listener(items);
-    ipcRenderer.on("mediax:downloads-changed", receive);
+    ipcRenderer.on(productIpcChannel("downloads-changed"), receive);
     return () => {
-      ipcRenderer.removeListener("mediax:downloads-changed", receive);
+      ipcRenderer.removeListener(productIpcChannel("downloads-changed"), receive);
     };
   },
   openExternalUrl: (url) => call("openExternalUrl", url),
@@ -170,8 +172,8 @@ const api: DesktopApi = {
 contextBridge.exposeInMainWorld("desktop", api);
 contextBridge.exposeInMainWorld("trayDrop", {
   pathForFile: (file: File) => webUtils.getPathForFile(file),
-  setHot: (hot: boolean) => ipcRenderer.send("mediax:tray-drop-hot", hot),
-  dropped: (paths: string[]) => ipcRenderer.send("mediax:tray-drop-files", paths),
+  setHot: (hot: boolean) => ipcRenderer.send(productIpcChannel("tray-drop-hot"), hot),
+  dropped: (paths: string[]) => ipcRenderer.send(productIpcChannel("tray-drop-files"), paths),
 });
 
 // Read-only platform metadata lets CSS provide an opaque fallback outside macOS.

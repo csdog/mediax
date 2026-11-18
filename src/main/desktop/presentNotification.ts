@@ -1,6 +1,7 @@
 import { app, Notification, shell, type BrowserWindow } from "electron";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { productIpcChannel } from "../../shared/product";
 
 const execFileAsync = promisify(execFile);
 
@@ -23,7 +24,7 @@ async function showMacScriptNotification(title: string, body: string, silent?: b
 
 function showInAppToast(window: BrowserWindow | null, title: string, body: string) {
   if (!window || window.isDestroyed()) return false;
-  window.webContents.send("mediax:command", {
+  window.webContents.send(productIpcChannel("command"), {
     action: "toast",
     title,
     body,

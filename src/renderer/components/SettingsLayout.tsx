@@ -31,6 +31,7 @@ import {
 import { ProfileMark } from "@/components/ProfileMark";
 import { PanelErrorBoundary } from "@/components/PanelErrorBoundary";
 import type { UpdateStatus } from "../../shared/models";
+import { productProtocol } from "../../shared/product";
 import type { NotificationSettings } from "../../shared/notificationSettings";
 import type { ThemePreference } from "../../shared/themePreference";
 import {
@@ -419,8 +420,8 @@ export function SettingsLayout({
                   </div>
                   <InfoRow
                     title="深度链接"
-                    description="可用 mediax://publish、history、settings 等打开对应页面。"
-                    value="mediax://"
+                    description={`可用 ${productProtocol}://publish、history、settings 等打开对应页面。`}
+                    value={`${productProtocol}://`}
                   />
                 </div>
               </section>

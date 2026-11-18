@@ -3,6 +3,7 @@ import React from "react";
 import { afterEach, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { AppErrorView } from "../../src/renderer/components/AppErrorView";
+import { productId, productIpcChannel } from "../../src/shared/product";
 
 afterEach(cleanup);
 
@@ -21,11 +22,13 @@ it("shows the useful account instruction without the IPC wrapper", () => {
     <AppErrorView
       error={
         new Error(
-          "Error invoking remote method 'mediax:refreshAccount': Error: 请在账号标签页中登录 头条号",
+          `Error invoking remote method '${productIpcChannel("refreshAccount")}': Error: 请在账号标签页中登录 头条号`,
         )
       }
     />,
   );
   expect(screen.getByRole("alert").textContent).toContain("请在账号标签页中登录 头条号");
-  expect(screen.getByRole("alert").textContent).not.toMatch(/mediax:|Error|remote method/);
+  expect(screen.getByRole("alert").textContent).not.toMatch(
+    new RegExp(`${productId}:|Error|remote method`),
+  );
 });
